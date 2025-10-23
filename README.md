@@ -93,7 +93,7 @@ Apretá Enter para aceptar la ruta por defecto (~/.ssh/id_ed25519)
 
 Podés dejar passphrase vacía (Enter) o poner una (más seguro) 
 
-### 3) Mostrar la clave pública (esta sí se copia a GitHub) 
+### 3) Mostrar la clave pública (esta sí se copia a GitHub -> <a href="https://github.com/settings/keys" target="_blank" style="background:#24292e;color:white;padding:8px 12px;border-radius:6px;text-decoration:none;">  🔑 GitHub Keys</a>) 
 
 `cat ~/.ssh/id_ed25519.pub`
 
