@@ -36,6 +36,7 @@ Open your command console and type:
 ssh argentv.local
 
 You might see the following message:
+
 <img width="688" height="245" alt="GetImage(5)" src="https://github.com/user-attachments/assets/33ae5eb5-0f7b-4cea-a7e9-fd71d36787e5" />
 
 If that happens, try this:
@@ -90,14 +91,39 @@ GitHub → your avatar → Settings → SSH and GPG keys → New SSH key → pas
 If everything works, you’ll get a message like:
 "Hi [user]! You’ve successfully authenticated, but GitHub does not provide shell access."
 
+### 6) Clone the GitHub Repository
 Now let’s prepare the directory where we’ll clone the repository.
-Make sure /srv exists (it usually does) and give ownership to your user (again, my username is rs, but replace it with yours):
+The folder /srv usually exists by default, but if it doesn’t, you can create it:
+
+`sudo mkdir -p /srv`
+
+Next, give ownership of that folder to your current user (replace rs with your own username).
+This allows you to write inside /srv without using sudo all the time:
+
+`sudo chown -R rs:rs /srv`
+
+#### Option A – Clone using HTTPS (easiest)
+This is the recommended method if you haven’t set up SSH keys in GitHub.
+```
+cd /srv
+git clone https://github.com/rsappia/TVArgenta-Release.git tvargenta
+cd /srv/tvargenta
+```
+#### Option B – Clone using SSH (for advanced users)
+Use this if you already have an SSH key configured in your GitHub account.
 ```
 cd /srv
 git clone git@github.com:rsappia/TVArgenta-Release.git tvargenta
 cd /srv/tvargenta
 ```
+It should look like this:
+
 <img width="729" height="202" alt="GetImage(8)" src="https://github.com/user-attachments/assets/28d59e5f-dd75-451f-a5ad-3bd34a4ce57b" />
+
+#### Tip:
+If you get an error like
+Permission denied (publickey)
+it simply means you’re trying the SSH method without having SSH keys set up. In that case, just use the HTTPS version above — it works exactly the same.
 
 ## Install system and project dependencies
 
