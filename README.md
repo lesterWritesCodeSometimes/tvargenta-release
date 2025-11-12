@@ -47,6 +47,9 @@ Esta versión marca un paso enorme para TVArgenta — ya no es solo una experien
 Esta imagen está pensada para Raspberry Pi 4 (2 GB o más) y se basa en Raspberry Pi OS Bookworm.
 Incluye todos los scripts, dependencias y servicios de inicio ya configurados.
 
+📦 **DDescargar la imagen oficial:**  
+[TVArgenta v2.0 on Archive.org](https://archive.org/details/2025-11-11-tvargenta-public-v-2.img)
+
 ### Método recomendado (Raspberry Pi Imager)
 - 1.Descargá el archivo .img.xz desde el release oficial o el mirror en Archive.org
 - 2.Abrí Raspberry Pi Imager → Elegir sistema operativo → Usar imagen personalizada → seleccioná el archivo descargado.
