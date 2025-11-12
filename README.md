@@ -27,6 +27,63 @@
 # TVArgenta---Retro-TV
 TVArgenta es una TV retro hecha con Raspberry Pi que revive la experiencia de hacer zapping entre publicidades y contenido offline. Incluye un backend local para gestionar videos, canales y metadatos, todo dentro de una carcasa 3D impresa.
 
+-------------------------------------------------------------
+# TVArgenta v2.0 — Gran Actualización
+
+Esta versión marca un paso enorme para TVArgenta — ya no es solo una experiencia de TV retro con Raspberry Pi, sino un sistema más completo, autónomo y fácil de usar.
+
+## Novedades principales
+
+- Imagen del sistema lista para flashear — no requiere configuración manual.
+- Integración con RetroPie — cambio fluido entre modo TV y modo juegos.
+- Emparejamiento Bluetooth para mandos — conectá tus controladores fácilmente, con cable o inalámbricos.
+- Gestión de redes Wi-Fi — interfaz mejorada para conectar o cambiar de red directamente desde la TV.
+- Rediseño de las páginas de gestión web — administración más clara y moderna del contenido.
+- Nuevos menús en pantalla (overlay) — navegación más ágil directamente desde la interfaz del televisor.
+
+## Cómo flashear la imagen
+
+Esta imagen está pensada para Raspberry Pi 4 (2 GB o más) y se basa en Raspberry Pi OS Bookworm.
+Incluye todos los scripts, dependencias y servicios de inicio ya configurados.
+
+### Método recomendado (Raspberry Pi Imager)
+- 1.Descargá el archivo .img.xz desde el release oficial o el mirror en Archive.org
+- 2.Abrí Raspberry Pi Imager → Elegir sistema operativo → Usar imagen personalizada → seleccioná el archivo descargado.
+- 3.Elegí tu tarjeta SD (mínimo 32 GB).
+- 4.⚠️ Cuando aparezca la pregunta “¿Editar configuración antes de flashear?”, seleccioná “No”.
+  - No cambies la configuración de Wi-Fi, nombre de host, usuario o contraseña.
+  - La imagen ya contiene su propia configuración interna.
+  - Si modificás estos valores, algunos scripts pueden dejar de funcionar o generar conflictos con la red Wi-Fi.
+- 5.Esperá a que el proceso de flasheo y verificación termine, y luego expulsá la tarjeta con seguridad.
+- 6.Insertala en la Raspberry Pi 4 y encendela — el sistema iniciará directamente en la interfaz de TVArgenta.
+
+## Verificación de integridad y autenticidad
+
+Antes de usar la imagen, se recomienda verificar su integridad y autenticidad.
+```
+# Verify integrity
+sha256sum -c TVArgenta_v2.0.sha256
+
+# Verify authenticity (optional)
+gpg --verify TVArgenta_v2.0.sha256.asc
+```
+Si ambos comandos muestran “OK”, la imagen está verificada correctamente.
+
+## ⚠️ Aviso importante
+
+Esta imagen se ofrece tal cual (“as-is”), sin ningún tipo de garantía o responsabilidad por parte del autor.
+El uso es bajo tu propia responsabilidad.
+
+Modificar los parámetros preconfigurados (red, usuario, comportamiento de arranque, etc.) no está soportado y puede causar fallos o comportamientos inesperados.
+Cualquier modificación se realiza bajo exclusiva responsabilidad del usuario.
+
+## Licencia
+
+Creative Commons Attribution – NonCommercial – NoDerivs 4.0 International
+(CC BY-NC-ND 4.0)
+
+-------------------------------------------------------------
+# Para quienes quieran hacerlo todo a mano
 
 # Primera parte: Configuracion basica de la Raspberry Pi
 
