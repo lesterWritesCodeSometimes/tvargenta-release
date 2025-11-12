@@ -39,6 +39,7 @@ Esta versión marca un paso enorme para TVArgenta — ya no es solo una experien
 - Emparejamiento Bluetooth para mandos — conectá tus controladores fácilmente, con cable o inalámbricos.
 - Gestión de redes Wi-Fi — interfaz mejorada para conectar o cambiar de red directamente desde la TV.
 - Rediseño de las páginas de gestión web — administración más clara y moderna del contenido.
+- Implementacion multi idioma (ES / EN / DE)
 - Nuevos menús en pantalla (overlay) — navegación más ágil directamente desde la interfaz del televisor.
 
 ## Cómo flashear la imagen
