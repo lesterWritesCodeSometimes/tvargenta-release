@@ -22,7 +22,7 @@
 </head>
 <body>
   <!-- Tip: arrancar muted para que el autoplay SIEMPRE dispare; desmuteamos en 'playing' -->
-  <video id="v" autoplay muted playsinline preload="auto" poster="">
+  <video id="v" autoplay muted playsinline preload="auto" poster="" disableRemotePlayback>
     <source src="{{ video_url }}?v={{ '%d'|format((range(1)|length)) }}" type="video/mp4">
   </video>
   <button class="skip" onclick="cleanupAndGo()">Saltar intro</button>
