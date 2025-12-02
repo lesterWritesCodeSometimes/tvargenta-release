@@ -21,6 +21,7 @@ VCR_PAUSE_TRIGGER = "/tmp/trigger_vcr_pause.json"
 VCR_REWIND_TRIGGER = "/tmp/trigger_vcr_rewind.json"
 VCR_COUNTDOWN_TRIGGER = "/tmp/trigger_vcr_countdown.json"
 VCR_CHANNEL_ID = "03"  # Channel 3 is VCR input
+VCR_TAP_THRESHOLD = 0.4  # Seconds - releases before this are "tap" (pause/play)
 VCR_REWIND_HOLD_SECONDS = 3.0  # Hold button for 3 seconds to start rewind
 
 estado = "idle"          # idle | evaluando | volume | vcr_hold
@@ -30,7 +31,7 @@ last_volume_activity = 0.0
 
 # VCR-specific state
 vcr_btn_press_time = 0.0  # When button was pressed on VCR channel
-vcr_countdown_active = False
+vcr_countdown_active = False  # True once we've passed tap threshold and shown countdown
 
 DEFAULT_VOL = 25  # porcentaje
 
@@ -217,11 +218,18 @@ def trigger_vcr_countdown(seconds_remaining):
         print(f"[{ts()}] [VCR] Error updating countdown: {e}")
 
 if __name__ == "__main__":
+    import select
+
     print(f"[{ts()}] [ENCODER] Escuchando salida de ./encoder_reader")
     proc = subprocess.Popen(["./encoder_reader"], stdout=subprocess.PIPE, text=True)
 
+    last_countdown_value = None  # Track last countdown to avoid spamming
+
     try:
-        for raw in proc.stdout:
+        while True:
+            # Use select with timeout to allow watchdog checks even without input
+            ready, _, _ = select.select([proc.stdout], [], [], 0.2)
+
             # --- watchdog de volumen ---
             if estado == "volume" and last_volume_activity and (time.time() - last_volume_activity) > 3.2:
                 estado = ultimo_estado
@@ -231,18 +239,39 @@ if __name__ == "__main__":
             # --- VCR hold watchdog: update countdown while button held ---
             if estado == "vcr_hold" and vcr_btn_press_time > 0:
                 elapsed = time.time() - vcr_btn_press_time
+
                 if elapsed >= VCR_REWIND_HOLD_SECONDS:
                     # Held long enough - trigger rewind
                     trigger_vcr_rewind()
                     trigger_vcr_countdown(None)  # Clear countdown
                     vcr_btn_press_time = 0.0
                     vcr_countdown_active = False
+                    last_countdown_value = None
                     estado = "idle"
                     print(f"[{ts()}] [VCR] Rewind initiated after {VCR_REWIND_HOLD_SECONDS}s hold")
-                else:
-                    # Update countdown display
+
+                elif elapsed >= VCR_TAP_THRESHOLD:
+                    # Past tap threshold - this is a hold, show/update countdown
+                    if not vcr_countdown_active:
+                        # First time past threshold - activate countdown mode
+                        vcr_countdown_active = True
+                        print(f"[{ts()}] [VCR] Hold detected, starting countdown")
+
+                    # Calculate remaining time for rewind (countdown from threshold point)
+                    # Time remaining = REWIND_HOLD - elapsed
                     remaining = int(VCR_REWIND_HOLD_SECONDS - elapsed) + 1
-                    trigger_vcr_countdown(remaining)
+                    if remaining != last_countdown_value and remaining > 0:
+                        trigger_vcr_countdown(remaining)
+                        last_countdown_value = remaining
+                # else: still in tap window, don't show anything yet
+
+            # Process input if available
+            if not ready:
+                continue
+
+            raw = proc.stdout.readline()
+            if not raw:  # EOF - process ended
+                break
 
             line = raw.strip()
             if not line:
@@ -290,14 +319,16 @@ if __name__ == "__main__":
                 if estado == "idle":
                     # Check if we're on VCR channel with tape inserted
                     if is_vcr_channel() and vcr_has_tape() and not vcr_is_rewinding():
-                        # VCR mode: start tracking hold time for rewind
+                        # VCR mode: start tracking hold time
+                        # Don't show countdown yet - wait for TAP_THRESHOLD to distinguish tap from hold
                         estado = "vcr_hold"
                         vcr_btn_press_time = time.time()
-                        vcr_countdown_active = True
+                        vcr_countdown_active = False  # Will become True after TAP_THRESHOLD
                         hubo_giro = False
-                        print(f"[{ts()}] [VCR] Button pressed, starting hold timer for rewind")
-                        # Show initial countdown
-                        trigger_vcr_countdown(int(VCR_REWIND_HOLD_SECONDS))
+                        print(f"[{ts()}] [VCR] Button pressed, waiting to distinguish tap/hold")
+                    elif is_vcr_channel():
+                        # On VCR channel but no tape or rewinding - ignore button
+                        print(f"[{ts()}] [VCR] Button ignored (no tape or rewinding)")
                     else:
                         # Normal mode
                         ultimo_estado = estado
@@ -310,17 +341,25 @@ if __name__ == "__main__":
                 if estado == "vcr_hold":
                     # VCR mode: check how long button was held
                     elapsed = time.time() - vcr_btn_press_time
-                    trigger_vcr_countdown(None)  # Clear countdown
+
+                    # Clear countdown display if it was shown
+                    if vcr_countdown_active:
+                        trigger_vcr_countdown(None)
+
                     vcr_btn_press_time = 0.0
                     vcr_countdown_active = False
+                    last_countdown_value = None
 
                     if elapsed >= VCR_REWIND_HOLD_SECONDS:
                         # Already triggered rewind in watchdog
-                        pass
-                    elif not hubo_giro:
-                        # Short press without rotation: toggle pause
+                        print(f"[{ts()}] [VCR] Released after rewind triggered")
+                    elif elapsed < VCR_TAP_THRESHOLD and not hubo_giro:
+                        # Quick tap (before threshold) without rotation: toggle pause
                         trigger_vcr_pause()
-                        print(f"[{ts()}] [VCR] Short press -> pause/play toggle")
+                        print(f"[{ts()}] [VCR] Quick tap ({elapsed:.2f}s) -> pause/play toggle")
+                    else:
+                        # Released after threshold but before rewind - countdown was cancelled
+                        print(f"[{ts()}] [VCR] Hold cancelled after {elapsed:.2f}s")
 
                     estado = "idle"
 

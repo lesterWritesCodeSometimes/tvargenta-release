@@ -2154,6 +2154,50 @@ def api_vcr_rewind():
         return jsonify({"ok": False, "error": str(e)}), 500
 
 
+# Track last processed trigger mtimes to avoid duplicate processing
+_last_pause_trigger_mtime = 0.0
+_last_rewind_trigger_mtime = 0.0
+
+@app.get("/api/vcr/check_pause_trigger")
+def api_vcr_check_pause_trigger():
+    """Check if encoder sent a pause trigger and consume it."""
+    global _last_pause_trigger_mtime
+    trigger_path = Path("/tmp/trigger_vcr_pause.json")
+    try:
+        if trigger_path.exists():
+            mtime = trigger_path.stat().st_mtime
+            if mtime > _last_pause_trigger_mtime:
+                _last_pause_trigger_mtime = mtime
+                # New trigger - toggle pause
+                is_paused = vcr_manager.toggle_pause()
+                logger.info(f"[API][VCR] pause trigger consumed -> is_paused={is_paused}")
+                return jsonify({"ok": True, "triggered": True, "is_paused": is_paused})
+        return jsonify({"ok": True, "triggered": False})
+    except Exception as e:
+        logger.error(f"[API][VCR] check_pause_trigger error: {e}")
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
+@app.get("/api/vcr/check_rewind_trigger")
+def api_vcr_check_rewind_trigger():
+    """Check if encoder sent a rewind trigger and consume it."""
+    global _last_rewind_trigger_mtime
+    trigger_path = Path("/tmp/trigger_vcr_rewind.json")
+    try:
+        if trigger_path.exists():
+            mtime = trigger_path.stat().st_mtime
+            if mtime > _last_rewind_trigger_mtime:
+                _last_rewind_trigger_mtime = mtime
+                # New trigger - start rewind
+                started = vcr_manager.start_rewind()
+                logger.info(f"[API][VCR] rewind trigger consumed -> started={started}")
+                return jsonify({"ok": True, "triggered": True, "started": started})
+        return jsonify({"ok": True, "triggered": False})
+    except Exception as e:
+        logger.error(f"[API][VCR] check_rewind_trigger error: {e}")
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
 @app.post("/api/vcr/seek")
 def api_vcr_seek():
     """Seek to a specific position (for admin/debug)."""
@@ -2464,6 +2508,9 @@ if __name__ == "__main__":
         os.remove("/tmp/tvargenta_kiosk_launched")
     except FileNotFoundError:
         pass
+
+    # Clear any stale VCR state from previous session
+    vcr_manager.clear_stale_vcr_state()
 
     #  Asegurarse de que NO quede ningÃºn encoder viejo corriendo
     try:

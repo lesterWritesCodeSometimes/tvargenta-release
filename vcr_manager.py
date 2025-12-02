@@ -22,8 +22,10 @@ from settings import (
     CONTENT_DIR,
 )
 
-# Rewind takes 2 minutes (120 seconds)
-REWIND_DURATION_SEC = 120.0
+# Rewind speed: 2 minutes (120 sec) per 90 minutes (5400 sec) of playback
+# Formula: rewind_duration = position_sec / 45
+REWIND_SEC_PER_PLAYBACK_SEC = 45.0  # 45 seconds of playback = 1 second of rewind
+MIN_REWIND_DURATION_SEC = 3.0  # Minimum rewind time for very short positions
 
 # How often to persist position to disk (seconds)
 POSITION_PERSIST_INTERVAL = 30.0
@@ -67,6 +69,8 @@ def get_default_vcr_state() -> dict:
         "is_paused": False,
         "is_rewinding": False,
         "rewind_started_at": None,
+        "rewind_duration_sec": 0.0,  # Calculated based on position
+        "rewind_original_position": 0.0,  # Position when rewind started
         "unknown_tape_uid": None,  # For unregistered tapes
         "updated_at": datetime.now().isoformat(),
     }
@@ -86,6 +90,41 @@ def save_vcr_state(state: dict) -> None:
 def trigger_vcr_update() -> None:
     """Touch the VCR trigger file to notify frontend of state change."""
     _write_json_atomic(VCR_TRIGGER_FILE, {"timestamp": time.time()})
+
+
+def clear_stale_vcr_state() -> None:
+    """
+    Clear any stale VCR state on app startup.
+    Resets rewind/pause states that may have persisted from a previous session.
+    """
+    state = load_vcr_state()
+    changed = False
+
+    # Clear any in-progress rewind (can't resume a rewind across restarts)
+    if state.get("is_rewinding"):
+        state["is_rewinding"] = False
+        state["rewind_started_at"] = None
+        state["rewind_duration_sec"] = 0.0
+        state["rewind_original_position"] = 0.0
+        changed = True
+
+    # Clear pause state (tape needs to be re-inserted anyway)
+    if state.get("is_paused"):
+        state["is_paused"] = False
+        changed = True
+
+    # Clear tape state (NFC reader will re-detect if tape is present)
+    if state.get("tape_inserted"):
+        state["tape_inserted"] = False
+        state["tape_uid"] = None
+        state["video_id"] = None
+        state["title"] = None
+        state["duration_sec"] = 0.0
+        state["position_sec"] = 0.0
+        changed = True
+
+    if changed:
+        save_vcr_state(state)
 
 
 def set_reader_attached(attached: bool) -> None:
@@ -117,6 +156,8 @@ def set_tape_inserted(uid: str, video_id: str, title: str,
     state["is_paused"] = False
     state["is_rewinding"] = False
     state["rewind_started_at"] = None
+    state["rewind_duration_sec"] = 0.0
+    state["rewind_original_position"] = 0.0
     state["unknown_tape_uid"] = None
     save_vcr_state(state)
     trigger_vcr_update()
@@ -151,6 +192,8 @@ def set_tape_removed() -> None:
     state["is_paused"] = False
     state["is_rewinding"] = False
     state["rewind_started_at"] = None
+    state["rewind_duration_sec"] = 0.0
+    state["rewind_original_position"] = 0.0
     state["unknown_tape_uid"] = None
     save_vcr_state(state)
     trigger_vcr_update()
@@ -168,15 +211,29 @@ def toggle_pause() -> bool:
     return state["is_paused"]
 
 
+def calculate_rewind_duration(position_sec: float) -> float:
+    """
+    Calculate how long rewind should take based on current position.
+    Formula: 2 minutes per 90 minutes of playback (position_sec / 45).
+    """
+    duration = position_sec / REWIND_SEC_PER_PLAYBACK_SEC
+    return max(MIN_REWIND_DURATION_SEC, duration)
+
+
 def start_rewind() -> bool:
     """Start the rewind process. Returns True if started."""
     state = load_vcr_state()
     if not state["tape_inserted"] or state["is_rewinding"]:
         return False
 
+    position = state.get("position_sec", 0.0)
+    rewind_duration = calculate_rewind_duration(position)
+
     state["is_paused"] = False
     state["is_rewinding"] = True
     state["rewind_started_at"] = time.time()
+    state["rewind_duration_sec"] = rewind_duration
+    state["rewind_original_position"] = position
     save_vcr_state(state)
     trigger_vcr_update()
     return True
@@ -190,20 +247,27 @@ def check_rewind_progress() -> dict:
 
     started = state.get("rewind_started_at", 0)
     elapsed = time.time() - started
-    progress = min(1.0, elapsed / REWIND_DURATION_SEC)
+
+    # Use stored rewind duration (calculated based on position when rewind started)
+    rewind_duration = state.get("rewind_duration_sec", MIN_REWIND_DURATION_SEC)
+    if rewind_duration <= 0:
+        rewind_duration = MIN_REWIND_DURATION_SEC
+
+    progress = min(1.0, elapsed / rewind_duration)
 
     # Calculate position based on rewind progress
-    # Position decreases linearly from start_position to 0
-    original_position = state.get("position_sec", 0)
+    # Position decreases linearly from original_position to 0
+    original_position = state.get("rewind_original_position", state.get("position_sec", 0))
     current_position = original_position * (1.0 - progress)
 
-    complete = elapsed >= REWIND_DURATION_SEC
+    complete = elapsed >= rewind_duration
 
     return {
         "rewinding": True,
         "progress": progress,
         "elapsed_sec": elapsed,
-        "remaining_sec": max(0, REWIND_DURATION_SEC - elapsed),
+        "total_duration_sec": rewind_duration,
+        "remaining_sec": max(0, rewind_duration - elapsed),
         "position_sec": current_position,
         "complete": complete,
     }
@@ -214,6 +278,8 @@ def complete_rewind() -> None:
     state = load_vcr_state()
     state["is_rewinding"] = False
     state["rewind_started_at"] = None
+    state["rewind_duration_sec"] = 0.0
+    state["rewind_original_position"] = 0.0
     state["position_sec"] = 0.0
     state["is_paused"] = True  # Paused at start, ready to play
     save_vcr_state(state)

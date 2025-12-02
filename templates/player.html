@@ -441,20 +441,17 @@
 	  top: 50%;
 	  left: 50%;
 	  transform: translate(-50%, -50%);
-	  background: rgba(0, 0, 0, 0.8);
-	  border: 3px solid white;
-	  padding: 20px 40px;
-	  font-family: "Lucida Console", monospace;
-	  font-size: 48px;
-	  color: white;
-	  letter-spacing: 4px;
+	  display: flex;
+	  gap: 16px;
 	  z-index: 9996;
-	  animation: vcr-pause-blink 1s ease-in-out infinite;
 	}
 
-	@keyframes vcr-pause-blink {
-	  0%, 100% { opacity: 1; }
-	  50% { opacity: 0.5; }
+	#vcr-paused .pause-bar {
+	  width: 24px;
+	  height: 80px;
+	  background: white;
+	  border-radius: 4px;
+	  box-shadow: 2px 2px 8px rgba(0, 0, 0, 0.6);
 	}
 
 	#vcr-countdown {
@@ -555,6 +552,10 @@
 <!-- VCR (NFC Mini VHS) Elements -->
 <canvas id="vcr-noise" class="vcr-fullscreen hidden"></canvas>
 
+<video id="vcr-static-video" class="vcr-fullscreen hidden" muted playsinline>
+  <source src="/static/vcr_static.mp4" type="video/mp4">
+</video>
+
 <div id="vcr-blue-screen" class="vcr-fullscreen hidden">
   <div id="vcr-blue-text">INSERT TAPE</div>
 </div>
@@ -575,7 +576,10 @@
   <span id="vcr-time">00:00:00</span>
 </div>
 
-<div id="vcr-paused" class="hidden">PAUSED</div>
+<div id="vcr-paused" class="hidden">
+  <div class="pause-bar"></div>
+  <div class="pause-bar"></div>
+</div>
 
 <div id="vcr-countdown" class="hidden">
   Rewind in <span id="vcr-countdown-num">3</span>...
@@ -2369,14 +2373,18 @@ function ejecutarSeleccion() {
 
   // --- VCR (NFC Mini VHS) System ---
   const VCR_CHANNEL_ID = "03";
+  const VCR_STATIC_DURATION_MS = 2000;  // Show static for 2 seconds on tape insert
   let vcrState = null;
   let vcrPollInterval = null;
   let vcrNoiseInterval = null;
   let currentChannelId = null;
   let lastVcrTriggerMtime = 0;
+  let vcrStaticTransitionActive = false;  // True while showing static transition
+  let vcrLastTapeInserted = false;  // Track previous tape_inserted state
 
   // VCR DOM elements
   const vcrNoiseCanvas = document.getElementById("vcr-noise");
+  const vcrStaticVideo = document.getElementById("vcr-static-video");
   const vcrBlueScreen = document.getElementById("vcr-blue-screen");
   const vcrBlueText = document.getElementById("vcr-blue-text");
   const vcrRewindScreen = document.getElementById("vcr-rewind-screen");
@@ -2455,12 +2463,35 @@ function ejecutarSeleccion() {
 
   function hideAllVcrScreens() {
     vcrNoiseCanvas?.classList.add("hidden");
+    vcrStaticVideo?.classList.add("hidden");
+    if (vcrStaticVideo) vcrStaticVideo.pause();
     vcrBlueScreen?.classList.add("hidden");
     vcrRewindScreen?.classList.add("hidden");
     vcrCounter?.classList.add("hidden");
     vcrPausedEl?.classList.add("hidden");
     hideChannelNumber();
     stopWhiteNoise();
+  }
+
+  function showVcrStatic(onComplete) {
+    hideAllVcrScreens();
+    video.style.display = "none";
+
+    if (vcrStaticVideo) {
+      vcrStaticVideo.currentTime = 0;
+      vcrStaticVideo.classList.remove("hidden");
+      vcrStaticVideo.play().catch(e => console.warn("[VCR] static play error:", e));
+
+      // After duration, call the completion callback
+      setTimeout(() => {
+        vcrStaticVideo.pause();
+        vcrStaticVideo.classList.add("hidden");
+        if (onComplete) onComplete();
+      }, VCR_STATIC_DURATION_MS);
+    } else if (onComplete) {
+      // No static video element, just complete immediately
+      onComplete();
+    }
   }
 
   function showVcrWhiteNoise() {
@@ -2528,12 +2559,28 @@ function ejecutarSeleccion() {
   function updateVcrDisplay(state) {
     if (!state) return;
 
+    // Detect tape insertion transition (no tape → tape inserted)
+    const tapeJustInserted = state.tape_inserted && !vcrLastTapeInserted && state.reader_attached;
+    vcrLastTapeInserted = state.tape_inserted;
+
+    // If we're in the middle of a static transition, don't update display
+    if (vcrStaticTransitionActive) {
+      return;
+    }
+
     if (!state.reader_attached) {
       // No NFC reader - show white noise
       showVcrWhiteNoise();
     } else if (!state.tape_inserted) {
       // Reader attached but no tape
       showVcrBlueScreen("INSERT TAPE");
+    } else if (tapeJustInserted && !state.is_rewinding) {
+      // Tape was just inserted - show static first, then playback
+      vcrStaticTransitionActive = true;
+      showVcrStatic(() => {
+        vcrStaticTransitionActive = false;
+        showVcrPlayback(state);
+      });
     } else if (state.is_rewinding) {
       // Rewinding
       const progress = state.rewind_progress?.progress || 0;
@@ -2610,8 +2657,26 @@ function ejecutarSeleccion() {
   // Monitor pause trigger from encoder
   async function checkVcrPauseTrigger() {
     try {
-      const res = await fetch("/api/vcr/pause", { method: "POST" });
-      // Trigger is consumed by posting to it
+      const res = await fetch("/api/vcr/check_pause_trigger");
+      const data = await res.json();
+      if (data.ok && data.triggered) {
+        console.log("[VCR] Pause triggered, is_paused:", data.is_paused);
+        pollVcrState(); // Refresh state
+      }
+    } catch (e) {
+      // Ignore
+    }
+  }
+
+  // Monitor rewind trigger from encoder
+  async function checkVcrRewindTrigger() {
+    try {
+      const res = await fetch("/api/vcr/check_rewind_trigger");
+      const data = await res.json();
+      if (data.ok && data.triggered) {
+        console.log("[VCR] Rewind triggered");
+        pollVcrState(); // Refresh state
+      }
     } catch (e) {
       // Ignore
     }
@@ -2634,13 +2699,12 @@ function ejecutarSeleccion() {
   // Poll for VCR trigger changes (more efficient than constant state polling)
   setInterval(checkVcrTrigger, 500);
 
-  // Poll for countdown trigger
-  setInterval(async () => {
+  // Poll for encoder button triggers (pause/rewind) when on VCR channel
+  setInterval(() => {
     if (currentChannelId === VCR_CHANNEL_ID) {
-      try {
-        const res = await fetch("/tmp/trigger_vcr_countdown.json");
-        // This won't work directly from browser - need API endpoint
-      } catch (e) {}
+      checkVcrPauseTrigger();
+      checkVcrRewindTrigger();
+      checkVcrCountdown();
     }
   }, 200);
 
