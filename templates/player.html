@@ -1023,6 +1023,21 @@
 
 
     video.addEventListener('ended', () => {
+      // Check if we're on VCR channel - auto-rewind like a real VCR
+      if (currentChannelId === VCR_CHANNEL_ID && vcrState?.tape_inserted && !vcrState?.is_rewinding) {
+        console.log("[VCR] Tape ended - auto-rewinding");
+        fetch("/api/vcr/rewind", { method: "POST" })
+          .then(res => res.json())
+          .then(data => {
+            if (data.ok) {
+              pollVcrState();  // Update display to show rewind screen
+            }
+          })
+          .catch(e => console.error("[VCR] auto-rewind error:", e));
+        return;
+      }
+
+      // Normal channel behavior - load next video
       // Si por algún motivo no se reportó (video muy corto, etc.), reportá ahora:
 	  if (currentVideo && playedReportedFor !== currentVideo) {
 		playedReportedFor = currentVideo;
