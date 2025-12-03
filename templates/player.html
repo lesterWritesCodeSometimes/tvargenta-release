@@ -496,7 +496,7 @@
   
 </head>
 <body>
-  <video id="tvVideo" autoplay playsinline></video>
+  <video id="tvVideo" autoplay playsinline disableRemotePlayback></video>
   <div id="channel-indicator" class="hidden" style="position:fixed !important; z-index:2147483647 !important;"></div>
   <div id="overlay">{{ tr("overlay.loading_channel") }}</div>
   <div id="barra-volumen" class="oculto">
@@ -552,7 +552,7 @@
 <!-- VCR (NFC Mini VHS) Elements -->
 <canvas id="vcr-noise" class="vcr-fullscreen hidden"></canvas>
 
-<video id="vcr-static-video" class="vcr-fullscreen hidden" muted playsinline>
+<video id="vcr-static-video" class="vcr-fullscreen hidden" muted playsinline disableRemotePlayback>
   <source src="/static/vcr_static.mp4" type="video/mp4">
 </video>
 
