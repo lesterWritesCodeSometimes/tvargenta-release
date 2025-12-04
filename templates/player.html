@@ -869,6 +869,12 @@
 	  // Stop current video immediately for faster perceived response
 	  video.pause();
 
+	  // Stop VCR polling immediately to prevent race condition where VCR poll
+	  // restarts playback during async fetch (will be restarted if staying on ch 03)
+	  if (typeof stopVcrPolling === 'function') {
+		stopVcrPolling();
+	  }
+
 	  ultimaCarga = Date.now();
 
 	  fetch('/api/next_video', { signal: currentFetchController.signal })
@@ -2396,6 +2402,7 @@ function ejecutarSeleccion() {
   let lastVcrTriggerMtime = 0;
   let vcrStaticTransitionActive = false;  // True while showing static transition
   let vcrLastTapeInserted = false;  // Track previous tape_inserted state
+  let vcrJustSwitchedToChannel = false;  // Skip static transition when switching to VCR channel
 
   // VCR DOM elements
   const vcrNoiseCanvas = document.getElementById("vcr-noise");
@@ -2523,6 +2530,9 @@ function ejecutarSeleccion() {
     vcrBlueScreen?.classList.remove("hidden");
     // Don't show "03" when VCR is attached
     video.style.display = "none";
+    video.pause();  // Stop playback when tape is removed
+    video.removeAttribute("src");  // Clear buffer to avoid stale frame on next play
+    video.load();
   }
 
   function showVcrRewindScreen(progress = 0) {
@@ -2575,8 +2585,10 @@ function ejecutarSeleccion() {
     if (!state) return;
 
     // Detect tape insertion transition (no tape → tape inserted)
-    const tapeJustInserted = state.tape_inserted && !vcrLastTapeInserted && state.reader_attached;
+    // But skip if we just switched to VCR channel (tape was already inserted while away)
+    const tapeJustInserted = state.tape_inserted && !vcrLastTapeInserted && state.reader_attached && !vcrJustSwitchedToChannel;
     vcrLastTapeInserted = state.tape_inserted;
+    vcrJustSwitchedToChannel = false;  // Clear flag after first update
 
     // If we're in the middle of a static transition, don't update display
     if (vcrStaticTransitionActive) {
@@ -2639,6 +2651,7 @@ function ejecutarSeleccion() {
 
   function startVcrPolling() {
     if (vcrPollInterval) return;
+    vcrJustSwitchedToChannel = true;  // Skip static transition on first poll
     pollVcrState(); // Initial poll
     vcrPollInterval = setInterval(pollVcrState, 500);
   }
@@ -2711,8 +2724,12 @@ function ejecutarSeleccion() {
   const originalCargarSiguienteVideo = cargarSiguienteVideo;
   // Note: We'll hook into channel changes via the API response
 
-  // Poll for VCR trigger changes (more efficient than constant state polling)
-  setInterval(checkVcrTrigger, 500);
+  // Poll for VCR trigger changes (only when on VCR channel)
+  setInterval(() => {
+    if (currentChannelId === VCR_CHANNEL_ID) {
+      checkVcrTrigger();
+    }
+  }, 500);
 
   // Poll for encoder button triggers (pause/rewind) when on VCR channel
   setInterval(() => {
