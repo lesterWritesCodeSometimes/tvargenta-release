@@ -2460,81 +2460,41 @@ function ejecutarSeleccion() {
     const outroDuration = vcrRewindBuffer.duration - VCR_REWIND_OUTRO_START;  // ~24s
     const minFullDuration = introDuration + outroDuration;  // ~36s
 
+    // Ensure minimum duration to always play full intro and outro
+    const audioDuration = Math.max(totalDuration, minFullDuration);
+    const middleNeeded = audioDuration - introDuration - outroDuration;
+
     let scheduledTime = vcrAudioContext.currentTime;
 
-    if (totalDuration >= minFullDuration) {
-      // Normal case: Full intro + middle (looped/trimmed) + full outro
-      const middleNeeded = totalDuration - introDuration - outroDuration;
+    // Play intro (full ramp-up)
+    const introSource = vcrAudioContext.createBufferSource();
+    introSource.buffer = vcrRewindBuffer;
+    introSource.connect(vcrAudioContext.destination);
+    introSource.start(scheduledTime, VCR_REWIND_INTRO_START, introDuration);
+    vcrRewindSources.push(introSource);
+    scheduledTime += introDuration;
 
-      // Play intro
-      const introSource = vcrAudioContext.createBufferSource();
-      introSource.buffer = vcrRewindBuffer;
-      introSource.connect(vcrAudioContext.destination);
-      introSource.start(scheduledTime, VCR_REWIND_INTRO_START, introDuration);
-      vcrRewindSources.push(introSource);
-      scheduledTime += introDuration;
-
-      // Play middle section (loop if needed, trim if shorter)
-      let middleRemaining = middleNeeded;
-      while (middleRemaining > 0) {
-        const chunkDuration = Math.min(middleRemaining, middleDuration);
-        const middleSource = vcrAudioContext.createBufferSource();
-        middleSource.buffer = vcrRewindBuffer;
-        middleSource.connect(vcrAudioContext.destination);
-        middleSource.start(scheduledTime, VCR_REWIND_MIDDLE_START, chunkDuration);
-        vcrRewindSources.push(middleSource);
-        scheduledTime += chunkDuration;
-        middleRemaining -= chunkDuration;
-      }
-
-      // Play outro
-      const outroSource = vcrAudioContext.createBufferSource();
-      outroSource.buffer = vcrRewindBuffer;
-      outroSource.connect(vcrAudioContext.destination);
-      outroSource.start(scheduledTime, VCR_REWIND_OUTRO_START, outroDuration);
-      vcrRewindSources.push(outroSource);
-
-    } else if (totalDuration >= 6) {
-      // Medium duration: proportionally scale intro and outro
-      const introRatio = introDuration / minFullDuration;
-      const scaledIntro = totalDuration * introRatio;
-      const scaledOutro = totalDuration - scaledIntro;
-
-      // Play scaled intro (from start)
-      const introSource = vcrAudioContext.createBufferSource();
-      introSource.buffer = vcrRewindBuffer;
-      introSource.connect(vcrAudioContext.destination);
-      introSource.start(scheduledTime, VCR_REWIND_INTRO_START, scaledIntro);
-      vcrRewindSources.push(introSource);
-      scheduledTime += scaledIntro;
-
-      // Play scaled outro (from end of outro section)
-      const outroOffset = VCR_REWIND_OUTRO_START + (outroDuration - scaledOutro);
-      const outroSource = vcrAudioContext.createBufferSource();
-      outroSource.buffer = vcrRewindBuffer;
-      outroSource.connect(vcrAudioContext.destination);
-      outroSource.start(scheduledTime, outroOffset, scaledOutro);
-      vcrRewindSources.push(outroSource);
-
-    } else {
-      // Short duration (<6s): play middle section only with fade
-      const gainNode = vcrAudioContext.createGain();
-      gainNode.connect(vcrAudioContext.destination);
-      gainNode.gain.setValueAtTime(0, scheduledTime);
-      gainNode.gain.linearRampToValueAtTime(1, scheduledTime + 0.3);
-      gainNode.gain.setValueAtTime(1, scheduledTime + totalDuration - 0.3);
-      gainNode.gain.linearRampToValueAtTime(0, scheduledTime + totalDuration);
-
-      const source = vcrAudioContext.createBufferSource();
-      source.buffer = vcrRewindBuffer;
-      source.connect(gainNode);
-      // Play from middle of the middle section
-      const middleMidpoint = VCR_REWIND_MIDDLE_START + (middleDuration / 2) - (totalDuration / 2);
-      source.start(scheduledTime, Math.max(VCR_REWIND_MIDDLE_START, middleMidpoint), totalDuration);
-      vcrRewindSources.push(source);
+    // Play middle section (loop if needed for long rewinds)
+    let middleRemaining = middleNeeded;
+    while (middleRemaining > 0) {
+      const chunkDuration = Math.min(middleRemaining, middleDuration);
+      const middleSource = vcrAudioContext.createBufferSource();
+      middleSource.buffer = vcrRewindBuffer;
+      middleSource.connect(vcrAudioContext.destination);
+      middleSource.start(scheduledTime, VCR_REWIND_MIDDLE_START, chunkDuration);
+      vcrRewindSources.push(middleSource);
+      scheduledTime += chunkDuration;
+      middleRemaining -= chunkDuration;
     }
 
-    console.log("[VCR] Rewind audio started, duration:", totalDuration);
+    // Play outro (full ramp-down)
+    const outroSource = vcrAudioContext.createBufferSource();
+    outroSource.buffer = vcrRewindBuffer;
+    outroSource.connect(vcrAudioContext.destination);
+    outroSource.start(scheduledTime, VCR_REWIND_OUTRO_START, outroDuration);
+    vcrRewindSources.push(outroSource);
+
+    console.log("[VCR] Rewind audio started, requested:", totalDuration, "actual:", audioDuration);
   }
 
   // VCR DOM elements
