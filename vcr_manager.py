@@ -25,7 +25,7 @@ from settings import (
 # Rewind speed: 2 minutes (120 sec) per 90 minutes (5400 sec) of playback
 # Formula: rewind_duration = position_sec / 45
 REWIND_SEC_PER_PLAYBACK_SEC = 45.0  # 45 seconds of playback = 1 second of rewind
-MIN_REWIND_DURATION_SEC = 3.0  # Minimum rewind time for very short positions
+MIN_REWIND_DURATION_SEC = 36.0  # Minimum to match rewind audio intro + outro duration
 
 # How often to persist position to disk (seconds)
 POSITION_PERSIST_INTERVAL = 30.0

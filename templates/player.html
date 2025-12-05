@@ -2404,6 +2404,99 @@ function ejecutarSeleccion() {
   let vcrLastTapeInserted = false;  // Track previous tape_inserted state
   let vcrJustSwitchedToChannel = false;  // Skip static transition when switching to VCR channel
 
+  // VCR Rewind Audio (Web Audio API for gapless segmented playback)
+  let vcrAudioContext = null;
+  let vcrRewindBuffer = null;
+  let vcrRewindSources = [];  // Active AudioBufferSourceNodes
+  let vcrRewindAudioPlaying = false;
+  let vcrLastRewindingState = false;  // Track previous is_rewinding state
+
+  // Rewind audio segment timestamps (in seconds)
+  const VCR_REWIND_INTRO_START = 0;
+  const VCR_REWIND_INTRO_END = 12;
+  const VCR_REWIND_MIDDLE_START = 12;
+  const VCR_REWIND_MIDDLE_END = 49;
+  const VCR_REWIND_OUTRO_START = 49;
+  // Outro goes to end of file
+
+  async function initVcrRewindAudio() {
+    if (vcrRewindBuffer) return;  // Already loaded
+    try {
+      vcrAudioContext = new (window.AudioContext || window.webkitAudioContext)();
+      const response = await fetch('/static/vcr_rewind.mp3');
+      const arrayBuffer = await response.arrayBuffer();
+      vcrRewindBuffer = await vcrAudioContext.decodeAudioData(arrayBuffer);
+      console.log("[VCR] Rewind audio loaded, duration:", vcrRewindBuffer.duration);
+    } catch (e) {
+      console.error("[VCR] Failed to load rewind audio:", e);
+    }
+  }
+
+  function stopVcrRewindAudio() {
+    vcrRewindSources.forEach(source => {
+      try { source.stop(); } catch(e) {}
+    });
+    vcrRewindSources = [];
+    vcrRewindAudioPlaying = false;
+  }
+
+  function playVcrRewindAudio(totalDuration) {
+    if (!vcrRewindBuffer || !vcrAudioContext) {
+      console.warn("[VCR] Rewind audio not loaded");
+      return;
+    }
+    if (vcrRewindAudioPlaying) return;  // Already playing
+
+    // Resume audio context if suspended (browser autoplay policy)
+    if (vcrAudioContext.state === 'suspended') {
+      vcrAudioContext.resume();
+    }
+
+    stopVcrRewindAudio();  // Clear any previous
+    vcrRewindAudioPlaying = true;
+
+    const introDuration = VCR_REWIND_INTRO_END - VCR_REWIND_INTRO_START;  // 12s
+    const middleDuration = VCR_REWIND_MIDDLE_END - VCR_REWIND_MIDDLE_START;  // 37s
+    const outroDuration = vcrRewindBuffer.duration - VCR_REWIND_OUTRO_START;  // ~24s
+    const minFullDuration = introDuration + outroDuration;  // ~36s
+
+    // Ensure minimum duration to always play full intro and outro
+    const audioDuration = Math.max(totalDuration, minFullDuration);
+    const middleNeeded = audioDuration - introDuration - outroDuration;
+
+    let scheduledTime = vcrAudioContext.currentTime;
+
+    // Play intro (full ramp-up)
+    const introSource = vcrAudioContext.createBufferSource();
+    introSource.buffer = vcrRewindBuffer;
+    introSource.connect(vcrAudioContext.destination);
+    introSource.start(scheduledTime, VCR_REWIND_INTRO_START, introDuration);
+    vcrRewindSources.push(introSource);
+    scheduledTime += introDuration;
+
+    // Play middle section (loop if needed for long rewinds)
+    let middleRemaining = middleNeeded;
+    while (middleRemaining > 0) {
+      const chunkDuration = Math.min(middleRemaining, middleDuration);
+      const middleSource = vcrAudioContext.createBufferSource();
+      middleSource.buffer = vcrRewindBuffer;
+      middleSource.connect(vcrAudioContext.destination);
+      middleSource.start(scheduledTime, VCR_REWIND_MIDDLE_START, chunkDuration);
+      vcrRewindSources.push(middleSource);
+      scheduledTime += chunkDuration;
+      middleRemaining -= chunkDuration;
+    }
+
+    // Play outro (full ramp-down)
+    const outroSource = vcrAudioContext.createBufferSource();
+    outroSource.buffer = vcrRewindBuffer;
+    outroSource.connect(vcrAudioContext.destination);
+    outroSource.start(scheduledTime, VCR_REWIND_OUTRO_START, outroDuration);
+    vcrRewindSources.push(outroSource);
+
+    console.log("[VCR] Rewind audio started, requested:", totalDuration, "actual:", audioDuration);
+  }
+
   // VCR DOM elements
   const vcrNoiseCanvas = document.getElementById("vcr-noise");
   const vcrStaticVideo = document.getElementById("vcr-static-video");
@@ -2591,6 +2684,18 @@ function ejecutarSeleccion() {
     vcrLastTapeInserted = state.tape_inserted;
     vcrJustSwitchedToChannel = false;  // Clear flag after first update
 
+    // Handle rewind audio state transitions
+    const isRewinding = state.is_rewinding || false;
+    if (isRewinding && !vcrLastRewindingState) {
+      // Rewind just started - play audio
+      const rewindDuration = state.rewind_progress?.total_duration_sec || 3;
+      playVcrRewindAudio(rewindDuration);
+    } else if (!isRewinding && vcrLastRewindingState) {
+      // Rewind just ended - stop audio
+      stopVcrRewindAudio();
+    }
+    vcrLastRewindingState = isRewinding;
+
     // If we're in the middle of a static transition, don't update display
     if (vcrStaticTransitionActive) {
       return;
@@ -2598,9 +2703,11 @@ function ejecutarSeleccion() {
 
     if (!state.reader_attached) {
       // No NFC reader - show white noise
+      stopVcrRewindAudio();  // Stop audio if reader disconnected
       showVcrWhiteNoise();
     } else if (!state.tape_inserted) {
       // Reader attached but no tape
+      stopVcrRewindAudio();  // Stop audio if tape removed
       showVcrBlueScreen("INSERT TAPE");
     } else if (tapeJustInserted && !state.is_rewinding) {
       // Tape was just inserted - show static first, then playback
@@ -2653,6 +2760,7 @@ function ejecutarSeleccion() {
   function startVcrPolling() {
     if (vcrPollInterval) return;
     vcrJustSwitchedToChannel = true;  // Skip static transition on first poll
+    initVcrRewindAudio();  // Preload rewind audio
     pollVcrState(); // Initial poll
     vcrPollInterval = setInterval(pollVcrState, 500);
   }
@@ -2662,6 +2770,8 @@ function ejecutarSeleccion() {
       clearInterval(vcrPollInterval);
       vcrPollInterval = null;
     }
+    stopVcrRewindAudio();  // Stop any playing rewind audio
+    vcrLastRewindingState = false;  // Reset rewind state tracking
     hideAllVcrScreens();
     video.style.display = "block";
   }
