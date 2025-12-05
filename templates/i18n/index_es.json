@@ -6,6 +6,7 @@
   "index.actions.upload": "⬆️ Subir",
   "index.actions.config": "⚙️ Configuración",
   "index.actions.tags": "🛠 Tags",
+  "index.actions.vcr": "📼 Cintas VCR",
   "index.videos.title": "🎬 Videos disponibles",
   "index.videos.count_label": "resultado(s)",
   "index.filters.toggle_show": "🔎 Mostrar filtros",

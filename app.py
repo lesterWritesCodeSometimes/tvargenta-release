@@ -2311,12 +2311,29 @@ def api_vcr_videos():
     try:
         metadata = vcr_manager._read_json(METADATA_FILE, {})
         videos = []
+        seen_ids = set()
+
+        # First, add videos with metadata
         for video_id, info in metadata.items():
             videos.append({
                 "video_id": video_id,
                 "title": info.get("title", video_id),
                 "duration": info.get("duracion", 0),
             })
+            seen_ids.add(video_id)
+
+        # Then, add videos from filesystem that don't have metadata
+        if os.path.isdir(VIDEO_DIR):
+            for filename in os.listdir(VIDEO_DIR):
+                if filename.endswith(".mp4"):
+                    video_id = os.path.splitext(filename)[0]
+                    if video_id not in seen_ids:
+                        videos.append({
+                            "video_id": video_id,
+                            "title": f"{video_id} (no metadata)",
+                            "duration": 0,
+                        })
+
         # Sort by title
         videos.sort(key=lambda v: v.get("title", "").lower())
         return jsonify({"ok": True, "videos": videos})

@@ -6,6 +6,7 @@
   "index.actions.upload": "⬆️ Upload",
   "index.actions.config": "⚙️ Settings",
   "index.actions.tags": "🛠 Tags",
+  "index.actions.vcr": "📼 VCR Tapes",
   "index.videos.title": "🎬 Available videos",
   "index.videos.count_label": "result(s)",
   "index.filters.toggle_show": "🔎 Show filters",

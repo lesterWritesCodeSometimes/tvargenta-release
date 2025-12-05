@@ -8,6 +8,7 @@
   "index.actions.upload": "⬆️ Hochladen",
   "index.actions.config": "⚙️ Einstellungen",
   "index.actions.tags": "🛠 Tags",
+  "index.actions.vcr": "📼 VCR-Kassetten",
 
   "index.videos.title": "🎬 Verfügbare Videos",
   "index.videos.count_label": "Ergebnis(se)",
