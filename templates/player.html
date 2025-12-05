@@ -2543,6 +2543,7 @@ function ejecutarSeleccion() {
       vcrRewindFill.style.width = `${progress * 100}%`;
     }
     video.style.display = "none";
+    video.pause();  // Stop audio during rewind animation
   }
 
   function showVcrPlayback(state) {
