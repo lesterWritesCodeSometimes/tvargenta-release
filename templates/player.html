@@ -2404,97 +2404,54 @@ function ejecutarSeleccion() {
   let vcrLastTapeInserted = false;  // Track previous tape_inserted state
   let vcrJustSwitchedToChannel = false;  // Skip static transition when switching to VCR channel
 
-  // VCR Rewind Audio (Web Audio API for gapless segmented playback)
-  let vcrAudioContext = null;
-  let vcrRewindBuffer = null;
-  let vcrRewindSources = [];  // Active AudioBufferSourceNodes
+  // VCR Rewind Audio - reuses the main video element which is already "unlocked"
+  // This avoids browser autoplay policy issues since the video element already has permission
   let vcrRewindAudioPlaying = false;
   let vcrLastRewindingState = false;  // Track previous is_rewinding state
+  let vcrSavedVideoSrc = null;
+  let vcrSavedVideoTime = 0;
 
-  // Rewind audio segment timestamps (in seconds)
-  const VCR_REWIND_INTRO_START = 0;
-  const VCR_REWIND_INTRO_END = 12;
-  const VCR_REWIND_MIDDLE_START = 12;
-  const VCR_REWIND_MIDDLE_END = 49;
-  const VCR_REWIND_OUTRO_START = 49;
-  // Outro goes to end of file
-
-  async function initVcrRewindAudio() {
-    if (vcrRewindBuffer) return;  // Already loaded
-    try {
-      vcrAudioContext = new (window.AudioContext || window.webkitAudioContext)();
-      const response = await fetch('/static/vcr_rewind.mp3');
-      const arrayBuffer = await response.arrayBuffer();
-      vcrRewindBuffer = await vcrAudioContext.decodeAudioData(arrayBuffer);
-      console.log("[VCR] Rewind audio loaded, duration:", vcrRewindBuffer.duration);
-    } catch (e) {
-      console.error("[VCR] Failed to load rewind audio:", e);
-    }
+  function initVcrRewindAudio() {
+    // Nothing to initialize - we reuse the main video element
+    console.log("[VCR] Rewind audio will use main video element");
   }
 
   function stopVcrRewindAudio() {
-    vcrRewindSources.forEach(source => {
-      try { source.stop(); } catch(e) {}
-    });
-    vcrRewindSources = [];
+    if (vcrRewindAudioPlaying) {
+      video.pause();
+      if (vcrSavedVideoSrc) {
+        video.src = vcrSavedVideoSrc;
+        video.currentTime = vcrSavedVideoTime;
+        vcrSavedVideoSrc = null;
+        console.log("[VCR] Restored original video source");
+      }
+    }
     vcrRewindAudioPlaying = false;
   }
 
   function playVcrRewindAudio(totalDuration) {
-    if (!vcrRewindBuffer || !vcrAudioContext) {
-      console.warn("[VCR] Rewind audio not loaded");
-      return;
-    }
-    if (vcrRewindAudioPlaying) return;  // Already playing
+    if (vcrRewindAudioPlaying) return;
 
-    // Resume audio context if suspended (browser autoplay policy)
-    if (vcrAudioContext.state === 'suspended') {
-      vcrAudioContext.resume();
-    }
-
-    stopVcrRewindAudio();  // Clear any previous
+    vcrSavedVideoSrc = video.src;
+    vcrSavedVideoTime = video.currentTime;
     vcrRewindAudioPlaying = true;
 
-    const introDuration = VCR_REWIND_INTRO_END - VCR_REWIND_INTRO_START;  // 12s
-    const middleDuration = VCR_REWIND_MIDDLE_END - VCR_REWIND_MIDDLE_START;  // 37s
-    const outroDuration = vcrRewindBuffer.duration - VCR_REWIND_OUTRO_START;  // ~24s
-    const minFullDuration = introDuration + outroDuration;  // ~36s
+    video.src = '/static/vcr_rewind.mp3';
+    video.loop = true;
+    video.currentTime = 0;
+    video.play()
+      .then(() => console.log("[VCR] Rewind audio playing via video element"))
+      .catch(e => {
+        console.error("[VCR] Rewind audio failed:", e);
+        vcrRewindAudioPlaying = false;
+        if (vcrSavedVideoSrc) {
+          video.src = vcrSavedVideoSrc;
+          video.currentTime = vcrSavedVideoTime;
+          vcrSavedVideoSrc = null;
+        }
+      });
 
-    // Ensure minimum duration to always play full intro and outro
-    const audioDuration = Math.max(totalDuration, minFullDuration);
-    const middleNeeded = audioDuration - introDuration - outroDuration;
-
-    let scheduledTime = vcrAudioContext.currentTime;
-
-    // Play intro (full ramp-up)
-    const introSource = vcrAudioContext.createBufferSource();
-    introSource.buffer = vcrRewindBuffer;
-    introSource.connect(vcrAudioContext.destination);
-    introSource.start(scheduledTime, VCR_REWIND_INTRO_START, introDuration);
-    vcrRewindSources.push(introSource);
-    scheduledTime += introDuration;
-
-    // Play middle section (loop if needed for long rewinds)
-    let middleRemaining = middleNeeded;
-    while (middleRemaining > 0) {
-      const chunkDuration = Math.min(middleRemaining, middleDuration);
-      const middleSource = vcrAudioContext.createBufferSource();
-      middleSource.buffer = vcrRewindBuffer;
-      middleSource.connect(vcrAudioContext.destination);
-      middleSource.start(scheduledTime, VCR_REWIND_MIDDLE_START, chunkDuration);
-      vcrRewindSources.push(middleSource);
-      scheduledTime += chunkDuration;
-      middleRemaining -= chunkDuration;
-    }
-
-    // Play outro (full ramp-down)
-    const outroSource = vcrAudioContext.createBufferSource();
-    outroSource.buffer = vcrRewindBuffer;
-    outroSource.connect(vcrAudioContext.destination);
-    outroSource.start(scheduledTime, VCR_REWIND_OUTRO_START, outroDuration);
-    vcrRewindSources.push(outroSource);
-
-    console.log("[VCR] Rewind audio started, requested:", totalDuration, "actual:", audioDuration);
+    console.log("[VCR] Rewind audio requested, duration:", totalDuration);
   }
 
   // VCR DOM elements
