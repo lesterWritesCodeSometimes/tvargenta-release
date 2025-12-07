@@ -445,7 +445,7 @@ def generate_thumbnail(video_path, thumb_path):
         "-vframes", "1",
         "-vf", "scale=320:-1",
         thumb_path
-    ], check=True, capture_output=True)  
+    ], check=True, capture_output=True, timeout=30)  
 
 
 def load_config_i18n():
@@ -656,7 +656,10 @@ def save_tags(tags_data):
 _bootstrap_config_from_tags_if_empty()
 
 # Scan series directories on startup
-scan_series_directories()
+try:
+    scan_series_directories()
+except Exception as e:
+    logger.error(f"[SERIES] Error during startup scan: {e}")
 
 def get_canal_activo():
     if os.path.exists(CANAL_ACTIVO_FILE):
