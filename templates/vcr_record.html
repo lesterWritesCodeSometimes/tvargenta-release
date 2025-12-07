@@ -1,0 +1,270 @@
+<!-- SPDX-License-Identifier: LicenseRef-TVArgenta-NC-Attribution-Consult-First
+     Proyecto: TVArgenta — Retro TV | Autor: Ricardo Sappia (rsflightronics@gmail.com)
+     © 2025. No comercial, atribución y consulta previa. TAL CUAL, sin garantías.
+     Ver LICENSE para términos completos.
+-->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Record VHS Tape - TVArgenta</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    .record-button {
+      width: 200px;
+      height: 200px;
+      background: linear-gradient(145deg, #2a2a2a, #1a1a1a);
+      border: 8px solid #444;
+      border-radius: 16px;
+      box-shadow:
+        0 8px 32px rgba(0, 0, 0, 0.5),
+        inset 0 2px 4px rgba(255, 255, 255, 0.1);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: transform 0.1s, box-shadow 0.1s;
+    }
+    .record-button:hover {
+      transform: scale(1.02);
+      box-shadow:
+        0 12px 40px rgba(0, 0, 0, 0.6),
+        inset 0 2px 4px rgba(255, 255, 255, 0.1);
+    }
+    .record-button:active {
+      transform: scale(0.98);
+    }
+    .record-circle {
+      width: 120px;
+      height: 120px;
+      background: linear-gradient(145deg, #ff3333, #cc0000);
+      border-radius: 50%;
+      box-shadow:
+        0 4px 20px rgba(255, 0, 0, 0.5),
+        inset 0 -4px 8px rgba(0, 0, 0, 0.3),
+        inset 0 4px 8px rgba(255, 255, 255, 0.2);
+    }
+    .record-button:hover .record-circle {
+      box-shadow:
+        0 4px 30px rgba(255, 0, 0, 0.7),
+        inset 0 -4px 8px rgba(0, 0, 0, 0.3),
+        inset 0 4px 8px rgba(255, 255, 255, 0.2);
+    }
+    .progress-bar-container {
+      width: 100%;
+      max-width: 300px;
+      height: 24px;
+      background: #333;
+      border-radius: 12px;
+      overflow: hidden;
+      border: 2px solid #555;
+    }
+    .progress-bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #ff0000, #ff3333);
+      transition: width 0.3s ease;
+      border-radius: 10px;
+    }
+    @keyframes pulse-recording {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.6; }
+    }
+    .recording-pulse {
+      animation: pulse-recording 1.5s ease-in-out infinite;
+    }
+  </style>
+</head>
+<body class="bg-black text-white font-mono min-h-screen flex flex-col items-center justify-center p-4">
+
+  <!-- Initial State: Press to Record -->
+  <div id="state-initial" class="flex flex-col items-center gap-8">
+    <h1 class="text-2xl sm:text-3xl text-center font-bold text-white">
+      Press to start recording
+    </h1>
+
+    <button id="record-btn" class="record-button" aria-label="Start recording">
+      <div class="record-circle"></div>
+    </button>
+
+    <input type="file"
+           id="file-input"
+           accept=".mp4,video/mp4"
+           class="hidden">
+
+    <p class="text-gray-500 text-sm text-center">
+      Only .mp4 files allowed (max 3GB)
+    </p>
+  </div>
+
+  <!-- Recording State: Progress -->
+  <div id="state-recording" class="hidden flex flex-col items-center gap-6">
+    <div class="flex items-center gap-3 recording-pulse">
+      <div class="w-4 h-4 bg-red-600 rounded-full"></div>
+      <h1 class="text-3xl sm:text-4xl font-bold text-red-500">Recording...</h1>
+    </div>
+
+    <div class="progress-bar-container">
+      <div id="progress-bar" class="progress-bar-fill" style="width: 0%"></div>
+    </div>
+
+    <p id="progress-text" class="text-gray-400 text-lg">0%</p>
+  </div>
+
+  <!-- Complete State -->
+  <div id="state-complete" class="hidden flex flex-col items-center gap-6">
+    <div class="text-6xl">✓</div>
+    <h1 class="text-3xl sm:text-4xl font-bold text-green-500">Recording Complete</h1>
+    <p class="text-gray-400">Your video has been saved to the tape.</p>
+  </div>
+
+  <!-- Error State -->
+  <div id="state-error" class="hidden flex flex-col items-center gap-6">
+    <div class="text-6xl">✗</div>
+    <h1 class="text-3xl sm:text-4xl font-bold text-red-500">Recording Failed</h1>
+    <p id="error-message" class="text-gray-400 text-center"></p>
+    <button id="retry-btn"
+            class="bg-gray-700 hover:bg-gray-600 text-white font-bold py-3 px-8 rounded-lg transition">
+      Try Again
+    </button>
+  </div>
+
+  <script>
+    const tapeUid = "{{ tape_uid }}";
+
+    const stateInitial = document.getElementById('state-initial');
+    const stateRecording = document.getElementById('state-recording');
+    const stateComplete = document.getElementById('state-complete');
+    const stateError = document.getElementById('state-error');
+
+    const recordBtn = document.getElementById('record-btn');
+    const fileInput = document.getElementById('file-input');
+    const progressBar = document.getElementById('progress-bar');
+    const progressText = document.getElementById('progress-text');
+    const errorMessage = document.getElementById('error-message');
+    const retryBtn = document.getElementById('retry-btn');
+
+    function showState(state) {
+      stateInitial.classList.add('hidden');
+      stateRecording.classList.add('hidden');
+      stateComplete.classList.add('hidden');
+      stateError.classList.add('hidden');
+
+      if (state === 'initial') stateInitial.classList.remove('hidden');
+      else if (state === 'recording') stateRecording.classList.remove('hidden');
+      else if (state === 'complete') stateComplete.classList.remove('hidden');
+      else if (state === 'error') stateError.classList.remove('hidden');
+    }
+
+    function updateProgress(percent) {
+      progressBar.style.width = `${percent}%`;
+      progressText.textContent = `${percent}%`;
+    }
+
+    // Click record button -> trigger file input
+    recordBtn.addEventListener('click', () => {
+      fileInput.click();
+    });
+
+    // Retry button
+    retryBtn.addEventListener('click', () => {
+      showState('initial');
+    });
+
+    // Handle file selection
+    fileInput.addEventListener('change', async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      // Validate file type
+      if (!file.name.toLowerCase().endsWith('.mp4')) {
+        errorMessage.textContent = 'Only .mp4 files are allowed.';
+        showState('error');
+        return;
+      }
+
+      // Validate file size (3GB)
+      const maxSize = 3 * 1024 * 1024 * 1024;
+      if (file.size > maxSize) {
+        errorMessage.textContent = 'File is too large. Maximum size is 3GB.';
+        showState('error');
+        return;
+      }
+
+      // Check tape UID
+      if (!tapeUid) {
+        errorMessage.textContent = 'No tape detected. Please insert a tape and try again.';
+        showState('error');
+        return;
+      }
+
+      // Start upload
+      showState('recording');
+      updateProgress(0);
+
+      try {
+        const formData = new FormData();
+        formData.append('tape_uid', tapeUid);
+        formData.append('video', file);
+
+        const xhr = new XMLHttpRequest();
+
+        // Track upload progress
+        xhr.upload.addEventListener('progress', (e) => {
+          if (e.lengthComputable) {
+            const percent = Math.round((e.loaded / e.total) * 100);
+            updateProgress(percent);
+          }
+        });
+
+        xhr.addEventListener('load', () => {
+          if (xhr.status === 200) {
+            try {
+              const response = JSON.parse(xhr.responseText);
+              if (response.ok) {
+                updateProgress(100);
+                showState('complete');
+              } else {
+                errorMessage.textContent = response.message || response.error || 'Upload failed.';
+                showState('error');
+              }
+            } catch {
+              errorMessage.textContent = 'Invalid server response.';
+              showState('error');
+            }
+          } else {
+            try {
+              const response = JSON.parse(xhr.responseText);
+              errorMessage.textContent = response.message || response.error || `Upload failed (${xhr.status})`;
+            } catch {
+              errorMessage.textContent = `Upload failed with status ${xhr.status}`;
+            }
+            showState('error');
+          }
+        });
+
+        xhr.addEventListener('error', () => {
+          errorMessage.textContent = 'Network error. Please check your connection.';
+          showState('error');
+        });
+
+        xhr.addEventListener('abort', () => {
+          errorMessage.textContent = 'Upload was cancelled.';
+          showState('error');
+        });
+
+        xhr.open('POST', '/api/vcr/record/upload');
+        xhr.send(formData);
+
+      } catch (err) {
+        errorMessage.textContent = err.message || 'An unexpected error occurred.';
+        showState('error');
+      }
+
+      // Reset file input for retry
+      fileInput.value = '';
+    });
+  </script>
+</body>
+</html>

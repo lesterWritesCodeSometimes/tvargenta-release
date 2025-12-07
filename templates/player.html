@@ -525,6 +525,84 @@
 	  max-width: 80%;
 	}
 
+	/* VCR Recording screen styles */
+	#vcr-recording-screen {
+	  background: #0000aa;
+	  display: flex;
+	  flex-direction: column;
+	  align-items: center;
+	  justify-content: center;
+	  font-family: "Lucida Console", "Courier New", monospace;
+	  color: white;
+	  gap: 30px;
+	}
+
+	.vcr-recording-indicator {
+	  display: flex;
+	  align-items: center;
+	  gap: 16px;
+	}
+
+	.vcr-recording-dot {
+	  width: 24px;
+	  height: 24px;
+	  background: #ff0000;
+	  border-radius: 50%;
+	  animation: vcr-recording-pulse 1s ease-in-out infinite;
+	}
+
+	@keyframes vcr-recording-pulse {
+	  0%, 100% { opacity: 1; box-shadow: 0 0 20px #ff0000; }
+	  50% { opacity: 0.5; box-shadow: 0 0 10px #ff0000; }
+	}
+
+	#vcr-recording-text {
+	  font-size: 48px;
+	  letter-spacing: 4px;
+	  text-shadow: 2px 2px 0 #000066;
+	  color: #ff3333;
+	}
+
+	.vcr-recording-progress {
+	  width: 400px;
+	  max-width: 80%;
+	  height: 20px;
+	  background: #000066;
+	  border: 3px solid white;
+	  border-radius: 10px;
+	  overflow: hidden;
+	}
+
+	.vcr-recording-progress-fill {
+	  height: 100%;
+	  background: linear-gradient(90deg, #ff0000, #ff3333);
+	  transition: width 0.3s ease;
+	}
+
+	#vcr-recording-percent {
+	  font-size: 28px;
+	  letter-spacing: 2px;
+	}
+
+	/* VCR Recording Failed screen */
+	#vcr-recording-failed {
+	  background: #0000aa;
+	  display: flex;
+	  flex-direction: column;
+	  align-items: center;
+	  justify-content: center;
+	  font-family: "Lucida Console", "Courier New", monospace;
+	  color: white;
+	  gap: 20px;
+	}
+
+	#vcr-recording-failed-text {
+	  font-size: 48px;
+	  letter-spacing: 4px;
+	  text-shadow: 2px 2px 0 #000066;
+	  color: #ff3333;
+	}
+
 	.hidden {
 	  display: none !important;
 	}
@@ -601,6 +679,21 @@
   <div id="vcr-empty-tape-title">This tape is empty. Start a recording?</div>
   <img id="vcr-empty-tape-qr" src="" alt="QR Code">
   <div id="vcr-empty-tape-hint">Please connect to <span id="vcr-empty-tape-ssid"></span> to record</div>
+</div>
+
+<div id="vcr-recording-screen" class="vcr-fullscreen hidden">
+  <div class="vcr-recording-indicator">
+    <div class="vcr-recording-dot"></div>
+    <div id="vcr-recording-text">Recording...</div>
+  </div>
+  <div class="vcr-recording-progress">
+    <div class="vcr-recording-progress-fill" id="vcr-recording-fill"></div>
+  </div>
+  <div id="vcr-recording-percent">0%</div>
+</div>
+
+<div id="vcr-recording-failed" class="vcr-fullscreen hidden">
+  <div id="vcr-recording-failed-text">Recording Failed</div>
 </div>
 
 <div id="vcr-rewind-screen" class="vcr-fullscreen hidden">
@@ -2561,6 +2654,14 @@ function ejecutarSeleccion() {
   const vcrEmptyTapeSsid = document.getElementById("vcr-empty-tape-ssid");
   let vcrEmptyTapeWifiCheckActive = false;  // Track if we're in WiFi check loop
 
+  // Recording screen DOM elements
+  const vcrRecordingScreen = document.getElementById("vcr-recording-screen");
+  const vcrRecordingFill = document.getElementById("vcr-recording-fill");
+  const vcrRecordingPercent = document.getElementById("vcr-recording-percent");
+  const vcrRecordingFailed = document.getElementById("vcr-recording-failed");
+  let vcrRecordingPollInterval = null;
+  let vcrRecordingFailedTimeout = null;
+
   function formatVcrTime(seconds) {
     const h = Math.floor(seconds / 3600);
     const m = Math.floor((seconds % 3600) / 60);
@@ -2631,11 +2732,14 @@ function ejecutarSeleccion() {
     if (vcrStaticVideo) vcrStaticVideo.pause();
     vcrBlueScreen?.classList.add("hidden");
     vcrEmptyTapeScreen?.classList.add("hidden");
+    vcrRecordingScreen?.classList.add("hidden");
+    vcrRecordingFailed?.classList.add("hidden");
     vcrRewindScreen?.classList.add("hidden");
     vcrCounter?.classList.add("hidden");
     vcrPausedEl?.classList.add("hidden");
     hideChannelNumber();
     stopWhiteNoise();
+    stopVcrRecordingPoll();
   }
 
   function showVcrStatic(onComplete) {
@@ -2816,6 +2920,98 @@ function ejecutarSeleccion() {
     }, 2000);
   }
 
+  // --- VCR Recording Screen Functions ---
+
+  function showVcrRecordingScreen(progress = 0) {
+    hideAllVcrScreens();
+    vcrRecordingScreen?.classList.remove("hidden");
+    video.style.display = "none";
+    video.pause();
+
+    // Update progress
+    if (vcrRecordingFill) {
+      vcrRecordingFill.style.width = `${progress}%`;
+    }
+    if (vcrRecordingPercent) {
+      vcrRecordingPercent.textContent = `${progress}%`;
+    }
+  }
+
+  function showVcrRecordingFailed() {
+    hideAllVcrScreens();
+    vcrRecordingFailed?.classList.remove("hidden");
+    video.style.display = "none";
+    video.pause();
+
+    // Auto-hide after 5 seconds and return to empty tape screen
+    if (vcrRecordingFailedTimeout) {
+      clearTimeout(vcrRecordingFailedTimeout);
+    }
+    vcrRecordingFailedTimeout = setTimeout(() => {
+      vcrRecordingFailedTimeout = null;
+      // Re-poll VCR state to show appropriate screen
+      pollVcrState();
+    }, 5000);
+  }
+
+  function stopVcrRecordingPoll() {
+    if (vcrRecordingPollInterval) {
+      clearInterval(vcrRecordingPollInterval);
+      vcrRecordingPollInterval = null;
+    }
+  }
+
+  function startVcrRecordingPoll() {
+    if (vcrRecordingPollInterval) return;
+
+    vcrRecordingPollInterval = setInterval(async () => {
+      try {
+        const res = await fetch("/api/vcr/record/progress");
+        const data = await res.json();
+
+        if (!data.ok) return;
+
+        if (data.recording && data.status === "recording") {
+          // Show recording progress
+          showVcrRecordingScreen(data.progress || 0);
+        } else if (data.status === "complete") {
+          // Recording complete - stop polling, VCR state poll will handle playback
+          stopVcrRecordingPoll();
+          console.log("[VCR] Recording complete, waiting for playback...");
+        } else if (data.status === "failed") {
+          // Recording failed
+          stopVcrRecordingPoll();
+          showVcrRecordingFailed();
+        } else if (!data.recording) {
+          // Not recording - stop polling
+          stopVcrRecordingPoll();
+        }
+      } catch (e) {
+        console.error("[VCR] Recording poll error:", e);
+      }
+    }, 500);
+  }
+
+  // Check if a recording is in progress and start polling if so
+  async function checkVcrRecordingState() {
+    try {
+      const res = await fetch("/api/vcr/record/progress");
+      const data = await res.json();
+
+      if (data.ok && data.recording && data.status === "recording") {
+        showVcrRecordingScreen(data.progress || 0);
+        startVcrRecordingPoll();
+        return true;  // Recording in progress
+      } else if (data.ok && data.status === "failed") {
+        showVcrRecordingFailed();
+        return true;  // Show failed screen
+      }
+      return false;  // No recording in progress
+    } catch (e) {
+      return false;
+    }
+  }
+
   function showVcrRewindScreen(progress = 0) {
     hideAllVcrScreens();
     vcrRewindScreen?.classList.remove("hidden");
@@ -2894,9 +3090,14 @@ function ejecutarSeleccion() {
       stopVcrRewindAudio();  // Stop audio if reader disconnected
       showVcrWhiteNoise();
     } else if (state.unknown_tape_uid) {
-      // Unknown/empty tape detected - show QR code for recording
+      // Unknown/empty tape detected - check if recording in progress first
       stopVcrRewindAudio();
-      handleEmptyTapeWithWifiCheck();
+      checkVcrRecordingState().then(isRecording => {
+        if (!isRecording) {
+          // No recording in progress - show QR code for recording
+          handleEmptyTapeWithWifiCheck();
+        }
+      });
     } else if (!state.tape_inserted) {
       // Reader attached but no tape
       stopVcrRewindAudio();  // Stop audio if tape removed
