@@ -367,8 +367,6 @@ def scan_series_directories():
     2. Add new series to series.json
     3. Scan for video files and create/update metadata
     """
-    global metadata
-
     if not SERIES_VIDEO_DIR.exists():
         SERIES_VIDEO_DIR.mkdir(parents=True, exist_ok=True)
         return
