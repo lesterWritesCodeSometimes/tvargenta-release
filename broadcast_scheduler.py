@@ -267,7 +267,8 @@ class BroadcastScheduler:
                 s_info = series_data[s_name]
                 episodes = self._get_series_episodes(s_name, metadata)
                 if episodes:
-                    max_duration = max(e.get("duracion", 0) or 0 for e in episodes)
+                    # Use 1800 (30 min) as default for unknown durations to match playback logic
+                    max_duration = max(e.get("duracion", 0) or 1800 for e in episodes)
                     channel_series.append({
                         "name": s_name,
                         "time_of_day": s_info.get("time_of_day", "any"),
