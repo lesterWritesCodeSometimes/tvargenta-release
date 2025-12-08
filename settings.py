@@ -66,3 +66,21 @@ VCR_REWIND_TRIGGER = TMP_DIR / "trigger_vcr_rewind.json"
 VCR_COUNTDOWN_TRIGGER = TMP_DIR / "trigger_vcr_countdown.json"
 VCR_RECORDING_STATE_FILE = TMP_DIR / "vcr_recording_state.json"
 TAPES_FILE = CONTENT_DIR / "tapes.json"
+
+# Broadcast scheduling paths
+SCHEDULE_FILE = SYSTEM_DATA_DIR / "schedule.json"
+TEST_PATTERN_FILE = VIDEO_DIR / "test_pattern.png"
+HANG_TIGHT_FILE = VIDEO_DIR / "hang_tight.png"
+ADS_DIR = VIDEO_DIR / "ads"
+
+# Time slot definitions for broadcast scheduling (hour ranges)
+TIME_SLOTS = {
+    "early_morning": (4, 7),    # 4:00 AM - 7:00 AM
+    "late_morning": (7, 12),    # 7:00 AM - 12:00 PM
+    "afternoon": (12, 17),      # 12:00 PM - 5:00 PM
+    "evening": (17, 21),        # 5:00 PM - 9:00 PM
+    "night": (21, 28),          # 9:00 PM - 4:00 AM (28 = 4 AM next day)
+}
+
+# Valid time_of_day options for series metadata
+VALID_TIME_OF_DAY = ["early_morning", "late_morning", "afternoon", "evening", "night", "any"]

@@ -32,11 +32,14 @@ from settings import (
     PLAYS_FILE, USER, UPLOAD_STATUS, TMP_DIR, CONFIG_PATH, LOG_DIR, I18N_DIR,
     VCR_STATE_FILE, VCR_TRIGGER_FILE, TAPES_FILE, VCR_RECORDING_STATE_FILE,
     SERIES_FILE, SERIES_VIDEO_DIR,
+    SCHEDULE_FILE, TEST_PATTERN_FILE, HANG_TIGHT_FILE, ADS_DIR,
+    TIME_SLOTS, VALID_TIME_OF_DAY,
 )
 import re
 import bluetooth_manager
 import wifi_manager
 import vcr_manager
+import broadcast_scheduler
 
 
        
@@ -385,9 +388,14 @@ def scan_series_directories():
         # Add to series.json if not present
         if series_name not in series_data:
             series_data[series_name] = {
-                "created": datetime.now().strftime("%Y-%m-%d")
+                "created": datetime.now().strftime("%Y-%m-%d"),
+                "time_of_day": "any"  # Default for broadcast scheduling
             }
             logger.info(f"[SERIES] Discovered new series: {series_display_name(series_name)}")
+            changes_made = True
+        # Ensure existing series have time_of_day field
+        elif "time_of_day" not in series_data[series_name]:
+            series_data[series_name]["time_of_day"] = "any"
             changes_made = True
 
         # Scan for video files in this series
@@ -658,6 +666,13 @@ try:
     scan_series_directories()
 except Exception as e:
     logger.error(f"[SERIES] Error during startup scan: {e}")
+
+# Start broadcast scheduler for series channels
+try:
+    broadcast_scheduler.start_scheduler()
+    logger.info("[STARTUP] Broadcast scheduler started")
+except Exception as e:
+    logger.error(f"[STARTUP] Error starting broadcast scheduler: {e}")
 
 def get_canal_activo():
     if os.path.exists(CANAL_ACTIVO_FILE):
@@ -1474,6 +1489,90 @@ def api_next_video():
                     "canal_numero": "03",
                 })
 
+    # --- BROADCAST SCHEDULER: Check if channel is a broadcast channel ---
+    canales_data = load_canales()
+    canal_id_for_broadcast = None
+    channel_config = None
+
+    if os.path.exists(canal_activo_path):
+        with open(canal_activo_path, "r", encoding="utf-8") as f:
+            activo = json.load(f)
+            canal_id_for_broadcast = activo.get("canal_id")
+            if canal_id_for_broadcast in canales_data:
+                channel_config = canales_data[canal_id_for_broadcast]
+
+    # If channel has series_filter, use broadcast scheduler
+    if channel_config and channel_config.get("series_filter"):
+        scheduler = broadcast_scheduler.get_scheduler()
+
+        # Wait for scheduler to be ready
+        if not scheduler.wait_ready(timeout=10):
+            logger.warning("[NEXT] Broadcast scheduler not ready, falling back to regular selection")
+        else:
+            channel_name = channel_config.get("nombre", "")
+            schedule_entry = scheduler.get_schedule_at(channel_name)
+
+            if schedule_entry:
+                content_type = schedule_entry.get("content_type", "test_pattern")
+                video_path = schedule_entry.get("video_path", "")
+                seek_timestamp = schedule_entry.get("timestamp", 0)
+
+                # Handle different content types
+                if content_type == "episode":
+                    video_url = f"/videos/{video_path}"
+                    logger.info(f"[NEXT-BROADCAST] channel={channel_name} series={schedule_entry.get('series')} "
+                               f"S{schedule_entry.get('season'):02d}E{schedule_entry.get('episode'):02d} "
+                               f"seek={seek_timestamp:.1f}s")
+                    return jsonify({
+                        "video_id": schedule_entry.get("video_id", ""),
+                        "video_url": video_url,
+                        "title": f"{schedule_entry.get('series', '')} S{schedule_entry.get('season'):02d}E{schedule_entry.get('episode'):02d}",
+                        "tags": [],
+                        "modo": canal_id_for_broadcast,
+                        "canal_nombre": channel_name,
+                        "canal_numero": get_canal_numero(canal_id_for_broadcast, canales_data),
+                        "broadcast_mode": True,
+                        "seek_timestamp": seek_timestamp,
+                        "content_type": content_type,
+                        "series": schedule_entry.get("series", ""),
+                        "season": schedule_entry.get("season", 0),
+                        "episode": schedule_entry.get("episode", 0),
+                        "duration": schedule_entry.get("duration", 0)
+                    })
+                elif content_type == "ad":
+                    video_url = f"/videos/{video_path}"
+                    logger.info(f"[NEXT-BROADCAST] channel={channel_name} ad seek={seek_timestamp:.1f}s")
+                    return jsonify({
+                        "video_id": schedule_entry.get("video_id", "ad"),
+                        "video_url": video_url,
+                        "title": "Commercial Break",
+                        "tags": [],
+                        "modo": canal_id_for_broadcast,
+                        "canal_nombre": channel_name,
+                        "canal_numero": get_canal_numero(canal_id_for_broadcast, canales_data),
+                        "broadcast_mode": True,
+                        "seek_timestamp": seek_timestamp,
+                        "content_type": content_type,
+                        "duration": schedule_entry.get("duration", 30)
+                    })
+                elif content_type in ("test_pattern", "hang_tight"):
+                    # Static image content
+                    logger.info(f"[NEXT-BROADCAST] channel={channel_name} showing {content_type}")
+                    return jsonify({
+                        "video_id": content_type,
+                        "image_url": f"/videos/{Path(video_path).name}" if video_path else f"/videos/{content_type}.png",
+                        "title": "Please Stand By" if content_type == "test_pattern" else "Commercial Break",
+                        "tags": [],
+                        "modo": canal_id_for_broadcast,
+                        "canal_nombre": channel_name,
+                        "canal_numero": get_canal_numero(canal_id_for_broadcast, canales_data),
+                        "broadcast_mode": True,
+                        "content_type": content_type,
+                        "is_static_image": True
+                    })
+
+    # --- END BROADCAST SCHEDULER ---
+
     metadata = load_metadata()
     canales = load_canales()
 
@@ -1714,11 +1813,22 @@ def series_page():
             "folder_name": folder_name,
             "display_name": series_display_name(folder_name),
             "episode_count": _get_series_episode_count(folder_name),
-            "created": info.get("created", "")
+            "created": info.get("created", ""),
+            "time_of_day": info.get("time_of_day", "any")
         })
 
     # Sort by display name
     series_list.sort(key=lambda s: s["display_name"].lower())
+
+    # Time of day display labels
+    time_of_day_labels = {
+        "early_morning": "Early Morning (4-7 AM)",
+        "late_morning": "Late Morning (7 AM-12 PM)",
+        "afternoon": "Afternoon (12-5 PM)",
+        "evening": "Evening (5-9 PM)",
+        "night": "Night (9 PM-4 AM)",
+        "any": "Any Time (24h)"
+    }
 
     cfg = load_config_i18n()
     lang = cfg.get("language", "es")
@@ -1736,6 +1846,8 @@ def series_page():
 
     return render_template("series.html",
                            series_list=series_list,
+                           time_of_day_options=VALID_TIME_OF_DAY,
+                           time_of_day_labels=time_of_day_labels,
                            lang=lang,
                            tr=tr)
 
@@ -1743,8 +1855,14 @@ def series_page():
 def series_add():
     """Add a new series."""
     display_name = request.form.get("name", "").strip()
+    time_of_day = request.form.get("time_of_day", "any").strip()
+
     if not display_name:
         return redirect(url_for("series_page"))
+
+    # Validate time_of_day
+    if time_of_day not in VALID_TIME_OF_DAY:
+        time_of_day = "any"
 
     folder_name = series_folder_name(display_name)
     if not folder_name:
@@ -1762,11 +1880,12 @@ def series_add():
 
     # Add to series.json
     series_data[folder_name] = {
-        "created": datetime.now().strftime("%Y-%m-%d")
+        "created": datetime.now().strftime("%Y-%m-%d"),
+        "time_of_day": time_of_day
     }
     save_series(series_data)
 
-    logger.info(f"[SERIES] Created new series: {display_name} ({folder_name})")
+    logger.info(f"[SERIES] Created new series: {display_name} ({folder_name}) time_of_day={time_of_day}")
     return redirect(url_for("series_page"))
 
 @app.route("/series/delete/<series_name>", methods=["POST"])
@@ -1811,11 +1930,137 @@ def api_series():
         "series": [
             {
                 "folder_name": name,
-                "display_name": series_display_name(name)
+                "display_name": series_display_name(name),
+                "time_of_day": info.get("time_of_day", "any")
             }
-            for name in sorted(series_data.keys())
+            for name, info in sorted(series_data.items())
         ]
     })
+
+@app.route("/api/series/<series_name>/time_of_day", methods=["POST"])
+def api_series_update_time_of_day(series_name):
+    """Update the time_of_day preference for a series."""
+    series_data = load_series()
+
+    if series_name not in series_data:
+        return jsonify({"error": "Series not found"}), 404
+
+    data = request.get_json() or {}
+    time_of_day = data.get("time_of_day", "any")
+
+    if time_of_day not in VALID_TIME_OF_DAY:
+        return jsonify({"error": f"Invalid time_of_day. Must be one of: {VALID_TIME_OF_DAY}"}), 400
+
+    series_data[series_name]["time_of_day"] = time_of_day
+    save_series(series_data)
+
+    logger.info(f"[SERIES] Updated time_of_day for {series_name}: {time_of_day}")
+    return jsonify({"success": True, "time_of_day": time_of_day})
+
+@app.route("/api/schedule_now")
+def api_schedule_now():
+    """
+    Get the current broadcast schedule for a channel.
+
+    Query params:
+        channel: Channel name (optional, defaults to active channel)
+
+    Returns:
+        {
+            "is_broadcast_channel": true/false,
+            "content_type": "episode" | "ad" | "test_pattern" | "hang_tight",
+            "video_path": "series/Series_Name/S01E05.mp4",
+            "seek_timestamp": 1234.5,
+            "series": "Series_Name",
+            "season": 1,
+            "episode": 5,
+            "duration": 2700
+        }
+    """
+    scheduler = broadcast_scheduler.get_scheduler()
+
+    # Wait for scheduler to be ready (with timeout)
+    if not scheduler.wait_ready(timeout=10):
+        return jsonify({"error": "Scheduler not ready", "is_broadcast_channel": False}), 503
+
+    # Get channel name
+    channel_name = request.args.get("channel")
+    if not channel_name:
+        # Get active channel
+        canal_id = get_canal_activo()
+        canales = load_canales().get("canales", [])
+        for c in canales:
+            if str(c.get("id")) == str(canal_id):
+                channel_name = c.get("nombre", "")
+                break
+
+    if not channel_name:
+        return jsonify({"error": "Channel not found", "is_broadcast_channel": False}), 404
+
+    # Check if this is a broadcast channel
+    canales = load_canales().get("canales", [])
+    is_broadcast = False
+    for c in canales:
+        if c.get("nombre") == channel_name:
+            if c.get("series_filter"):
+                is_broadcast = True
+            break
+
+    if not is_broadcast:
+        return jsonify({"is_broadcast_channel": False})
+
+    # Get schedule entry
+    entry = scheduler.get_schedule_at(channel_name)
+
+    if not entry:
+        return jsonify({
+            "is_broadcast_channel": True,
+            "content_type": "test_pattern",
+            "video_path": str(TEST_PATTERN_FILE),
+            "seek_timestamp": 0
+        })
+
+    return jsonify({
+        "is_broadcast_channel": True,
+        "content_type": entry.get("content_type", "test_pattern"),
+        "video_path": entry.get("video_path", ""),
+        "seek_timestamp": entry.get("timestamp", 0),
+        "series": entry.get("series", ""),
+        "season": entry.get("season", 0),
+        "episode": entry.get("episode", 0),
+        "duration": entry.get("duration", 0),
+        "video_id": entry.get("video_id", "")
+    })
+
+@app.route("/api/schedule_info")
+def api_schedule_info():
+    """Get detailed schedule info for a channel (now playing, up next, etc.)."""
+    scheduler = broadcast_scheduler.get_scheduler()
+
+    if not scheduler.wait_ready(timeout=10):
+        return jsonify({"error": "Scheduler not ready"}), 503
+
+    channel_name = request.args.get("channel")
+    if not channel_name:
+        canal_id = get_canal_activo()
+        canales = load_canales().get("canales", [])
+        for c in canales:
+            if str(c.get("id")) == str(canal_id):
+                channel_name = c.get("nombre", "")
+                break
+
+    if not channel_name:
+        return jsonify({"error": "Channel not found"}), 404
+
+    info = scheduler.get_current_schedule_info(channel_name)
+    return jsonify(info)
+
+@app.route("/api/schedule_regenerate", methods=["POST"])
+def api_schedule_regenerate():
+    """Force regeneration of the weekly schedule."""
+    scheduler = broadcast_scheduler.get_scheduler()
+    scheduler.force_regenerate_schedule()
+    return jsonify({"success": True, "message": "Schedule regenerated"})
 
 # ============================================================================
 # SERIES UPLOAD ROUTES

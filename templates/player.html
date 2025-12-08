@@ -613,6 +613,7 @@
 <body>
   <video id="tvVideo" autoplay playsinline disableRemotePlayback></video>
   <img id="no-signal" src="/static/no_signal.png" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; object-fit:cover; z-index:10;">
+  <img id="broadcast-static" src="" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; object-fit:contain; background:#000; z-index:10;">
   <div id="channel-indicator" class="hidden" style="position:fixed !important; z-index:2147483647 !important;"></div>
   <div id="overlay">{{ tr("overlay.loading_channel") }}</div>
   <div id="barra-volumen" class="oculto">
@@ -1050,6 +1051,7 @@
 		  if (data.no_videos) {
 			// Show SMPTE color bars when no content available
 			document.getElementById('no-signal').style.display = 'block';
+			document.getElementById('broadcast-static').style.display = 'none';
 			video.pause();
 			return;
 		  }
@@ -1057,50 +1059,97 @@
 		  // Hide no-signal image when we have content
 		  document.getElementById('no-signal').style.display = 'none';
 
+		  // --- BROADCAST MODE: Handle static images and seeking ---
+		  const broadcastStatic = document.getElementById('broadcast-static');
+
+		  if (data.is_static_image) {
+			// Show static image (test pattern or hang tight)
+			video.pause();
+			video.style.display = 'none';
+			broadcastStatic.src = data.image_url || '/videos/test_pattern.png';
+			broadcastStatic.style.display = 'block';
+			currentVideo = data.video_id;
+
+			// Poll for schedule changes every 5 seconds in static mode
+			if (data.broadcast_mode) {
+			  setTimeout(() => cargarSiguienteVideo(false), 5000);
+			}
+			return;
+		  } else {
+			// Hide static image, show video
+			broadcastStatic.style.display = 'none';
+			video.style.display = 'block';
+		  }
+		  // --- END BROADCAST STATIC HANDLING ---
+
 		  const cambioDeVideo = data.video_id !== currentVideo;
 		  const cambioDeCanal = data.modo !== ultimoCanal;
+		  const seekTimestamp = data.seek_timestamp || 0;
+		  const isBroadcastMode = data.broadcast_mode || false;
 
 		  // Solo cambiamos el src si verdaderamente cambia el video o es forzado
 		  if (cambioDeVideo ) {
 			currentVideo = data.video_id;
 			video.src = data.video_url || `/videos/${data.video_id}.mp4`;
 			video.load();
+
+			// For broadcast mode, seek to the scheduled timestamp after metadata loads
+			if (isBroadcastMode && seekTimestamp > 0) {
+			  const onMetadataLoaded = () => {
+				if (seekTimestamp < video.duration) {
+				  console.log(`[BROADCAST] Seeking to ${seekTimestamp.toFixed(1)}s`);
+				  video.currentTime = seekTimestamp;
+				}
+				video.removeEventListener('loadedmetadata', onMetadataLoaded);
+			  };
+			  video.addEventListener('loadedmetadata', onMetadataLoaded);
+			}
+
 			video.play().catch(e => console.warn("[TV] play() rechazado:", e));
 			// Channel badge removed for immersion
 
 			// --- armado del umbral de "play real" ---
-			playedReportedFor = null;
-			playedArmed = false;
-			clearTimeout(playedTimer);
+			// Skip play tracking for ads in broadcast mode
+			if (data.content_type !== 'ad') {
+			  playedReportedFor = null;
+			  playedArmed = false;
+			  clearTimeout(playedTimer);
 
-			// A) 10 segundos
-			playedTimer = setTimeout(() => {
-			  if (currentVideo && playedReportedFor !== currentVideo) {
-				playedReportedFor = currentVideo;
-				reportPlayed(currentVideo);
-			  }
-			}, 10000);
-
-			// B) 30% de duración (cuando se conozca el metadata)
-			const onTimeUpdate = () => {
-			  const dur = video.duration || 0;
-			  if (!playedArmed && dur > 0) {
-				playedArmed = true; // sólo armamos una vez cuando tengamos duración
-			  }
-			  if (dur > 0) {
-				const threshold = 0.30 * dur; // 30%
-				if (video.currentTime >= threshold && playedReportedFor !== currentVideo) {
+			  // A) 10 segundos
+			  playedTimer = setTimeout(() => {
+				if (currentVideo && playedReportedFor !== currentVideo) {
 				  playedReportedFor = currentVideo;
-				  clearTimeout(playedTimer);
 				  reportPlayed(currentVideo);
-				  video.removeEventListener("timeupdate", onTimeUpdate);
 				}
-			  }
-			};
+			  }, 10000);
 
-			video.removeEventListener("timeupdate", onTimeUpdate);
-			video.addEventListener("timeupdate", onTimeUpdate);
+			  // B) 30% de duración (cuando se conozca el metadata)
+			  const onTimeUpdate = () => {
+				const dur = video.duration || 0;
+				if (!playedArmed && dur > 0) {
+				  playedArmed = true; // sólo armamos una vez cuando tengamos duración
+				}
+				if (dur > 0) {
+				  const threshold = 0.30 * dur; // 30%
+				  if (video.currentTime >= threshold && playedReportedFor !== currentVideo) {
+					playedReportedFor = currentVideo;
+					clearTimeout(playedTimer);
+					reportPlayed(currentVideo);
+					video.removeEventListener("timeupdate", onTimeUpdate);
+				  }
+				}
+			  };
 
+			  video.removeEventListener("timeupdate", onTimeUpdate);
+			  video.addEventListener("timeupdate", onTimeUpdate);
+			}
+		  } else if (isBroadcastMode && seekTimestamp > 0) {
+			// Same video but may need to resync position in broadcast mode
+			const drift = Math.abs(video.currentTime - seekTimestamp);
+			if (drift > 3) {
+			  console.log(`[BROADCAST] Resync: drift=${drift.toFixed(1)}s, seeking to ${seekTimestamp.toFixed(1)}s`);
+			  video.currentTime = seekTimestamp;
+			}
 		  }
 
 		  if (cambioDeCanal) {

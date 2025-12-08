@@ -42,8 +42,22 @@
             <span class="text-purple-300 font-semibold">{{ series.episode_count }}</span> episode{% if series.episode_count != 1 %}s{% endif %}
           </p>
           {% if series.created %}
-          <p class="text-xs text-gray-500">Created: {{ series.created }}</p>
+          <p class="text-xs text-gray-500 mb-3">Created: {{ series.created }}</p>
           {% endif %}
+
+          <!-- Time of Day Selector -->
+          <div class="mb-4">
+            <label class="block text-xs text-gray-400 mb-1">Broadcast Time Slot</label>
+            <select id="tod-{{ series.folder_name }}"
+                    onchange="updateTimeOfDay('{{ series.folder_name }}', this.value)"
+                    class="w-full bg-gray-800 text-white text-sm px-2 py-1.5 rounded border border-gray-600 focus:border-purple-500 focus:outline-none">
+              {% for option in time_of_day_options %}
+              <option value="{{ option }}" {% if series.time_of_day == option %}selected{% endif %}>
+                {{ time_of_day_labels.get(option, option) }}
+              </option>
+              {% endfor %}
+            </select>
+          </div>
 
           <div class="flex justify-end gap-4 mt-4">
             <a href="{{ url_for('upload_series') }}?series={{ series.folder_name }}"
@@ -66,15 +80,28 @@
     <!-- ADD NEW SERIES FORM -->
     <div class="bg-gray-800 border border-purple-600 rounded-lg p-6 shadow">
       <h2 class="text-xl font-bold text-green-400 mb-4">Add New Series</h2>
-      <form action="{{ url_for('series_add') }}" method="post" class="flex flex-col sm:flex-row gap-4">
-        <div class="flex-1">
-          <label class="block text-sm mb-1 text-gray-300">Series Name</label>
-          <input type="text" name="name" required
-                 placeholder="e.g. Los Simuladores"
-                 class="w-full bg-gray-900 text-white px-3 py-2 rounded border border-gray-600 focus:border-purple-500 focus:outline-none">
-          <p class="text-xs text-gray-500 mt-1">Spaces will be converted to underscores in folder names.</p>
+      <form action="{{ url_for('series_add') }}" method="post" class="space-y-4">
+        <div class="flex flex-col sm:flex-row gap-4">
+          <div class="flex-1">
+            <label class="block text-sm mb-1 text-gray-300">Series Name</label>
+            <input type="text" name="name" required
+                   placeholder="e.g. Los Simuladores"
+                   class="w-full bg-gray-900 text-white px-3 py-2 rounded border border-gray-600 focus:border-purple-500 focus:outline-none">
+            <p class="text-xs text-gray-500 mt-1">Spaces will be converted to underscores in folder names.</p>
+          </div>
+          <div class="sm:w-64">
+            <label class="block text-sm mb-1 text-gray-300">Broadcast Time Slot</label>
+            <select name="time_of_day"
+                    class="w-full bg-gray-900 text-white px-3 py-2 rounded border border-gray-600 focus:border-purple-500 focus:outline-none">
+              {% for option in time_of_day_options %}
+              <option value="{{ option }}" {% if option == 'any' %}selected{% endif %}>
+                {{ time_of_day_labels.get(option, option) }}
+              </option>
+              {% endfor %}
+            </select>
+          </div>
         </div>
-        <div class="flex items-end">
+        <div class="flex justify-end">
           <button type="submit"
                   class="bg-purple-600 hover:bg-purple-700 text-white font-bold px-6 py-2 rounded shadow">
             Create Series
@@ -87,5 +114,27 @@
       <a href="{{ url_for('index') }}" class="text-blue-400 hover:underline text-sm">Back to Admin</a>
     </div>
   </div>
+
+  <script>
+    async function updateTimeOfDay(seriesName, value) {
+      try {
+        const response = await fetch(`/api/series/${encodeURIComponent(seriesName)}/time_of_day`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ time_of_day: value })
+        });
+
+        if (!response.ok) {
+          const data = await response.json();
+          alert('Error updating time of day: ' + (data.error || 'Unknown error'));
+        }
+      } catch (err) {
+        console.error('Failed to update time of day:', err);
+        alert('Failed to update time of day');
+      }
+    }
+  </script>
 </body>
 </html>
