@@ -1544,9 +1544,15 @@ def api_next_video():
         logger.info(f"[NEXT] cooldown canal={canal_id} dt={now-ultimo:.2f}s -> bloqueo")
         return jsonify({"cooldown": True, "canal_id": canal_id}), 200
 
+    # --- Series filter: if channel has series_filter, only show TV Episodes from those series ---
+    series_filter = config.get("series_filter", [])
+    series_filter_set = set(series_filter) if series_filter else None
+
     prioridad = config.get("tags_prioridad", [])
     incluidos = set(config.get("tags_incluidos", prioridad))  # fallback
-    if not incluidos:
+
+    # Only require tags_incluidos for non-series channels
+    if not incluidos and not series_filter_set:
         return jsonify({"error": "No hay tags incluidos definidos en la configuración."}), 400
 
     canal_shown = shown_videos_por_canal.get(canal_id, [])
@@ -1557,10 +1563,6 @@ def api_next_video():
     if prev:
         prev_md = metadata.get(prev["video_id"], {})
         last_tags = set(prev_md.get("tags", []))
-
-    # --- Series filter: if channel has series_filter, only show TV Episodes from those series ---
-    series_filter = config.get("series_filter", [])
-    series_filter_set = set(series_filter) if series_filter else None
 
     # Debug logging for series filter
     if series_filter_set:
