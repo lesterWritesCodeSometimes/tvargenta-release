@@ -639,20 +639,22 @@ class BroadcastScheduler:
             # No ads available, show hang tight
             return self._hang_tight_entry()
 
-        # Calculate which ad and position within it
-        accumulated = 0
+        # Calculate total duration of all ads
         total_ads_duration = sum(a.get("duracion", 30) for a in ads)
 
         if total_ads_duration == 0:
             return self._hang_tight_entry()
 
-        # Loop through ads as needed to fill the break
-        position_in_ads = offset_in_break % total_ads_duration
+        # If we're past all available ads, show hang tight for the rest of the break
+        if offset_in_break >= total_ads_duration:
+            return self._hang_tight_entry()
 
+        # Find which ad we're in and at what position
+        accumulated = 0
         for ad in ads:
             ad_duration = ad.get("duracion", 30) or 30
-            if accumulated + ad_duration > position_in_ads:
-                seek_time = position_in_ads - accumulated
+            if accumulated + ad_duration > offset_in_break:
+                seek_time = offset_in_break - accumulated
                 return {
                     "content_type": "ad",
                     "video_path": ad.get("path", ""),
@@ -662,11 +664,7 @@ class BroadcastScheduler:
                 }
             accumulated += ad_duration
 
-        # If we've exhausted all ads but break isn't over, show hang tight
-        remaining = break_duration - offset_in_break
-        if remaining > 0 and offset_in_break >= total_ads_duration:
-            return self._hang_tight_entry()
-
+        # Fallback to hang tight (shouldn't normally reach here)
         return self._hang_tight_entry()
 
     def _get_available_ads(self) -> List[Dict]:

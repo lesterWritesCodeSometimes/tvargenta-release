@@ -1137,6 +1137,11 @@ def serve_series_video(series_name, filename):
     series_dir = SERIES_VIDEO_DIR / series_name
     return send_from_directory(str(series_dir), filename)
 
+@app.route("/videos/ads/<filename>")
+def serve_ad_video(filename):
+    """Serve video files from ads directory."""
+    return send_from_directory(str(ADS_DIR), filename)
+
 @app.route("/delete_full/<video_id>")
 def delete_full_video(video_id):
     # Check if it's a series video
