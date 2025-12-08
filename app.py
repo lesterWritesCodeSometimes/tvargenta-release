@@ -1988,21 +1988,19 @@ def api_schedule_now():
     if not channel_name:
         # Get active channel
         canal_id = get_canal_activo()
-        canales = load_canales().get("canales", [])
-        for c in canales:
-            if str(c.get("id")) == str(canal_id):
-                channel_name = c.get("nombre", "")
-                break
+        canales = load_canales()
+        if canal_id in canales:
+            channel_name = canales[canal_id].get("nombre", "")
 
     if not channel_name:
         return jsonify({"error": "Channel not found", "is_broadcast_channel": False}), 404
 
     # Check if this is a broadcast channel
-    canales = load_canales().get("canales", [])
+    canales = load_canales()
     is_broadcast = False
-    for c in canales:
-        if c.get("nombre") == channel_name:
-            if c.get("series_filter"):
+    for canal_id, config in canales.items():
+        if config.get("nombre") == channel_name:
+            if config.get("series_filter"):
                 is_broadcast = True
             break
 
@@ -2043,11 +2041,9 @@ def api_schedule_info():
     channel_name = request.args.get("channel")
     if not channel_name:
         canal_id = get_canal_activo()
-        canales = load_canales().get("canales", [])
-        for c in canales:
-            if str(c.get("id")) == str(canal_id):
-                channel_name = c.get("nombre", "")
-                break
+        canales = load_canales()
+        if canal_id in canales:
+            channel_name = canales[canal_id].get("nombre", "")
 
     if not channel_name:
         return jsonify({"error": "Channel not found"}), 404

@@ -343,6 +343,7 @@ class BroadcastScheduler:
             if data.get("series") == series_name and data.get("category") == "tv_episode":
                 episodes.append({
                     "video_id": video_id,
+                    "series": series_name,  # Include series name for _episode_entry
                     "season": data.get("season", 1) or 1,
                     "episode": data.get("episode", 1) or 1,
                     "duracion": data.get("duracion", 0),
@@ -733,7 +734,13 @@ class BroadcastScheduler:
         try:
             with open(CANALES_FILE, 'r', encoding='utf-8') as f:
                 data = json.load(f)
-                return data.get("canales", [])
+                # canales.json is a dict keyed by canal_id, convert to list
+                channels = []
+                for canal_id, config in data.items():
+                    config_copy = config.copy()
+                    config_copy["id"] = canal_id
+                    channels.append(config_copy)
+                return channels
         except Exception:
             return []
 
