@@ -90,7 +90,7 @@
 			  return;
 			}
 
-			const videoUrl = `/videos/${data.video_id}.mp4`;
+			const videoUrl = data.video_url || `/videos/${data.video_id}.mp4`;
 			videoEl.src = videoUrl;
 			videoEl.load();
 			videoEl.volume = 0.5;

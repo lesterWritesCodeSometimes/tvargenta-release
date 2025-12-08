@@ -1007,7 +1007,15 @@ def video_detail(video_id):
     video = metadata.get(video_id)
     if not video:
         return "Video no encontrado", 404
-    return render_template("video.html", video_id=video_id, video=video)
+
+    # Determine video URL based on whether it's a series video
+    series_path = video.get("series_path")
+    if series_path:
+        video_url = f"/videos/{series_path}.mp4"
+    else:
+        video_url = f"/videos/{video_id}.mp4"
+
+    return render_template("video.html", video_id=video_id, video=video, video_url=video_url)
 
 @app.route("/edit/<video_id>", methods=["GET", "POST"])
 def edit_video(video_id):
@@ -1484,15 +1492,18 @@ def api_next_video():
                 canal_id = activo["canal_id"]
                 config = canales[canal_id]
     
-    # --- De-dupe: si hay pick pendiente “fresco”, reusalo ---
+    # --- De-dupe: si hay pick pendiente "fresco", reusalo ---
     now = time.time()
     pp = pending_pick.get(canal_id)
     if (not force_next) and pp and (now - pp.get("ts", 0.0)) < PENDING_TTL:
         vid = pp["video_id"]
         info = metadata.get(vid, {})
+        series_path = info.get("series_path")
+        video_url = f"/videos/{series_path}.mp4" if series_path else f"/videos/{vid}.mp4"
         logger.info(f"[NEXT-DUPE] Reuso pick pendiente canal={canal_id} video={vid}")
         return jsonify({
             "video_id": vid,
+            "video_url": video_url,
             "title": info.get("title", vid.replace("_", " ")),
             "tags": info.get("tags", []),
             "modo": canal_id,
@@ -1509,8 +1520,11 @@ def api_next_video():
         elegido_id = sticky["video_id"]
         elegido_data = metadata.get(elegido_id, {})
         if elegido_data:
+            series_path = elegido_data.get("series_path")
+            video_url = f"/videos/{series_path}.mp4" if series_path else f"/videos/{elegido_id}.mp4"
             return jsonify({
                 "video_id": elegido_id,
+                "video_url": video_url,
                 "title": elegido_data.get("title", elegido_id.replace("_", " ")),
                 "tags": elegido_data.get("tags", []),
                 "score_tags": 0,

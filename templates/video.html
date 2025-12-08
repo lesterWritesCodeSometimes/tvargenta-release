@@ -29,7 +29,7 @@
 
     <!-- Reproductor de video -->
     <video controls class="w-full rounded border border-yellow-500 shadow-lg">
-      <source src="{{ url_for('serve_video', filename=video_id + '.mp4') }}" type="video/mp4">
+      <source src="{{ video_url }}" type="video/mp4">
       Tu navegador no soporta la etiqueta de video.
     </video>
 
