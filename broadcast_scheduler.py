@@ -309,6 +309,7 @@ class BroadcastScheduler:
 
         channels = self._load_channels()
         daily_schedule = {}
+        cursor_updates_needed = False
 
         for channel in channels:
             channel_name = channel.get("nombre", "")
@@ -317,7 +318,7 @@ class BroadcastScheduler:
             if not series_filter:
                 continue  # Not a broadcast channel
 
-            segments = self._generate_channel_daily_segments(
+            segments, episode_offsets = self._generate_channel_daily_segments(
                 channel_name, day_start_ts, day_end_ts
             )
             daily_schedule[channel_name] = {
@@ -325,10 +326,19 @@ class BroadcastScheduler:
                 "_generated_at": datetime.now().isoformat()
             }
 
+            # Update episode cursors in weekly schedule for tomorrow
+            if episode_offsets:
+                self._advance_episode_cursors(channel_name, episode_offsets)
+                cursor_updates_needed = True
+
         # Update in-memory state
         with self._lock:
             self._daily_schedule = daily_schedule
             self._daily_schedule_date = today_str
+
+        # Save weekly schedule if cursors were updated
+        if cursor_updates_needed:
+            self._save_schedule()
 
         # Save to file for debugging
         self._save_daily_schedule(today_str, daily_schedule)
@@ -341,11 +351,16 @@ class BroadcastScheduler:
         channel_name: str,
         day_start_ts: int,
         day_end_ts: int
-    ) -> List[Dict]:
+    ) -> Tuple[List[Dict], Dict[str, int]]:
         """
         Generate all segments for a channel for the day.
 
-        Returns a list of segments, each containing:
+        Returns:
+            Tuple of (segments list, episode_offsets dict)
+            - segments: list of segment dicts
+            - episode_offsets: dict mapping series_name -> episodes consumed
+
+        Each segment contains:
         {
             "start": epoch_timestamp,
             "end": epoch_timestamp,
@@ -361,11 +376,11 @@ class BroadcastScheduler:
         """
         channel_schedule = self._schedule.get("channels", {}).get(channel_name)
         if not channel_schedule:
-            return []
+            return [], {}
 
         daily_slots = channel_schedule.get("daily_slots", [])
         if not daily_slots:
-            return []
+            return [], {}
 
         metadata = self._load_metadata()
         segments = []
@@ -436,7 +451,7 @@ class BroadcastScheduler:
             # Move to end of this slot
             current_ts = slot_end_ts
 
-        return segments
+        return segments, episode_offsets
 
     def _generate_slot_segments(
         self,
@@ -690,6 +705,12 @@ class BroadcastScheduler:
         """Generate a new weekly schedule for all broadcast channels."""
         logger.info("[SCHEDULER] Generating new weekly schedule...")
 
+        # Preserve existing episode cursors before regeneration
+        existing_cursors = {}
+        for channel_name, channel_data in self._schedule.get("channels", {}).items():
+            if "episode_cursor" in channel_data:
+                existing_cursors[channel_name] = channel_data["episode_cursor"]
+
         channels = self._load_channels()
         series_data = self._load_series()
         metadata = self._load_metadata()
@@ -710,6 +731,12 @@ class BroadcastScheduler:
             channel_schedule = self._generate_channel_schedule(
                 channel_name, series_filter, series_data, metadata
             )
+
+            # Restore preserved cursors if they exist
+            if channel_name in existing_cursors:
+                channel_schedule["episode_cursor"] = existing_cursors[channel_name]
+                logger.debug(f"[SCHEDULER] Preserved episode cursors for {channel_name}")
+
             schedule["channels"][channel_name] = channel_schedule
 
         self._schedule = schedule
@@ -896,6 +923,46 @@ class BroadcastScheduler:
                 return i
 
         return 0  # Default to first episode
+
+    def _advance_episode_cursors(self, channel_name: str, episode_offsets: Dict[str, int]):
+        """
+        Advance episode cursors in the weekly schedule based on episodes consumed today.
+
+        Args:
+            channel_name: Name of the channel
+            episode_offsets: Dict mapping series_name -> number of episodes consumed
+        """
+        channel_schedule = self._schedule.get("channels", {}).get(channel_name)
+        if not channel_schedule:
+            return
+
+        cursors = channel_schedule.get("episode_cursor", {})
+        metadata = self._load_metadata()
+
+        for series_name, episodes_consumed in episode_offsets.items():
+            if episodes_consumed == 0:
+                continue
+
+            episodes = self._get_series_episodes(series_name, metadata)
+            if not episodes:
+                continue
+
+            # Get current cursor position
+            current_cursor = cursors.get(series_name, {"season": 1, "episode": 1})
+            current_index = self._cursor_to_index(current_cursor, episodes)
+
+            # Advance by episodes consumed, wrapping around
+            new_index = (current_index + episodes_consumed) % len(episodes)
+            new_episode = episodes[new_index]
+
+            # Update cursor to new position
+            cursors[series_name] = {
+                "season": new_episode.get("season", 1),
+                "episode": new_episode.get("episode", 1)
+            }
+            logger.debug(f"[SCHEDULER] Advanced {channel_name}/{series_name} cursor by {episodes_consumed} to S{new_episode.get('season')}E{new_episode.get('episode')}")
+
+        channel_schedule["episode_cursor"] = cursors
 
     def _test_pattern_entry(self) -> Dict:
         """Create a schedule entry for test pattern."""
