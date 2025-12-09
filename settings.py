@@ -69,6 +69,7 @@ TAPES_FILE = CONTENT_DIR / "tapes.json"
 
 # Broadcast scheduling paths
 SCHEDULE_FILE = SYSTEM_DATA_DIR / "schedule.json"
+DAILY_SCHEDULE_FILE = SYSTEM_DATA_DIR / "daily_schedule.json"
 TEST_PATTERN_FILE = VIDEO_DIR / "test_pattern.png"
 HANG_TIGHT_FILE = VIDEO_DIR / "hang_tight.png"
 ADS_DIR = VIDEO_DIR / "ads"

@@ -11,11 +11,12 @@ Broadcast TV Scheduler
 This module implements broadcast-style TV scheduling for channels with series_filter.
 It provides:
 - Weekly schedule generation (regenerates every Sunday at midnight)
-- Rolling 5-minute buffer of scheduled content
+- Daily pre-computed schedule with video segments (regenerates at 3am or on demand)
 - Commercial break insertion for series with short episodes
 - Time-of-day based series programming
 """
 
+import bisect
 import json
 import logging
 import math
@@ -29,17 +30,16 @@ from pathlib import Path
 from typing import Dict, List, Optional, Tuple, Any
 
 from settings import (
-    SCHEDULE_FILE, TIME_SLOTS, VALID_TIME_OF_DAY,
+    SCHEDULE_FILE, DAILY_SCHEDULE_FILE, TIME_SLOTS, VALID_TIME_OF_DAY,
     TEST_PATTERN_FILE, HANG_TIGHT_FILE, ADS_DIR,
     METADATA_FILE, SERIES_FILE, CANALES_FILE, VIDEO_DIR,
 )
 
 logger = logging.getLogger("tvargenta")
 
-# Buffer configuration
-BUFFER_DURATION_SEC = 300  # 5 minutes of buffer
-LOOKAHEAD_SEC = 30  # Compute 30 seconds into the future
-SCHEDULER_INTERVAL_SEC = 1  # Run scheduler every second
+# Daily schedule configuration
+DAILY_REGEN_HOUR = 3  # Regenerate daily schedule at 3 AM
+SCHEDULER_CHECK_INTERVAL_SEC = 60  # Check for regeneration every minute
 
 # Commercial break configuration
 BLOCK_DURATION_SEC = 30 * 60  # 30 minutes
@@ -47,7 +47,7 @@ MAX_COMMERCIAL_BREAK_SEC = 4 * 60  # 4 minutes max per break
 MIN_COMMERCIAL_BREAKS = 3  # Minimum number of breaks per block
 
 # Schedule version - increment when schedule logic changes to trigger regeneration
-SCHEDULE_VERSION = 2
+SCHEDULE_VERSION = 3
 
 # Contiguous block randomization for series scheduling
 # Probability distribution for max consecutive 30-min blocks per series per time slot
@@ -76,16 +76,20 @@ class BroadcastScheduler:
     Manages broadcast-style TV scheduling for series channels.
 
     The scheduler:
-    1. Generates weekly schedules on Sunday midnight or when missing
-    2. Maintains a rolling 5-minute buffer of scheduled content
-    3. Handles commercial breaks for short episodes
-    4. Shows test pattern when no eligible content
+    1. Generates weekly schedules on Sunday midnight (defines time slots and series assignments)
+    2. Pre-computes daily schedule with video segments (regenerates at 3 AM or on new day)
+    3. Uses binary search for O(log n) content lookup at any timestamp
+    4. Handles commercial breaks for short episodes
+    5. Shows test pattern when no eligible content
+
+    Daily schedule is written to disk for debugging inspection.
     """
 
     def __init__(self):
         self._lock = threading.RLock()
-        self._buffer: Dict[str, Dict] = {}  # channel_name:epoch_ts -> content info
         self._schedule: Dict = {}  # Persisted weekly schedule
+        self._daily_schedule: Dict = {}  # Pre-computed daily segments per channel
+        self._daily_schedule_date: str = ""  # Date string for current daily schedule
         self._running = False
         self._thread: Optional[threading.Thread] = None
         self._ready = threading.Event()
@@ -123,6 +127,8 @@ class BroadcastScheduler:
         """
         Get the scheduled content for a channel at a specific timestamp.
 
+        Uses binary search on pre-computed daily schedule segments.
+
         Args:
             channel_name: Name of the channel
             timestamp: Unix timestamp (defaults to now)
@@ -133,50 +139,69 @@ class BroadcastScheduler:
         if timestamp is None:
             timestamp = int(time.time())
 
-        key = f"{channel_name}:{timestamp}"
-
         with self._lock:
-            if key in self._buffer:
-                return self._buffer[key].copy()
+            channel_segments = self._daily_schedule.get(channel_name, {}).get("segments", [])
 
-        # If not in buffer, compute it directly (fallback)
-        return self._compute_schedule_entry(channel_name, timestamp)
+        if not channel_segments:
+            return self._test_pattern_entry()
+
+        # Binary search to find the segment containing this timestamp
+        # We search for the rightmost segment where start <= timestamp
+        starts = [seg["start"] for seg in channel_segments]
+        idx = bisect.bisect_right(starts, timestamp) - 1
+
+        if idx < 0:
+            # Before first segment
+            return self._test_pattern_entry()
+
+        segment = channel_segments[idx]
+
+        # Check if timestamp is within this segment
+        if timestamp >= segment["end"]:
+            # After this segment ends (gap or end of day)
+            return self._test_pattern_entry()
+
+        # Calculate seek position within the content
+        elapsed = timestamp - segment["start"]
+        seek_time = segment.get("seek_start", 0) + elapsed
+
+        # Return content info with calculated seek time
+        return {
+            "content_type": segment["content_type"],
+            "series": segment.get("series", ""),
+            "season": segment.get("season", 0),
+            "episode": segment.get("episode", 0),
+            "timestamp": seek_time,
+            "video_path": segment.get("video_path", ""),
+            "duration": segment.get("duration", 0),
+            "video_id": segment.get("video_id", "")
+        }
 
     def _scheduler_loop(self):
-        """Main scheduler loop running every second."""
-        # Initial schedule load/generation
+        """Main scheduler loop - checks for schedule regeneration periodically."""
+        # Load weekly schedule
         self._load_or_generate_schedule()
 
-        # Populate initial buffer
-        now = int(time.time())
-        for t in range(now, now + BUFFER_DURATION_SEC):
-            self._populate_buffer_at(t)
+        # Generate or load daily schedule
+        self._load_or_generate_daily_schedule()
 
         self._ready.set()
-        logger.info("[SCHEDULER] Initial buffer populated, scheduler ready")
+        logger.info("[SCHEDULER] Daily schedule ready")
 
         while self._running:
             try:
-                loop_start = time.time()
-
-                # Check for Sunday schedule regeneration
+                # Check for weekly schedule regeneration (Sunday midnight)
                 self._check_schedule_regeneration()
 
-                # Compute schedule for now + lookahead
-                target_time = int(time.time()) + LOOKAHEAD_SEC
-                self._populate_buffer_at(target_time)
+                # Check for daily schedule regeneration (3 AM or new day)
+                self._check_daily_schedule_regeneration()
 
-                # Prune old entries
-                self._prune_buffer()
-
-                # Sleep for remainder of interval
-                elapsed = time.time() - loop_start
-                sleep_time = max(0, SCHEDULER_INTERVAL_SEC - elapsed)
-                time.sleep(sleep_time)
+                # Sleep until next check
+                time.sleep(SCHEDULER_CHECK_INTERVAL_SEC)
 
             except Exception as e:
                 logger.error(f"[SCHEDULER] Error in scheduler loop: {e}", exc_info=True)
-                time.sleep(1)
+                time.sleep(SCHEDULER_CHECK_INTERVAL_SEC)
 
     def _load_or_generate_schedule(self):
         """Load existing schedule or generate a new one."""
@@ -225,6 +250,421 @@ class BroadcastScheduler:
                 if ws_dt < this_sunday:
                     logger.info("[SCHEDULER] Sunday midnight reached, regenerating weekly schedule")
                     self._generate_weekly_schedule()
+                    # Also regenerate daily schedule after weekly regeneration
+                    self._generate_daily_schedule()
+
+    def _load_or_generate_daily_schedule(self):
+        """Load existing daily schedule or generate a new one."""
+        today = datetime.now().strftime("%Y-%m-%d")
+        schedule_path = Path(DAILY_SCHEDULE_FILE)
+
+        if schedule_path.exists():
+            try:
+                with open(schedule_path, 'r', encoding='utf-8') as f:
+                    daily_data = json.load(f)
+
+                schedule_date = daily_data.get("date", "")
+                if schedule_date == today:
+                    self._daily_schedule = daily_data.get("channels", {})
+                    self._daily_schedule_date = today
+                    logger.info(f"[SCHEDULER] Loaded existing daily schedule for {today}")
+                    return
+                else:
+                    logger.info(f"[SCHEDULER] Daily schedule is for {schedule_date}, need {today}")
+            except Exception as e:
+                logger.error(f"[SCHEDULER] Error loading daily schedule: {e}")
+
+        # Generate new daily schedule
+        self._generate_daily_schedule()
+
+    def _check_daily_schedule_regeneration(self):
+        """Check if we need to regenerate the daily schedule."""
+        now = datetime.now()
+        today = now.strftime("%Y-%m-%d")
+
+        # Regenerate if date changed or at 3 AM
+        if self._daily_schedule_date != today:
+            logger.info(f"[SCHEDULER] New day detected ({today}), regenerating daily schedule")
+            self._generate_daily_schedule()
+        elif now.hour == DAILY_REGEN_HOUR and now.minute < 2:
+            # Regenerate at 3 AM (within first 2 minutes to catch it with 60s interval)
+            # Check if we already regenerated today at 3 AM
+            if self._daily_schedule_date == today:
+                # Check if schedule was generated before 3 AM
+                generated_at = self._daily_schedule.get("_generated_at", "")
+                if generated_at:
+                    gen_time = datetime.fromisoformat(generated_at)
+                    if gen_time.hour < DAILY_REGEN_HOUR:
+                        logger.info("[SCHEDULER] 3 AM regeneration triggered")
+                        self._generate_daily_schedule()
+
+    def _generate_daily_schedule(self):
+        """Generate pre-computed segments for all broadcast channels for today."""
+        logger.info("[SCHEDULER] Generating daily schedule...")
+
+        today = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+        today_str = today.strftime("%Y-%m-%d")
+        day_start_ts = int(today.timestamp())
+        day_end_ts = day_start_ts + 86400  # 24 hours
+
+        channels = self._load_channels()
+        daily_schedule = {}
+
+        for channel in channels:
+            channel_name = channel.get("nombre", "")
+            series_filter = channel.get("series_filter", [])
+
+            if not series_filter:
+                continue  # Not a broadcast channel
+
+            segments = self._generate_channel_daily_segments(
+                channel_name, day_start_ts, day_end_ts
+            )
+            daily_schedule[channel_name] = {
+                "segments": segments,
+                "_generated_at": datetime.now().isoformat()
+            }
+
+        # Update in-memory state
+        with self._lock:
+            self._daily_schedule = daily_schedule
+            self._daily_schedule_date = today_str
+
+        # Save to file for debugging
+        self._save_daily_schedule(today_str, daily_schedule)
+
+        total_segments = sum(len(ch.get("segments", [])) for ch in daily_schedule.values())
+        logger.info(f"[SCHEDULER] Generated daily schedule: {len(daily_schedule)} channels, {total_segments} segments")
+
+    def _generate_channel_daily_segments(
+        self,
+        channel_name: str,
+        day_start_ts: int,
+        day_end_ts: int
+    ) -> List[Dict]:
+        """
+        Generate all segments for a channel for the day.
+
+        Returns a list of segments, each containing:
+        {
+            "start": epoch_timestamp,
+            "end": epoch_timestamp,
+            "content_type": "episode" | "ad" | "test_pattern",
+            "video_path": "path/to/video.mp4",
+            "seek_start": seconds_into_video,
+            "series": "Series Name",
+            "season": 1,
+            "episode": 5,
+            "duration": total_video_duration,
+            "video_id": "video_id"
+        }
+        """
+        channel_schedule = self._schedule.get("channels", {}).get(channel_name)
+        if not channel_schedule:
+            return []
+
+        daily_slots = channel_schedule.get("daily_slots", [])
+        if not daily_slots:
+            return []
+
+        metadata = self._load_metadata()
+        segments = []
+        current_ts = day_start_ts
+
+        # Process each second of the day by iterating through time slots
+        while current_ts < day_end_ts:
+            dt = datetime.fromtimestamp(current_ts)
+            hour = dt.hour
+
+            # Handle night slot crossing midnight
+            effective_hour = hour
+            if hour < 4:
+                effective_hour = hour + 24
+
+            # Find active slot for this time
+            active_slot = None
+            for slot in daily_slots:
+                start_h = slot["start_hour"]
+                end_h = slot["end_hour"]
+                if start_h <= effective_hour < end_h:
+                    active_slot = slot
+                    break
+
+            if not active_slot:
+                # No content for this time, skip to next hour
+                next_hour_dt = dt.replace(minute=0, second=0, microsecond=0) + timedelta(hours=1)
+                current_ts = int(next_hour_dt.timestamp())
+                continue
+
+            # Calculate slot boundaries for today
+            slot_start_hour = active_slot["start_hour"]
+            slot_end_hour = active_slot["end_hour"]
+
+            # Handle night slot crossing midnight
+            if slot_start_hour >= 24:
+                slot_start_dt = dt.replace(hour=slot_start_hour - 24, minute=0, second=0, microsecond=0)
+            elif slot_start_hour > 21 and hour < 4:
+                # We're in early morning part of night slot
+                slot_start_dt = (dt - timedelta(days=1)).replace(hour=slot_start_hour, minute=0, second=0, microsecond=0)
+            else:
+                slot_start_dt = dt.replace(hour=slot_start_hour, minute=0, second=0, microsecond=0)
+
+            if slot_end_hour > 24:
+                slot_end_dt = (dt + timedelta(days=1)).replace(hour=slot_end_hour - 24, minute=0, second=0, microsecond=0)
+            elif slot_end_hour <= slot_start_hour and hour >= slot_start_hour:
+                slot_end_dt = (dt + timedelta(days=1)).replace(hour=slot_end_hour, minute=0, second=0, microsecond=0)
+            else:
+                slot_end_dt = dt.replace(hour=min(slot_end_hour, 24) % 24, minute=0, second=0, microsecond=0)
+
+            slot_start_ts = int(slot_start_dt.timestamp())
+            slot_end_ts = int(slot_end_dt.timestamp())
+
+            # Clamp to day boundaries
+            slot_start_ts = max(slot_start_ts, day_start_ts)
+            slot_end_ts = min(slot_end_ts, day_end_ts)
+
+            # Generate segments for this slot
+            slot_segments = self._generate_slot_segments(
+                channel_name, active_slot, slot_start_ts, slot_end_ts, metadata
+            )
+            segments.extend(slot_segments)
+
+            # Move to end of this slot
+            current_ts = slot_end_ts
+
+        return segments
+
+    def _generate_slot_segments(
+        self,
+        channel_name: str,
+        slot: Dict,
+        slot_start_ts: int,
+        slot_end_ts: int,
+        metadata: Dict
+    ) -> List[Dict]:
+        """Generate segments for a single time slot."""
+        segments = []
+        series_blocks = slot.get("series_blocks", [])
+
+        if not series_blocks:
+            return segments
+
+        slot_duration = slot_end_ts - slot_start_ts
+
+        for block in series_blocks:
+            series_name = block["series"]
+            block_start_minute = block["start_minute"]
+            block_duration_minutes = block["duration_minutes"]
+            use_commercial_blocks = block.get("use_commercial_blocks", False)
+
+            # Calculate block time boundaries
+            block_start_ts = slot_start_ts + (block_start_minute * 60)
+            block_end_ts = block_start_ts + (block_duration_minutes * 60)
+
+            # Clamp to slot boundaries
+            block_start_ts = max(block_start_ts, slot_start_ts)
+            block_end_ts = min(block_end_ts, slot_end_ts)
+
+            if block_start_ts >= block_end_ts:
+                continue
+
+            # Generate segments for this series block
+            block_segments = self._generate_series_block_segments(
+                channel_name, series_name, block_start_ts, block_end_ts,
+                use_commercial_blocks, metadata
+            )
+            segments.extend(block_segments)
+
+        return segments
+
+    def _generate_series_block_segments(
+        self,
+        channel_name: str,
+        series_name: str,
+        block_start_ts: int,
+        block_end_ts: int,
+        use_commercial_blocks: bool,
+        metadata: Dict
+    ) -> List[Dict]:
+        """Generate segments for a series within a time block."""
+        segments = []
+        episodes = self._get_series_episodes(series_name, metadata)
+
+        if not episodes:
+            return segments
+
+        cursor = self._get_episode_cursor(channel_name, series_name)
+        episode_index = self._cursor_to_index(cursor, episodes)
+
+        current_ts = block_start_ts
+
+        while current_ts < block_end_ts:
+            episode = episodes[episode_index % len(episodes)]
+            video_id = episode.get("video_id", "")
+            episode_duration = self._get_episode_duration(video_id, episode)
+
+            if use_commercial_blocks and episode_duration < BLOCK_DURATION_SEC:
+                # Short episode with commercial breaks
+                segs = self._generate_episode_with_ads_segments(
+                    episode, current_ts, block_end_ts, episode_duration
+                )
+                segments.extend(segs)
+                # Each episode block is 30 minutes
+                current_ts += BLOCK_DURATION_SEC
+            else:
+                # Long episode, no commercials
+                remaining_time = block_end_ts - current_ts
+                segment_duration = min(episode_duration, remaining_time)
+
+                segments.append({
+                    "start": current_ts,
+                    "end": current_ts + int(segment_duration),
+                    "content_type": "episode",
+                    "video_path": f"{episode.get('series_path', '')}.mp4",
+                    "seek_start": 0,
+                    "series": series_name,
+                    "season": episode.get("season", 1),
+                    "episode": episode.get("episode", 1),
+                    "duration": episode_duration,
+                    "video_id": video_id
+                })
+                current_ts += int(segment_duration)
+
+            episode_index += 1
+
+        return segments
+
+    def _generate_episode_with_ads_segments(
+        self,
+        episode: Dict,
+        block_start_ts: int,
+        block_end_ts: int,
+        episode_duration: float
+    ) -> List[Dict]:
+        """Generate segments for an episode with commercial breaks."""
+        segments = []
+        video_id = episode.get("video_id", "")
+        series_name = episode.get("series", "")
+
+        # Calculate commercial break structure
+        commercial_time = BLOCK_DURATION_SEC - episode_duration
+        num_breaks = max(MIN_COMMERCIAL_BREAKS, int(commercial_time / MAX_COMMERCIAL_BREAK_SEC) + 1)
+        break_duration = commercial_time / num_breaks
+        num_segments = num_breaks + 1
+        segment_duration = episode_duration / num_segments
+
+        current_ts = block_start_ts
+        episode_position = 0
+
+        for i in range(num_segments):
+            # Episode segment
+            seg_duration = min(segment_duration, episode_duration - episode_position)
+            if seg_duration > 0 and current_ts < block_end_ts:
+                segments.append({
+                    "start": current_ts,
+                    "end": current_ts + int(seg_duration),
+                    "content_type": "episode",
+                    "video_path": f"{episode.get('series_path', '')}.mp4",
+                    "seek_start": episode_position,
+                    "series": series_name,
+                    "season": episode.get("season", 1),
+                    "episode": episode.get("episode", 1),
+                    "duration": episode_duration,
+                    "video_id": video_id
+                })
+                current_ts += int(seg_duration)
+                episode_position += seg_duration
+
+            # Commercial break (except after last segment)
+            if i < num_breaks and current_ts < block_end_ts:
+                ad_segments = self._generate_ad_break_segments(
+                    current_ts, break_duration, block_end_ts
+                )
+                segments.extend(ad_segments)
+                current_ts += int(break_duration)
+
+        return segments
+
+    def _generate_ad_break_segments(
+        self,
+        break_start_ts: int,
+        break_duration: float,
+        max_end_ts: int
+    ) -> List[Dict]:
+        """Generate segments for a commercial break."""
+        segments = []
+        ads = self._load_ads()
+
+        if not ads:
+            # No ads available - use hang tight
+            segments.append({
+                "start": break_start_ts,
+                "end": min(break_start_ts + int(break_duration), max_end_ts),
+                "content_type": "hang_tight",
+                "video_path": str(HANG_TIGHT_FILE),
+                "seek_start": 0,
+                "duration": 0
+            })
+            return segments
+
+        current_ts = break_start_ts
+        break_end_ts = min(break_start_ts + int(break_duration), max_end_ts)
+        ad_index = 0
+
+        while current_ts < break_end_ts and ad_index < len(ads):
+            ad = ads[ad_index % len(ads)]
+            ad_duration = ad.get("duracion", 30) or 30
+            remaining = break_end_ts - current_ts
+
+            if remaining <= 0:
+                break
+
+            seg_duration = min(ad_duration, remaining)
+            segments.append({
+                "start": current_ts,
+                "end": current_ts + int(seg_duration),
+                "content_type": "ad",
+                "video_path": ad.get("path", ""),
+                "seek_start": 0,
+                "duration": ad_duration,
+                "video_id": ad.get("video_id", "")
+            })
+            current_ts += int(seg_duration)
+            ad_index += 1
+
+        # Fill remaining time with hang_tight if we ran out of unique ads
+        if current_ts < break_end_ts:
+            segments.append({
+                "start": current_ts,
+                "end": break_end_ts,
+                "content_type": "hang_tight",
+                "video_path": str(HANG_TIGHT_FILE),
+                "seek_start": 0,
+                "duration": 0
+            })
+
+        return segments
+
+    def _save_daily_schedule(self, date_str: str, schedule: Dict):
+        """Save daily schedule to disk for debugging."""
+        try:
+            schedule_path = Path(DAILY_SCHEDULE_FILE)
+            schedule_path.parent.mkdir(parents=True, exist_ok=True)
+
+            output = {
+                "date": date_str,
+                "generated_at": datetime.now().isoformat(),
+                "channels": schedule
+            }
+
+            tmp_path = schedule_path.with_suffix(".tmp")
+            with open(tmp_path, 'w', encoding='utf-8') as f:
+                json.dump(output, f, indent=2, ensure_ascii=False)
+            os.replace(tmp_path, schedule_path)
+
+            logger.info(f"[SCHEDULER] Saved daily schedule to {schedule_path}")
+        except Exception as e:
+            logger.error(f"[SCHEDULER] Error saving daily schedule: {e}")
 
     def _get_last_sunday_midnight(self) -> datetime:
         """Get the datetime of the most recent Sunday at midnight."""
@@ -427,231 +867,6 @@ class BroadcastScheduler:
         episodes.sort(key=lambda e: (e["season"], e["episode"]))
         return episodes
 
-    def _populate_buffer_at(self, timestamp: int):
-        """Populate the buffer with schedule entries for all broadcast channels."""
-        channels = self._load_channels()
-
-        for channel in channels:
-            channel_name = channel.get("nombre", "")
-            series_filter = channel.get("series_filter", [])
-
-            if not series_filter:
-                continue  # Not a broadcast channel
-
-            entry = self._compute_schedule_entry(channel_name, timestamp)
-            if entry:
-                key = f"{channel_name}:{timestamp}"
-                with self._lock:
-                    self._buffer[key] = entry
-
-    def _compute_schedule_entry(self, channel_name: str, timestamp: int) -> Optional[Dict]:
-        """
-        Compute what should be playing on a channel at a given timestamp.
-
-        Returns:
-        {
-            "content_type": "episode" | "ad" | "test_pattern" | "hang_tight",
-            "series": "Series_Name",  # Only for episodes
-            "season": 1,
-            "episode": 5,
-            "timestamp": 1234.5,  # Seconds into the content
-            "video_path": "series/Series_Name/S01E05.mp4",
-            "duration": 2700  # Total duration of this content
-        }
-        """
-        channel_schedule = self._schedule.get("channels", {}).get(channel_name)
-        if not channel_schedule:
-            return self._test_pattern_entry()
-
-        daily_slots = channel_schedule.get("daily_slots", [])
-        if not daily_slots:
-            return self._test_pattern_entry()
-
-        # Convert timestamp to time of day
-        dt = datetime.fromtimestamp(timestamp)
-        hour = dt.hour
-        minute = dt.minute
-        second = dt.second
-
-        # Handle night slot that crosses midnight (21-28 means 21:00-04:00)
-        effective_hour = hour
-        if hour < 4:
-            effective_hour = hour + 24  # Convert 0-3 to 24-27
-
-        # Find the active slot
-        active_slot = None
-        for slot in daily_slots:
-            start_h = slot["start_hour"]
-            end_h = slot["end_hour"]
-            if start_h <= effective_hour < end_h:
-                active_slot = slot
-                break
-
-        if not active_slot:
-            return self._test_pattern_entry()
-
-        # Calculate minutes into the slot
-        slot_start_hour = active_slot["start_hour"]
-        if effective_hour >= 24:
-            # We're in the early morning part of the night slot
-            minutes_into_slot = (effective_hour - slot_start_hour) * 60 + minute
-        else:
-            minutes_into_slot = (hour - slot_start_hour) * 60 + minute
-
-        # Find the active series block
-        series_blocks = active_slot.get("series_blocks", [])
-        active_block = None
-        for block in series_blocks:
-            block_start = block["start_minute"]
-            block_end = block_start + block["duration_minutes"]
-            if block_start <= minutes_into_slot < block_end:
-                active_block = block
-                break
-
-        if not active_block:
-            return self._test_pattern_entry()
-
-        # Calculate position within series block
-        series_name = active_block["series"]
-        minutes_into_block = minutes_into_slot - active_block["start_minute"]
-        seconds_into_block = minutes_into_block * 60 + second
-
-        # Get series episodes and metadata
-        metadata = self._load_metadata()
-        episodes = self._get_series_episodes(series_name, metadata)
-        if not episodes:
-            return self._test_pattern_entry()
-
-        # Determine if we use commercial blocks
-        use_commercial_blocks = active_block.get("use_commercial_blocks", False)
-
-        if use_commercial_blocks:
-            return self._compute_commercial_block_entry(
-                channel_name, series_name, episodes, seconds_into_block, timestamp
-            )
-        else:
-            return self._compute_continuous_playback_entry(
-                channel_name, series_name, episodes, seconds_into_block
-            )
-
-    def _compute_commercial_block_entry(
-        self,
-        channel_name: str,
-        series_name: str,
-        episodes: List[Dict],
-        seconds_into_block: int,
-        timestamp: int
-    ) -> Dict:
-        """
-        Compute entry for series with 30-minute commercial blocks.
-
-        Each 30-minute block contains:
-        - Episode content
-        - Commercial breaks (evenly spaced)
-        """
-        # Figure out which 30-minute block we're in within the series time
-        block_index = seconds_into_block // BLOCK_DURATION_SEC
-        seconds_into_30min_block = seconds_into_block % BLOCK_DURATION_SEC
-
-        # Get episode for this block (cycling through episodes)
-        cursor = self._get_episode_cursor(channel_name, series_name)
-        episode_index = self._cursor_to_index(cursor, episodes)
-
-        # Advance by block_index episodes (each block = 1 episode)
-        target_index = (episode_index + block_index) % len(episodes)
-        episode = episodes[target_index]
-
-        episode_duration = self._get_episode_duration(episode.get("video_id", ""), episode)
-        if episode_duration >= BLOCK_DURATION_SEC:
-            # Episode is >= 30 min, no commercials
-            seek_time = min(seconds_into_30min_block, episode_duration - 1)
-            return self._episode_entry(episode, seek_time)
-
-        # Calculate commercial breaks
-        commercial_time = BLOCK_DURATION_SEC - episode_duration
-        num_breaks = max(MIN_COMMERCIAL_BREAKS, math.ceil(commercial_time / MAX_COMMERCIAL_BREAK_SEC))
-        break_duration = commercial_time / num_breaks
-
-        # Episode is split into num_breaks + 1 segments
-        num_segments = num_breaks + 1
-        segment_duration = episode_duration / num_segments
-
-        # Build timeline: [break, segment, break, segment, break, segment, ...]
-        # Actually: [segment, break, segment, break, segment, break] - start with content
-        timeline = []
-        pos = 0
-        for i in range(num_segments):
-            # Episode segment
-            timeline.append({
-                "type": "episode",
-                "start": pos,
-                "duration": segment_duration,
-                "episode_start": i * segment_duration  # Position in episode
-            })
-            pos += segment_duration
-
-            # Commercial break (except after last segment)
-            if i < num_breaks:
-                timeline.append({
-                    "type": "commercial",
-                    "start": pos,
-                    "duration": break_duration
-                })
-                pos += break_duration
-
-        # Find where we are in the timeline
-        for segment in timeline:
-            seg_start = segment["start"]
-            seg_end = seg_start + segment["duration"]
-
-            if seg_start <= seconds_into_30min_block < seg_end:
-                offset_in_segment = seconds_into_30min_block - seg_start
-
-                if segment["type"] == "episode":
-                    episode_time = segment["episode_start"] + offset_in_segment
-                    return self._episode_entry(episode, episode_time)
-                else:
-                    # Commercial break
-                    return self._get_commercial_entry(offset_in_segment, segment["duration"], timestamp)
-
-        # Fallback - shouldn't reach here
-        return self._episode_entry(episode, 0)
-
-    def _compute_continuous_playback_entry(
-        self,
-        channel_name: str,
-        series_name: str,
-        episodes: List[Dict],
-        seconds_into_block: int
-    ) -> Dict:
-        """
-        Compute entry for series with continuous playback (no commercial breaks).
-        Episodes play back-to-back.
-        """
-        cursor = self._get_episode_cursor(channel_name, series_name)
-        episode_index = self._cursor_to_index(cursor, episodes)
-
-        # Calculate total time through all episodes
-        total_time = sum(
-            self._get_episode_duration(e.get("video_id", ""), e)
-            for e in episodes
-        )
-
-        # Where are we in the cycle?
-        position = seconds_into_block % total_time
-
-        # Find which episode and timestamp
-        accumulated = 0
-        for i, ep in enumerate(episodes):
-            ep_duration = self._get_episode_duration(ep.get("video_id", ""), ep)
-            if accumulated + ep_duration > position:
-                seek_time = position - accumulated
-                return self._episode_entry(ep, seek_time)
-            accumulated += ep_duration
-
-        # Fallback
-        return self._episode_entry(episodes[0], 0)
-
     def _get_episode_cursor(self, channel_name: str, series_name: str) -> Dict:
         """Get the episode cursor for a series on a channel."""
         channel_schedule = self._schedule.get("channels", {}).get(channel_name, {})
@@ -669,91 +884,14 @@ class BroadcastScheduler:
 
         return 0  # Default to first episode
 
-    def _episode_entry(self, episode: Dict, seek_time: float) -> Dict:
-        """Create a buffer entry for an episode."""
-        video_id = episode.get("video_id", "")
-        return {
-            "content_type": "episode",
-            "series": episode.get("series", ""),
-            "season": episode.get("season", 1),
-            "episode": episode.get("episode", 1),
-            "timestamp": max(0, seek_time),
-            "video_path": f"{episode.get('series_path', '')}.mp4",
-            "duration": self._get_episode_duration(video_id, episode),
-            "video_id": video_id
-        }
-
     def _test_pattern_entry(self) -> Dict:
-        """Create a buffer entry for test pattern."""
+        """Create a schedule entry for test pattern."""
         return {
             "content_type": "test_pattern",
             "video_path": str(TEST_PATTERN_FILE),
             "timestamp": 0,
             "duration": 0  # Static image
         }
-
-    def _hang_tight_entry(self) -> Dict:
-        """Create a buffer entry for hang tight screen."""
-        return {
-            "content_type": "hang_tight",
-            "video_path": str(HANG_TIGHT_FILE),
-            "timestamp": 0,
-            "duration": 0  # Static image
-        }
-
-    def _get_commercial_entry(self, offset_in_break: float, break_duration: float, timestamp: int) -> Dict:
-        """
-        Get the commercial to play at a given position in a commercial break.
-
-        Args:
-            offset_in_break: Seconds into the commercial break
-            break_duration: Total duration of the break
-            timestamp: Current timestamp (for cache key)
-        """
-        ads = self._get_available_ads()
-
-        if not ads:
-            # No ads available, show hang tight
-            return self._hang_tight_entry()
-
-        # Calculate total duration of all ads
-        total_ads_duration = sum(a.get("duracion", 30) for a in ads)
-
-        if total_ads_duration == 0:
-            return self._hang_tight_entry()
-
-        # If we're past all available ads, show hang tight for the rest of the break
-        if offset_in_break >= total_ads_duration:
-            return self._hang_tight_entry()
-
-        # Find which ad we're in and at what position
-        accumulated = 0
-        for ad in ads:
-            ad_duration = ad.get("duracion", 30) or 30
-            if accumulated + ad_duration > offset_in_break:
-                seek_time = offset_in_break - accumulated
-                return {
-                    "content_type": "ad",
-                    "video_path": ad.get("path", ""),
-                    "timestamp": seek_time,
-                    "duration": ad_duration,
-                    "video_id": ad.get("video_id", "")
-                }
-            accumulated += ad_duration
-
-        # Fallback to hang tight (shouldn't normally reach here)
-        return self._hang_tight_entry()
-
-    def _get_available_ads(self) -> List[Dict]:
-        """Get list of available ads, with caching."""
-        now = time.time()
-
-        # Refresh cache every 60 seconds
-        if now - self._ads_cache_time > 60:
-            self._ads_cache = self._load_ads()
-            self._ads_cache_time = now
-
-        return self._ads_cache
 
     def _load_ads(self) -> List[Dict]:
         """Load available ads from the ads directory."""
@@ -777,18 +915,6 @@ class BroadcastScheduler:
             })
 
         return ads
-
-    def _prune_buffer(self):
-        """Remove buffer entries older than BUFFER_DURATION_SEC."""
-        cutoff = int(time.time()) - BUFFER_DURATION_SEC
-
-        with self._lock:
-            keys_to_remove = [
-                key for key in self._buffer.keys()
-                if int(key.split(":")[-1]) < cutoff
-            ]
-            for key in keys_to_remove:
-                del self._buffer[key]
 
     def _save_schedule(self):
         """Save the schedule to disk."""
