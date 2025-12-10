@@ -37,6 +37,7 @@ import re
 import bluetooth_manager
 import wifi_manager
 import vcr_manager
+import scheduler
 
 
        
@@ -1122,6 +1123,14 @@ def serve_series_video(series_name, filename):
     series_dir = SERIES_VIDEO_DIR / series_name
     return send_from_directory(str(series_dir), filename)
 
+
+@app.route("/videos/system/<filename>")
+def serve_system_video(filename):
+    """Serve system video files (test pattern, sponsors placeholder)."""
+    system_dir = VIDEO_DIR / "system"
+    return send_from_directory(str(system_dir), filename)
+
+
 @app.route("/delete_full/<video_id>")
 def delete_full_video(video_id):
     # Check if it's a series video
@@ -1474,8 +1483,38 @@ def api_next_video():
                     "canal_numero": "03",
                 })
 
-    metadata = load_metadata()
+    # Check for broadcast TV scheduling
+    # If channel has series_filter, use scheduled content instead of fairness-based selection
     canales = load_canales()
+    if os.path.exists(canal_activo_path):
+        with open(canal_activo_path, "r", encoding="utf-8") as f:
+            activo = json.load(f)
+            canal_id = activo.get("canal_id")
+            if canal_id and canal_id in canales:
+                config = canales[canal_id]
+                if config.get("series_filter"):
+                    # This is a broadcast TV channel - use scheduler
+                    try:
+                        scheduled = scheduler.get_scheduled_content(canal_id)
+                        if scheduled:
+                            logger.info(f"[NEXT] Broadcast channel {canal_id}: type={scheduled['type']}, video={scheduled['video_id']}, seek={scheduled.get('seek_to', 0)}")
+                            return jsonify({
+                                "video_id": scheduled["video_id"],
+                                "video_url": scheduled["video_url"],
+                                "seek_to": scheduled.get("seek_to", 0),
+                                "title": scheduled.get("title", ""),
+                                "tags": [],
+                                "modo": canal_id,
+                                "canal_nombre": config.get("nombre", canal_id),
+                                "canal_numero": get_canal_numero(canal_id, canales),
+                                "broadcast_type": scheduled["type"],
+                                "is_broadcast": True
+                            })
+                    except Exception as e:
+                        logger.error(f"[NEXT] Broadcast scheduling error for {canal_id}: {e}")
+                        # Fall through to normal selection if scheduler fails
+
+    metadata = load_metadata()
 
     global _force_next_once
     force_next = _force_next_once
@@ -1714,7 +1753,8 @@ def series_page():
             "folder_name": folder_name,
             "display_name": series_display_name(folder_name),
             "episode_count": _get_series_episode_count(folder_name),
-            "created": info.get("created", "")
+            "created": info.get("created", ""),
+            "time_of_day": info.get("time_of_day", "any")
         })
 
     # Sort by display name
@@ -1760,9 +1800,10 @@ def series_add():
     series_dir = SERIES_VIDEO_DIR / folder_name
     series_dir.mkdir(parents=True, exist_ok=True)
 
-    # Add to series.json
+    # Add to series.json with default time_of_day
     series_data[folder_name] = {
-        "created": datetime.now().strftime("%Y-%m-%d")
+        "created": datetime.now().strftime("%Y-%m-%d"),
+        "time_of_day": "any"  # Default: can play at any time
     }
     save_series(series_data)
 
@@ -1816,6 +1857,32 @@ def api_series():
             for name in sorted(series_data.keys())
         ]
     })
+
+
+@app.route("/api/series/time_of_day", methods=["POST"])
+def api_series_time_of_day():
+    """Update time-of-day preference for a series."""
+    data = request.get_json() or request.form
+    series_name = data.get("series_name")
+    time_of_day = data.get("time_of_day")
+
+    if not series_name or not time_of_day:
+        return jsonify({"error": "Missing series_name or time_of_day"}), 400
+
+    valid_options = ["early_morning", "late_morning", "afternoon", "evening", "night", "any"]
+    if time_of_day not in valid_options:
+        return jsonify({"error": f"Invalid time_of_day. Valid options: {valid_options}"}), 400
+
+    series_data = load_series()
+    if series_name not in series_data:
+        return jsonify({"error": f"Series not found: {series_name}"}), 404
+
+    series_data[series_name]["time_of_day"] = time_of_day
+    save_series(series_data)
+
+    logger.info(f"[SERIES] Updated time_of_day for {series_name} to {time_of_day}")
+    return jsonify({"ok": True, "series_name": series_name, "time_of_day": time_of_day})
+
 
 # ============================================================================
 # SERIES UPLOAD ROUTES
@@ -3492,6 +3559,13 @@ if __name__ == "__main__":
     # Start VCR position tracker thread
     _start_vcr_tracker()
     print("[APP] VCR position tracker started")
+
+    # Initialize broadcast TV scheduler
+    try:
+        scheduler.initialize_scheduler()
+        print("[APP] Broadcast TV scheduler initialized")
+    except Exception as e:
+        print(f"[APP] Warning: Could not initialize scheduler: {e}")
 
     def cleanup():
         if encoder_proc:
