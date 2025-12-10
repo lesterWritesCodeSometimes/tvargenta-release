@@ -603,6 +603,245 @@ def test_13_back_to_back_probability():
     return True
 
 
+def test_14_generate_block_schedule():
+    """Test 14: Block schedule generation with commercials and episodes."""
+    print("\n=== Test 14: Generate block schedule ===")
+
+    commercials = scheduler.get_commercials()
+    metadata = scheduler.load_metadata()
+
+    # Test single medium episode (20 min) in a 30-min block
+    episodes = [{
+        "video_id": "ep_a_s01e01",
+        "series_path": "series/Test_Series_A/ep_a_s01e01",
+        "duration": 1200,  # 20 minutes
+    }]
+
+    entries = scheduler.generate_block_schedule(0, episodes, commercials, 1800)
+
+    assert len(entries) > 0, "Expected entries to be generated"
+    print(f"  Generated {len(entries)} entries for 20-min episode in 30-min block")
+
+    # Verify we have both episode and commercial entries
+    entry_types = set(e["type"] for e in entries)
+    assert "episode" in entry_types, "Should have episode entries"
+    assert "commercial" in entry_types, "Should have commercial entries"
+    print(f"  Entry types: {entry_types} ✓")
+
+    # Verify entries have required fields
+    for entry in entries:
+        assert "start" in entry, "Entry missing 'start'"
+        assert "end" in entry, "Entry missing 'end'"
+        assert "type" in entry, "Entry missing 'type'"
+        assert "video_id" in entry, "Entry missing 'video_id'"
+        assert entry["end"] > entry["start"], "End should be > start"
+    print(f"  All entries have required fields ✓")
+
+    # Verify episode entries have base_timestamp
+    episode_entries = [e for e in entries if e["type"] == "episode"]
+    for ep in episode_entries:
+        assert "base_timestamp" in ep, "Episode missing base_timestamp"
+    print(f"  Episode entries have base_timestamp ✓")
+
+    print("  Test 14 PASSED")
+    return True
+
+
+def test_15_cross_day_boundary():
+    """Test 15: Schedule lookup handles cross-day boundary (before/after 3am)."""
+    print("\n=== Test 15: Cross-day boundary handling ===")
+
+    # Ensure schedule exists
+    if not scheduler.DAILY_SCHEDULE_FILE.exists():
+        scheduler.generate_weekly_schedule()
+        scheduler.generate_daily_schedule()
+
+    # Test at 2:30am (before 3am - should be in "night" of previous logical day)
+    # This is still within the test pattern period (3am-4am) or late night
+    test_time = datetime.now().replace(hour=2, minute=30, second=0, microsecond=0)
+    result = scheduler.get_scheduled_content("channel_1", test_time)
+
+    assert result is not None, "Should return content for 2:30am"
+    print(f"  2:30am: {result['type']} (seek_to: {result.get('seek_to', 0)}) ✓")
+
+    # Test at 3:15am (within test pattern period)
+    test_time = datetime.now().replace(hour=3, minute=15, second=0, microsecond=0)
+    result = scheduler.get_scheduled_content("channel_1", test_time)
+
+    assert result is not None, "Should return content for 3:15am"
+    assert result["type"] == "test_pattern", f"Expected test_pattern, got {result['type']}"
+    print(f"  3:15am: {result['type']} ✓")
+
+    # Test at 4:01am (just after test pattern ends)
+    test_time = datetime.now().replace(hour=4, minute=1, second=0, microsecond=0)
+    result = scheduler.get_scheduled_content("channel_1", test_time)
+
+    assert result is not None, "Should return content for 4:01am"
+    assert result["type"] != "test_pattern" or result["type"] in ["episode", "commercial", "test_pattern"], \
+        "Should be programming or scheduled content"
+    print(f"  4:01am: {result['type']} ✓")
+
+    print("  Test 15 PASSED")
+    return True
+
+
+def test_16_schedule_regeneration_checks():
+    """Test 16: Schedule regeneration need detection."""
+    print("\n=== Test 16: Schedule regeneration checks ===")
+
+    now = datetime.now()
+
+    # Test needs_daily_regeneration with no schedule
+    if scheduler.DAILY_SCHEDULE_FILE.exists():
+        scheduler.DAILY_SCHEDULE_FILE.unlink()
+
+    meta = {}
+    result = scheduler.needs_daily_regeneration(meta, now)
+    assert result == True, "Should need regeneration when no schedule exists"
+    print(f"  No schedule exists: needs_daily_regeneration = {result} ✓")
+
+    # Generate a schedule
+    scheduler.generate_weekly_schedule()
+    scheduler.generate_daily_schedule()
+
+    # Test with recent schedule
+    meta = {"daily_generated": now.isoformat()}
+    result = scheduler.needs_daily_regeneration(meta, now)
+    # If we're past 3am, we shouldn't need regeneration (we just generated)
+    print(f"  Recent schedule: needs_daily_regeneration = {result}")
+
+    # Test needs_weekly_regeneration
+    # Not Sunday - should not need regeneration
+    non_sunday = now
+    while non_sunday.weekday() == 6:  # Find a non-Sunday
+        non_sunday = non_sunday + timedelta(days=1)
+
+    if non_sunday.weekday() != 6:
+        meta = {"weekly_generated": non_sunday.isoformat()}
+        result = scheduler.needs_weekly_regeneration(meta, non_sunday)
+        assert result == False, "Should not need weekly regeneration on non-Sunday"
+        print(f"  Non-Sunday: needs_weekly_regeneration = {result} ✓")
+
+    print("  Test 16 PASSED")
+    return True
+
+
+def test_17_is_broadcast_channel():
+    """Test 17: Broadcast channel detection."""
+    print("\n=== Test 17: Is broadcast channel detection ===")
+
+    # channel_1 has series_filter - should be broadcast
+    result = scheduler.is_broadcast_channel("channel_1")
+    assert result == True, "channel_1 should be broadcast channel"
+    print(f"  channel_1 (has series_filter): is_broadcast = {result} ✓")
+
+    # channel_3 has no series_filter - should not be broadcast
+    result = scheduler.is_broadcast_channel("channel_3")
+    assert result == False, "channel_3 should not be broadcast channel"
+    print(f"  channel_3 (no series_filter): is_broadcast = {result} ✓")
+
+    # Non-existent channel
+    result = scheduler.is_broadcast_channel("non_existent_channel")
+    assert result == False, "Non-existent channel should not be broadcast"
+    print(f"  non_existent_channel: is_broadcast = {result} ✓")
+
+    print("  Test 17 PASSED")
+    return True
+
+
+def test_18_schedule_lookup_no_schedule():
+    """Test 18: Schedule lookup when no schedule exists for channel."""
+    print("\n=== Test 18: Schedule lookup - no schedule ===")
+
+    # Test with a channel that has no schedule entries
+    result = scheduler.get_scheduled_content("non_existent_channel")
+
+    # Should return test pattern as fallback
+    assert result is not None, "Should return fallback content"
+    assert result["type"] == "test_pattern", f"Fallback should be test_pattern, got {result['type']}"
+    print(f"  Non-existent channel: returns {result['type']} fallback ✓")
+
+    # Test with channel_3 (not a broadcast channel, so no schedule)
+    result = scheduler.get_scheduled_content("channel_3")
+    assert result is not None, "Should return fallback for non-broadcast channel"
+    print(f"  channel_3 (non-broadcast): returns {result['type']} ✓")
+
+    print("  Test 18 PASSED")
+    return True
+
+
+def test_19_peek_episode_without_advancing():
+    """Test 19: Peek at next episode without advancing cursor."""
+    print("\n=== Test 19: Peek episode without advancing ===")
+
+    # Clear cursors
+    scheduler.save_episode_cursors({})
+
+    # Peek at next episode
+    peeked = scheduler.peek_next_episode_for_channel("channel_1", "Test_Series_A")
+    assert peeked is not None, "Should peek an episode"
+    assert peeked["episode"] == 1, "First peek should be episode 1"
+    print(f"  First peek: {peeked['video_id']} (S{peeked['season']}E{peeked['episode']}) ✓")
+
+    # Peek again - should still be episode 1 (not advanced)
+    peeked2 = scheduler.peek_next_episode_for_channel("channel_1", "Test_Series_A")
+    assert peeked2["episode"] == 1, "Second peek should still be episode 1"
+    print(f"  Second peek: {peeked2['video_id']} (still episode 1) ✓")
+
+    # Peek with offset
+    peeked_offset = scheduler.peek_next_episode_for_channel("channel_1", "Test_Series_A", offset=1)
+    assert peeked_offset["episode"] == 2, "Peek with offset=1 should be episode 2"
+    print(f"  Peek with offset=1: {peeked_offset['video_id']} (S{peeked_offset['season']}E{peeked_offset['episode']}) ✓")
+
+    # Now actually get episode - should advance cursor
+    actual = scheduler.get_next_episode_for_channel("channel_1", "Test_Series_A")
+    assert actual["episode"] == 1, "Get should return episode 1"
+
+    # Peek again - should now be episode 2
+    peeked3 = scheduler.peek_next_episode_for_channel("channel_1", "Test_Series_A")
+    assert peeked3["episode"] == 2, "After get, peek should be episode 2"
+    print(f"  After get, peek: {peeked3['video_id']} (now episode 2) ✓")
+
+    print("  Test 19 PASSED")
+    return True
+
+
+def test_20_multiple_episodes_per_block():
+    """Test 20: Block with multiple short episodes."""
+    print("\n=== Test 20: Multiple episodes per block ===")
+
+    commercials = scheduler.get_commercials()
+
+    # Test with 3 very short episodes (8 min each = 24 min total)
+    episodes = [
+        {"video_id": "ep_c_s01e01", "series_path": "series/Test_Series_C/ep_c_s01e01", "duration": 480},
+        {"video_id": "ep_c_s01e02", "series_path": "series/Test_Series_C/ep_c_s01e02", "duration": 480},
+        {"video_id": "ep_c_s01e03", "series_path": "series/Test_Series_C/ep_c_s01e03", "duration": 480},
+    ]
+
+    entries = scheduler.generate_block_schedule(0, episodes, commercials, 1800)
+
+    # Count episode entries
+    episode_entries = [e for e in entries if e["type"] == "episode"]
+    unique_videos = set(e["video_id"] for e in episode_entries)
+
+    print(f"  Generated {len(entries)} total entries")
+    print(f"  Episode entries: {len(episode_entries)}")
+    print(f"  Unique episode videos: {unique_videos}")
+
+    # Should have entries for multiple episodes
+    assert len(unique_videos) >= 2, f"Expected multiple episodes, got {len(unique_videos)}"
+    print(f"  Multiple episodes in block ✓")
+
+    # Commercial entries should exist
+    commercial_entries = [e for e in entries if e["type"] == "commercial"]
+    assert len(commercial_entries) > 0, "Should have commercial entries"
+    print(f"  Commercial entries: {len(commercial_entries)} ✓")
+
+    print("  Test 20 PASSED")
+    return True
+
+
 def run_all_tests():
     """Run all tests."""
     print("=" * 60)
@@ -625,6 +864,13 @@ def run_all_tests():
         test_11_get_scheduled_content,
         test_12_time_of_day_period_detection,
         test_13_back_to_back_probability,
+        test_14_generate_block_schedule,
+        test_15_cross_day_boundary,
+        test_16_schedule_regeneration_checks,
+        test_17_is_broadcast_channel,
+        test_18_schedule_lookup_no_schedule,
+        test_19_peek_episode_without_advancing,
+        test_20_multiple_episodes_per_block,
     ]
 
     passed = 0

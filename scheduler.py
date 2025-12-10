@@ -1011,17 +1011,26 @@ def get_scheduled_content(channel_id: str, timestamp: datetime = None) -> Option
     """
     Get the scheduled content for a channel at a specific timestamp.
     Returns dict with video_id, seek_to timestamp, type, etc.
+    Falls back to test pattern if no schedule exists.
     """
+    # Fallback response for when no schedule exists
+    fallback = {
+        "type": "test_pattern",
+        "video_id": "__test_pattern__",
+        "video_url": "/videos/system/test_pattern.mp4",
+        "seek_to": 0,
+    }
+
     if timestamp is None:
         timestamp = datetime.now()
 
     schedule = load_daily_schedule()
     if not schedule:
-        return None
+        return fallback
 
     channel_entries = schedule.get("channels", {}).get(channel_id, [])
     if not channel_entries:
-        return None
+        return fallback
 
     # Calculate second-of-day relative to 3am start
     # Our schedule day runs 3am to 3am
