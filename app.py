@@ -654,12 +654,6 @@ def save_tags(tags_data):
 
 _bootstrap_config_from_tags_if_empty()
 
-# Scan series directories on startup
-try:
-    scan_series_directories()
-except Exception as e:
-    logger.error(f"[SERIES] Error during startup scan: {e}")
-
 def get_canal_activo():
     if os.path.exists(CANAL_ACTIVO_FILE):
         with open(CANAL_ACTIVO_FILE, "r", encoding="utf-8") as f:
@@ -890,6 +884,12 @@ def bump_play(video_id):
 
 def load_metadata():
     return _read_json(METADATA_FILE, {})
+
+# Scan series directories on startup (must be after load_metadata is defined)
+try:
+    scan_series_directories()
+except Exception as e:
+    logger.error(f"[SERIES] Error during startup scan: {e}")
 
 def _iso_to_ts(iso_str):
     try:
