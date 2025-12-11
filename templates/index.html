@@ -8,292 +8,811 @@
 {% block title %}{{ tr("index.title") }}{% endblock %}
 
 {% block extra_styles %}
-  .video-card {
-    background: rgba(17,24,39,.45);
+  .section-card {
+    background: rgba(17,24,39,.6);
     backdrop-filter: blur(2px);
-    position: relative;
   }
-  .video-card .delete-btn { position:absolute; top:.5rem; right:.5rem; z-index:30; }
-  .category-badge {
-    font-size: 0.65rem;
-    padding: 0.125rem 0.5rem;
-    border-radius: 9999px;
+  .section-header {
+    cursor: pointer;
+    user-select: none;
   }
+  .section-header:hover {
+    background: rgba(255,255,255,0.05);
+  }
+  .dropzone {
+    border: 2px dashed #4b5563;
+    transition: all 0.3s ease;
+  }
+  .dropzone.dragover {
+    border-color: #a855f7;
+    background-color: rgba(147, 51, 234, 0.1);
+  }
+  .dropzone-green.dragover {
+    border-color: #22c55e;
+    background-color: rgba(34, 197, 94, 0.1);
+  }
+  .dropzone-blue.dragover {
+    border-color: #3b82f6;
+    background-color: rgba(59, 130, 246, 0.1);
+  }
+  .dropzone-yellow.dragover {
+    border-color: #facc15;
+    background-color: rgba(250, 204, 21, 0.1);
+  }
+  .file-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem;
+    background: #1f2937;
+    border-radius: 0.375rem;
+    margin-bottom: 0.5rem;
+  }
+  .file-item .progress-bar {
+    width: 40px;
+    height: 8px;
+    background: #374151;
+    border-radius: 4px;
+    overflow: hidden;
+    flex-shrink: 0;
+  }
+  .file-item .progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #9333ea, #a855f7);
+    width: 0%;
+    transition: width 0.2s ease;
+  }
+  .content-card {
+    background: rgba(17,24,39,0.8);
+    border: 1px solid #374151;
+    transition: border-color 0.2s, transform 0.2s;
+  }
+  .content-card:hover {
+    border-color: #9333ea;
+  }
+  .tape-inserted {
+    border-color: #22c55e !important;
+    box-shadow: 0 0 12px rgba(34, 197, 94, 0.4);
+  }
+  .inserted-badge {
+    animation: pulse-glow 2s ease-in-out infinite;
+  }
+  @keyframes pulse-glow {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.6; }
+  }
+  .scanning { animation: pulse-glow 1.5s ease-in-out infinite; }
 {% endblock %}
 
 {% block content %}
   <!-- Stats -->
-  <p class="text-xs sm:text-sm text-gray-400 text-center mb-4">
+  <p class="text-xs sm:text-sm text-gray-400 text-center mb-6">
     {{ tr("index.stats.total_time") }}
     <span class="text-yellow-300 font-semibold">{{ recuerdos }}</span>
   </p>
 
-  <!-- Title + Counter -->
-  <div class="flex items-center justify-between mb-2">
-    <h2 class="text-xl sm:text-2xl text-green-400 font-bold">{{ tr("index.videos.title") }}</h2>
-    <div class="text-xs sm:text-sm text-gray-300">
-      <span id="conteoTop" class="font-semibold">0</span> {{ tr("index.videos.count_label") }}
-    </div>
-  </div>
-
-  <!-- Toggle filters -->
-  <div class="flex items-center justify-end mb-3">
-    <button
-      id="toggleFiltros"
-      class="text-xs sm:text-sm bg-gray-900/70 border border-gray-600 hover:border-yellow-500 rounded px-3 py-2"
-      data-label-show="{{ tr('index.filters.toggle_show') }}"
-      data-label-hide="{{ tr('index.filters.toggle_hide') }}"
-    >
-      {{ tr("index.filters.toggle_show") }}
-    </button>
-  </div>
-
-  <!-- Filter Panel -->
-  <section id="panelFiltros" class="mb-6 sm:mb-8 border border-yellow-700/40 rounded-lg p-3 sm:p-4 bg-gray-900/50 hide">
-    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-      <!-- Channel Filter -->
-      <div>
-        <label class="block text-xs sm:text-sm text-gray-300 mb-1">{{ tr("index.filters.by_channel_label") }}</label>
-        <select id="canalSelect" class="w-full bg-gray-800 border border-gray-600 rounded px-3 py-2 text-sm">
-          <option value="">{{ tr("index.filters.by_channel_all") }}</option>
-          {% if canales %}
-            {% for canal_id, canal in (canales or {}).items() %}
-              <option value="{{ canal_id }}">{{ canal.nombre or canal_id }}</option>
-            {% endfor %}
-          {% endif %}
-        </select>
+  <!-- ============================================ -->
+  <!-- TV SERIES SECTION -->
+  <!-- ============================================ -->
+  <section class="section-card rounded-lg border border-purple-600 mb-4 overflow-hidden">
+    <div class="section-header flex items-center justify-between p-4 bg-purple-900/30" onclick="toggleSection('series')">
+      <div class="flex items-center gap-3">
+        <span class="text-2xl">📺</span>
+        <div>
+          <h2 class="text-lg font-bold text-purple-400">TV Series</h2>
+          <p class="text-xs text-gray-400"><span id="series-count">0</span> series</p>
+        </div>
       </div>
-
-      <!-- Category Filter -->
-      <div>
-        <label class="block text-xs sm:text-sm text-gray-300 mb-1">Category</label>
-        <select id="categorySelect" class="w-full bg-gray-800 border border-gray-600 rounded px-3 py-2 text-sm">
-          <option value="">All Categories</option>
-          <option value="tv_episode">TV Episodes</option>
-          <option value="movie">Movies</option>
-          <option value="commercial">Commercials</option>
-          <option value="vhs_tape">VHS Tapes</option>
-        </select>
-      </div>
-
-      <!-- Sort Order -->
-      <div>
-        <label class="block text-xs sm:text-sm text-gray-300 mb-1">{{ tr("index.filters.order_label") }}</label>
-        <select id="ordenSelect" class="w-full bg-gray-800 border border-gray-600 rounded px-3 py-2 text-sm">
-          <option value="fecha_desc">{{ tr("index.filters.order.date_desc") }}</option>
-          <option value="fecha_asc">{{ tr("index.filters.order.date_asc") }}</option>
-          <option value="titulo_asc">{{ tr("index.filters.order.title_asc") }}</option>
-          <option value="titulo_desc">{{ tr("index.filters.order.title_desc") }}</option>
-          <option value="dur_asc">{{ tr("index.filters.order.dur_asc") }}</option>
-          <option value="dur_desc">{{ tr("index.filters.order.dur_desc") }}</option>
-        </select>
-      </div>
+      <span id="series-toggle" class="text-xl text-gray-400">▼</span>
     </div>
 
-    <!-- Clear button -->
-    <div class="mt-3 text-right">
-      <button id="limpiarBtn" class="text-xs bg-gray-800 border border-gray-600 px-3 py-1.5 rounded hover:border-yellow-500">
-        {{ tr("index.filters.clear_button") }}
-      </button>
+    <div id="series-content" class="p-4">
+      <!-- Upload Episodes -->
+      <div class="mb-4 p-3 bg-gray-900/50 rounded-lg border border-purple-500/50">
+        <h3 class="text-sm font-bold text-purple-300 mb-2">Upload Episodes</h3>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+          <div>
+            <label class="block text-xs mb-1 text-gray-300">Select Series:</label>
+            <select id="series-select" class="w-full bg-gray-800 text-white px-2 py-1.5 rounded border border-gray-600 text-sm">
+              <option value="">-- Select series --</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs mb-1 text-gray-300">Or Create New:</label>
+            <input type="text" id="new-series-input" placeholder="e.g. Los Simuladores"
+                   class="w-full bg-gray-800 text-white px-2 py-1.5 rounded border border-gray-600 text-sm">
+          </div>
+        </div>
+        <div id="series-dropzone" class="dropzone rounded-lg p-4 text-center cursor-pointer mb-2">
+          <input type="file" id="series-file-input" multiple accept=".mp4" class="hidden">
+          <p class="text-gray-300 text-sm">Drop episode files here <span class="text-gray-500">(S01E05.mp4, 1x05.mp4)</span></p>
+        </div>
+        <div id="series-file-list" class="hidden mb-2">
+          <div id="series-file-items"></div>
+        </div>
+        <div class="flex justify-end gap-2">
+          <span id="series-upload-status" class="text-xs text-gray-400 self-center"></span>
+          <button id="series-upload-btn" disabled
+                  class="bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-bold px-3 py-1.5 rounded text-sm">
+            Upload
+          </button>
+        </div>
+      </div>
+
+      <!-- Series List -->
+      <div id="series-list" class="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div class="text-gray-500 italic text-sm">Loading...</div>
+      </div>
     </div>
   </section>
 
-  <!-- NEW VIDEOS WITHOUT METADATA -->
-  {% if nuevos %}
-    <h3 class="text-lg sm:text-2xl text-blue-400 font-bold mt-2 mb-3 sm:mb-4">{{ tr("index.new_videos.header") }}</h3>
-    <ul class="space-y-2 mb-6 sm:mb-10">
-      {% for video_id in nuevos %}
-      <li class="bg-gray-900/50 border border-blue-500 p-3 sm:p-4 rounded flex items-center justify-between">
+  <!-- ============================================ -->
+  <!-- MOVIES SECTION -->
+  <!-- ============================================ -->
+  <section class="section-card rounded-lg border border-blue-600 mb-4 overflow-hidden">
+    <div class="section-header flex items-center justify-between p-4 bg-blue-900/30" onclick="toggleSection('movies')">
+      <div class="flex items-center gap-3">
+        <span class="text-2xl">🎬</span>
         <div>
-          <p class="text-base sm:text-lg font-semibold break-all">{{ video_id }}</p>
-          <a href="{{ url_for('edit_video', video_id=video_id) }}" class="text-xs sm:text-sm text-blue-300 underline">{{ tr("index.new_videos.fill_metadata") }}</a>
-        </div>
-        <span class="text-[11px] sm:text-xs text-gray-300">{{ tr("index.new_videos.no_duration") }}</span>
-      </li>
-      {% endfor %}
-    </ul>
-  {% endif %}
-
-  <!-- VIDEO LIST -->
-  <div id="listaVideos" class="grid grid-cols-1 gap-4 sm:gap-6">
-    {% for video_id, video in videos.items() %}
-    <div class="video-card relative rounded-lg p-3 sm:p-4 shadow-lg border border-yellow-500 flex flex-col sm:flex-row gap-3 sm:gap-4 items-start"
-         data-id="{{ video_id }}"
-         data-title="{{ (video.title or '')|lower }}"
-         data-fecha="{{ video.fecha or '' }}"
-         data-duration="{{ video.duracion or 0 }}"
-         data-category="{{ video.category or 'vhs_tape' }}"
-         data-series="{{ video.series or '' }}">
-      <!-- Delete button -->
-      <button onclick="confirmFullDelete('{{ video_id }}')" class="delete-btn text-red-500 hover:text-white text-lg font-bold" title="Delete video">🗑</button>
-
-      <!-- Thumbnail + Duration -->
-      <div class="relative w-full sm:w-28 sm:h-28">
-        <img src="{{ url_for('serve_thumbnail', filename=video_id + '.jpg') }}"
-             onerror="this.onerror=null;this.src='{{ url_for('serve_thumbnail', filename='default_thumbnail.png') }}';"
-             class="w-full sm:w-28 sm:h-28 h-auto aspect-square object-cover rounded border border-yellow-600 relative z-0">
-        <span class="absolute left-1 bottom-1 text-[11px] sm:text-xs px-1.5 py-0.5 rounded bg-gray-900/90 border border-gray-600" data-role="dur-label">—</span>
-      </div>
-
-      <!-- Info -->
-      <div class="flex-1 w-full">
-        <div class="flex items-center gap-2 mb-1 flex-wrap">
-          <h4 class="text-lg sm:text-xl font-semibold break-words">{{ video.title }}</h4>
-          {% set cat = video.category or 'vhs_tape' %}
-          {% if cat == 'tv_episode' %}
-            <span class="category-badge bg-purple-600 text-white">TV</span>
-          {% elif cat == 'movie' %}
-            <span class="category-badge bg-blue-600 text-white">Movie</span>
-          {% elif cat == 'commercial' %}
-            <span class="category-badge bg-green-600 text-white">Ad</span>
-          {% else %}
-            <span class="category-badge bg-gray-600 text-white">VHS</span>
-          {% endif %}
-        </div>
-        {% if video.category == 'tv_episode' and video.series %}
-        <p class="text-xs sm:text-sm text-purple-300">
-          <strong>Series:</strong> {{ video.series }}
-          {% if video.season %}S{{ video.season }}{% endif %}
-          {% if video.episode %}E{{ video.episode }}{% endif %}
-        </p>
-        {% endif %}
-        <p class="text-xs sm:text-sm text-gray-300"><strong>{{ tr("index.video_card.date") }}:</strong> {{ video.fecha }}</p>
-        {% if video.personaje %}
-        <p class="text-xs sm:text-sm text-gray-300"><strong>{{ tr("index.video_card.character") }}</strong> {{ video.personaje }}</p>
-        {% endif %}
-        <div class="flex gap-2 sm:gap-4 mt-3 flex-wrap">
-          <a href="{{ url_for('video_detail', video_id=video_id) }}" class="text-xs sm:text-sm bg-blue-600 hover:bg-blue-700 text-white px-3 sm:px-4 py-1 rounded">{{ tr("index.video_card.view") }}</a>
-          <a href="{{ url_for('edit_video', video_id=video_id) }}" class="text-xs sm:text-sm bg-yellow-600 hover:bg-yellow-700 text-black px-3 sm:px-4 py-1 rounded">{{ tr("index.video_card.edit") }}</a>
+          <h2 class="text-lg font-bold text-blue-400">Movies</h2>
+          <p class="text-xs text-gray-400"><span id="movies-count">0</span> movies</p>
         </div>
       </div>
+      <span id="movies-toggle" class="text-xl text-gray-400">▼</span>
     </div>
-    {% endfor %}
-  </div>
 
-  <!-- GHOST ENTRIES -->
-  {% if fantasmas %}
-    <div class="flex justify-between items-center mt-10 mb-3 sm:mb-4">
-      <h3 class="text-lg sm:text-2xl text-red-400 font-bold">{{ tr("index.ghosts.header") }}</h3>
-      <button onclick="confirmDeleteAll()" class="text-xs sm:text-sm bg-red-600 hover:bg-red-700 text-white px-3 sm:px-4 py-1 rounded">{{ tr("index.ghosts.delete_all") }}</button>
-    </div>
-    <div class="grid grid-cols-1 gap-3 sm:gap-4">
-      {% for video_id, video in fantasmas.items() %}
-      <div class="bg-gray-900/50 p-3 sm:p-4 border border-red-500 rounded relative">
-        <button onclick="confirmDelete('{{ video_id }}')" class="absolute top-2 right-2 text-red-400 hover:text-white font-bold text-lg">×</button>
-        <h3 class="text-lg sm:text-xl font-bold text-red-300 break-words">{{ video.title or video_id }}</h3>
-        <p class="text-xs sm:text-sm text-gray-400">Date: {{ video.fecha or "?" }} | Character: {{ video.personaje or "?" }}</p>
-        <a href="{{ url_for('edit_video', video_id=video_id) }}" class="text-xs sm:text-sm text-red-300 underline mt-2 inline-block">{{ tr("index.ghosts.edit_metadata") }}</a>
+    <div id="movies-content" class="p-4">
+      <!-- Upload Movies -->
+      <div class="mb-4 p-3 bg-gray-900/50 rounded-lg border border-blue-500/50">
+        <h3 class="text-sm font-bold text-blue-300 mb-2">Upload Movies</h3>
+        <div id="movies-dropzone" class="dropzone dropzone-blue rounded-lg p-4 text-center cursor-pointer mb-2">
+          <input type="file" id="movies-file-input" multiple accept=".mp4" class="hidden">
+          <p class="text-gray-300 text-sm">Drop movie files here</p>
+        </div>
+        <div id="movies-file-list" class="hidden mb-2">
+          <div id="movies-file-items"></div>
+        </div>
+        <div class="flex justify-end gap-2">
+          <span id="movies-upload-status" class="text-xs text-gray-400 self-center"></span>
+          <button id="movies-upload-btn" disabled
+                  class="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-bold px-3 py-1.5 rounded text-sm">
+            Upload
+          </button>
+        </div>
       </div>
-      {% endfor %}
+
+      <!-- Movies List -->
+      <div id="movies-list" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        <div class="text-gray-500 italic text-sm">Loading...</div>
+      </div>
     </div>
+  </section>
+
+  <!-- ============================================ -->
+  <!-- COMMERCIALS SECTION -->
+  <!-- ============================================ -->
+  <section class="section-card rounded-lg border border-green-600 mb-4 overflow-hidden">
+    <div class="section-header flex items-center justify-between p-4 bg-green-900/30" onclick="toggleSection('commercials')">
+      <div class="flex items-center gap-3">
+        <span class="text-2xl">📢</span>
+        <div>
+          <h2 class="text-lg font-bold text-green-400">Commercials</h2>
+          <p class="text-xs text-gray-400"><span id="commercials-count">0</span> commercials</p>
+        </div>
+      </div>
+      <span id="commercials-toggle" class="text-xl text-gray-400">▼</span>
+    </div>
+
+    <div id="commercials-content" class="p-4">
+      <!-- Upload Commercials -->
+      <div class="mb-4 p-3 bg-gray-900/50 rounded-lg border border-green-500/50">
+        <h3 class="text-sm font-bold text-green-300 mb-2">Upload Commercials</h3>
+        <div id="commercials-dropzone" class="dropzone dropzone-green rounded-lg p-4 text-center cursor-pointer mb-2">
+          <input type="file" id="commercials-file-input" multiple accept=".mp4" class="hidden">
+          <p class="text-gray-300 text-sm">Drop commercial files here</p>
+        </div>
+        <div id="commercials-file-list" class="hidden mb-2">
+          <div id="commercials-file-items"></div>
+        </div>
+        <div class="flex justify-end gap-2">
+          <span id="commercials-upload-status" class="text-xs text-gray-400 self-center"></span>
+          <button id="commercials-upload-btn" disabled
+                  class="bg-green-600 hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-bold px-3 py-1.5 rounded text-sm">
+            Upload
+          </button>
+        </div>
+      </div>
+
+      <!-- Commercials List -->
+      <div id="commercials-list" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        <div class="text-gray-500 italic text-sm">Loading...</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================ -->
+  <!-- VHS TAPES SECTION -->
+  <!-- ============================================ -->
+  <section class="section-card rounded-lg border border-yellow-600 mb-4 overflow-hidden">
+    <div class="section-header flex items-center justify-between p-4 bg-yellow-900/30" onclick="toggleSection('vhs')">
+      <div class="flex items-center gap-3">
+        <span class="text-2xl">📼</span>
+        <div>
+          <h2 class="text-lg font-bold text-yellow-400">VHS Tapes</h2>
+          <p class="text-xs text-gray-400"><span id="vhs-count">0</span> tapes</p>
+        </div>
+      </div>
+      <span id="vhs-toggle" class="text-xl text-gray-400">▼</span>
+    </div>
+
+    <div id="vhs-content" class="p-4">
+      <!-- NFC Reader Status -->
+      <div id="reader-status" class="mb-4 p-3 rounded-lg border-2 border-gray-600 bg-gray-900/50">
+        <div class="flex items-center gap-3">
+          <span id="reader-icon" class="text-2xl">🔌</span>
+          <div class="flex-1">
+            <div id="reader-text" class="font-bold text-sm">Checking NFC Reader...</div>
+            <div id="reader-detail" class="text-xs text-gray-400"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Register New Tape (shown when unregistered tape detected) -->
+      <div id="register-tape-section" class="hidden mb-4 p-3 bg-green-900/30 rounded-lg border border-green-500">
+        <h3 class="text-sm font-bold text-green-400 mb-2">New Tape Detected!</h3>
+        <p class="text-xs text-gray-300 mb-2">UID: <span id="detected-uid" class="font-mono"></span></p>
+        <form id="register-form" class="space-y-2">
+          <input type="hidden" id="register-uid">
+          <div>
+            <label class="block text-xs mb-1 text-gray-300">Assign to Video:</label>
+            <select id="register-video" required class="w-full bg-gray-800 text-white px-2 py-1.5 rounded border border-gray-600 text-sm">
+              <option value="">-- Select video --</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs mb-1 text-gray-300">Custom Label (optional):</label>
+            <input type="text" id="register-title" placeholder="e.g. Summer Vacation 1995"
+                   class="w-full bg-gray-800 text-white px-2 py-1.5 rounded border border-gray-600 text-sm">
+          </div>
+          <button type="submit" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-1.5 rounded text-sm">
+            Register Tape
+          </button>
+        </form>
+      </div>
+
+      <!-- VHS Tapes List -->
+      <div id="vhs-list" class="space-y-2">
+        <div class="text-gray-500 italic text-sm">Loading...</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================ -->
+  <!-- DEBUG SECTION (Collapsed) -->
+  <!-- ============================================ -->
+  {% if nuevos or fantasmas %}
+  <details class="section-card rounded-lg border border-red-600/50 mb-4">
+    <summary class="p-3 cursor-pointer text-red-400 hover:bg-red-900/20">
+      Debug: {{ (nuevos|length) + (fantasmas|length) }} issue(s)
+    </summary>
+    <div class="p-4 border-t border-red-600/30">
+      {% if nuevos %}
+      <div class="mb-4">
+        <h3 class="text-sm font-bold text-blue-400 mb-2">New Files (no metadata)</h3>
+        {% for video_id in nuevos %}
+        <div class="flex items-center justify-between bg-gray-900/50 p-2 rounded mb-1 text-sm">
+          <span class="font-mono text-xs truncate flex-1">{{ video_id }}</span>
+          <a href="{{ url_for('edit_video', video_id=video_id) }}" class="text-blue-400 hover:underline text-xs ml-2">Add metadata</a>
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+      {% if fantasmas %}
+      <div>
+        <div class="flex items-center justify-between mb-2">
+          <h3 class="text-sm font-bold text-red-400">Ghost Entries (no file)</h3>
+          <button onclick="confirmDeleteAllGhosts()" class="text-xs bg-red-600 hover:bg-red-700 text-white px-2 py-1 rounded">Delete All</button>
+        </div>
+        {% for video_id, video in fantasmas.items() %}
+        <div class="flex items-center justify-between bg-gray-900/50 p-2 rounded mb-1 text-sm">
+          <span class="truncate flex-1">{{ video.title or video_id }}</span>
+          <div class="flex gap-2 ml-2">
+            <a href="{{ url_for('edit_video', video_id=video_id) }}" class="text-yellow-400 hover:underline text-xs">Edit</a>
+            <button onclick="confirmDeleteGhost('{{ video_id }}')" class="text-red-400 hover:underline text-xs">Delete</button>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+    </div>
+  </details>
   {% endif %}
 {% endblock %}
 
 {% block extra_scripts %}
-  // Helpers
-  function confirmDelete(videoId){ if(confirm("Delete metadata for '" + videoId + "'?")) window.location.href="/delete/"+videoId; }
-  function confirmDeleteAll(){ if(confirm("This will delete ALL ghost entries (no video file). Continue?")) window.location.href="/delete_fantasmas"; }
-  function confirmFullDelete(videoId){ if(confirm("This will delete the video file, metadata, and thumbnail. Are you sure?")) window.location.href="/delete_full/"+videoId; }
-  function fmtDur(s){ s=Number(s)||0; const m=Math.floor(s/60); const ss=Math.floor(s%60); return `${m}:${ss.toString().padStart(2,'0')}`; }
-
-  // Toggle filters
-  const panelFiltros=document.getElementById('panelFiltros');
-  const toggleBtn=document.getElementById('toggleFiltros');
-  const STORAGE_KEY='tvargenta_filtros_visible';
-  const labelShow = toggleBtn.dataset.labelShow || 'Show filters';
-  const labelHide = toggleBtn.dataset.labelHide || 'Hide filters';
-
-  function setFiltroVisible(on){
-    panelFiltros.classList.toggle('hide', !on);
-    toggleBtn.textContent = on ? labelHide : labelShow;
-    try { localStorage.setItem(STORAGE_KEY, on ? '1' : '0'); } catch(e){}
+  // ============================================
+  // HELPERS
+  // ============================================
+  function formatDuration(seconds) {
+    const m = Math.floor(seconds / 60);
+    const s = Math.floor(seconds % 60);
+    return `${m}:${s.toString().padStart(2, '0')}`;
   }
 
-  const visibleInicial=(typeof localStorage!=='undefined' && localStorage.getItem(STORAGE_KEY)==='1');
-  setFiltroVisible(visibleInicial);
-  toggleBtn.addEventListener('click',()=>{ setFiltroVisible(panelFiltros.classList.contains('hide')); });
-
-  // Data
-  const CANALES={{ (canales or {}) | tojson }};
-  const lista=document.getElementById('listaVideos');
-  const cards=Array.from(document.querySelectorAll('.video-card'));
-  const canalSelect=document.getElementById('canalSelect');
-  const categorySelect=document.getElementById('categorySelect');
-  const ordenSelect=document.getElementById('ordenSelect');
-  const limpiarBtn=document.getElementById('limpiarBtn');
-  const conteoTop=document.getElementById('conteoTop');
-
-  // Duration labels
-  cards.forEach(card=>{
-    const s=Number(card.dataset.duration||0);
-    const label=card.querySelector('[data-role="dur-label"]');
-    label.textContent=s>0?fmtDur(s):'—';
-  });
-
-  // Clear filters
-  limpiarBtn.addEventListener('click',()=>{
-    canalSelect.value='';
-    categorySelect.value='';
-    ordenSelect.value='fecha_desc';
-    aplicarFiltrosYOrden();
-  });
-
-  canalSelect.addEventListener('change',aplicarFiltrosYOrden);
-  categorySelect.addEventListener('change',aplicarFiltrosYOrden);
-  ordenSelect.addEventListener('change',aplicarFiltrosYOrden);
-
-  function pasaFiltroCanal(card){
-    const canalId=canalSelect.value;
-    if(!canalId) return true;
-    const regla=CANALES[canalId];
-    if(!regla) return true;
-
-    // Series filter
-    const seriesFilter = regla.series_filter || [];
-    if(seriesFilter.length > 0) {
-      const cardCategory = card.dataset.category || 'vhs_tape';
-      const cardSeries = card.dataset.series || '';
-      if(cardCategory !== 'tv_episode') return false;
-      if(!seriesFilter.includes(cardSeries)) return false;
+  function confirmDeleteGhost(videoId) {
+    if (confirm("Delete ghost entry '" + videoId + "'?")) {
+      window.location.href = "/delete/" + videoId;
     }
-    return true;
   }
 
-  function pasaFiltroCategory(card){
-    const cat = categorySelect.value;
-    if(!cat) return true;
-    return card.dataset.category === cat;
+  function confirmDeleteAllGhosts() {
+    if (confirm("Delete ALL ghost entries?")) {
+      window.location.href = "/delete_fantasmas";
+    }
   }
 
-  function aplicarFiltrosYOrden(){
-    let visibles=[];
-    cards.forEach(c=>{
-      const ok = pasaFiltroCanal(c) && pasaFiltroCategory(c);
-      c.classList.toggle('hide',!ok);
-      if(ok) visibles.push(c);
-    });
-    conteoTop.textContent=String(visibles.length);
+  // ============================================
+  // SECTION TOGGLE
+  // ============================================
+  function toggleSection(section) {
+    const content = document.getElementById(section + '-content');
+    const toggle = document.getElementById(section + '-toggle');
+    const isHidden = content.style.display === 'none';
+    content.style.display = isHidden ? 'block' : 'none';
+    toggle.textContent = isHidden ? '▼' : '▶';
+    localStorage.setItem('lib_section_' + section, isHidden ? 'open' : 'closed');
+  }
 
-    const criterio=ordenSelect.value;
-    visibles.sort((a,b)=>{
-      const da=Number(a.dataset.duration||0), db=Number(b.dataset.duration||0);
-      const ta=a.dataset.title||'', tb=b.dataset.title||'';
-      const fa=a.dataset.fecha||'', fb=b.dataset.fecha||'';
-      switch(criterio){
-        case 'dur_asc': return da-db;
-        case 'dur_desc': return db-da;
-        case 'titulo_asc': return ta.localeCompare(tb,'es');
-        case 'titulo_desc': return tb.localeCompare(ta,'es');
-        case 'fecha_desc': return (fb||'').localeCompare(fa||'');
-        case 'fecha_asc': return (fa||'').localeCompare(fb||'');
-        default: return 0;
+  // Restore section states
+  ['series', 'movies', 'commercials', 'vhs'].forEach(section => {
+    const state = localStorage.getItem('lib_section_' + section);
+    if (state === 'closed') {
+      document.getElementById(section + '-content').style.display = 'none';
+      document.getElementById(section + '-toggle').textContent = '▶';
+    }
+  });
+
+  // ============================================
+  // UPLOAD HELPER (reusable)
+  // ============================================
+  function setupUploader(config) {
+    const dropzone = document.getElementById(config.dropzoneId);
+    const fileInput = document.getElementById(config.fileInputId);
+    const fileList = document.getElementById(config.fileListId);
+    const fileItems = document.getElementById(config.fileItemsId);
+    const uploadBtn = document.getElementById(config.uploadBtnId);
+    const statusEl = document.getElementById(config.statusId);
+
+    dropzone.addEventListener('click', () => fileInput.click());
+    dropzone.addEventListener('dragover', e => { e.preventDefault(); dropzone.classList.add('dragover'); });
+    dropzone.addEventListener('dragleave', () => dropzone.classList.remove('dragover'));
+    dropzone.addEventListener('drop', e => {
+      e.preventDefault();
+      dropzone.classList.remove('dragover');
+      const dt = new DataTransfer();
+      for (const f of e.dataTransfer.files) {
+        if (f.name.toLowerCase().endsWith('.mp4')) dt.items.add(f);
       }
+      fileInput.files = dt.files;
+      updateFileList();
     });
-    const frag=document.createDocumentFragment();
-    visibles.forEach(c=>frag.appendChild(c));
-    lista.appendChild(frag);
+    fileInput.addEventListener('change', updateFileList);
+
+    function updateFileList() {
+      const files = fileInput.files;
+      fileItems.innerHTML = '';
+      if (files.length === 0) {
+        fileList.classList.add('hidden');
+        uploadBtn.disabled = true;
+        return;
+      }
+      fileList.classList.remove('hidden');
+      for (const f of files) {
+        const item = document.createElement('div');
+        item.className = 'file-item';
+        item.innerHTML = `<div class="progress-bar"><div class="progress-fill"></div></div><span class="flex-1 truncate text-xs">${f.name}</span>`;
+        fileItems.appendChild(item);
+      }
+      if (config.checkReady) config.checkReady();
+      else uploadBtn.disabled = false;
+    }
+
+    uploadBtn.addEventListener('click', async () => {
+      const files = Array.from(fileInput.files);
+      if (files.length === 0) return;
+
+      uploadBtn.disabled = true;
+      uploadBtn.textContent = 'Uploading...';
+
+      let completed = 0;
+      for (const file of files) {
+        statusEl.textContent = `${completed + 1}/${files.length}...`;
+        const formData = new FormData();
+        formData.append('videos[]', file);
+        if (config.extraFormData) config.extraFormData(formData);
+
+        try {
+          await fetch(config.uploadUrl, { method: 'POST', body: formData });
+          completed++;
+        } catch (e) { console.error(e); }
+      }
+
+      statusEl.textContent = `Done! (${completed})`;
+      uploadBtn.textContent = 'Upload';
+      fileInput.value = '';
+      fileList.classList.add('hidden');
+      if (config.onComplete) config.onComplete();
+      setTimeout(() => { statusEl.textContent = ''; uploadBtn.disabled = true; }, 2000);
+    });
+
+    return { updateFileList, checkReady: () => { if (config.checkReady) config.checkReady(); } };
   }
 
-  // Initial pass
-  aplicarFiltrosYOrden();
+  // ============================================
+  // TV SERIES
+  // ============================================
+  const seriesUploader = setupUploader({
+    dropzoneId: 'series-dropzone',
+    fileInputId: 'series-file-input',
+    fileListId: 'series-file-list',
+    fileItemsId: 'series-file-items',
+    uploadBtnId: 'series-upload-btn',
+    statusId: 'series-upload-status',
+    uploadUrl: '/upload/series',
+    extraFormData: (fd) => {
+      fd.append('series', document.getElementById('series-select').value);
+      fd.append('new_series', document.getElementById('new-series-input').value.trim());
+    },
+    checkReady: () => {
+      const hasFiles = document.getElementById('series-file-input').files.length > 0;
+      const hasSeries = document.getElementById('series-select').value || document.getElementById('new-series-input').value.trim();
+      document.getElementById('series-upload-btn').disabled = !(hasFiles && hasSeries);
+    },
+    onComplete: loadSeries
+  });
+
+  document.getElementById('series-select').addEventListener('change', () => {
+    if (document.getElementById('series-select').value) document.getElementById('new-series-input').value = '';
+    seriesUploader.checkReady();
+  });
+  document.getElementById('new-series-input').addEventListener('input', () => {
+    if (document.getElementById('new-series-input').value.trim()) document.getElementById('series-select').value = '';
+    seriesUploader.checkReady();
+  });
+
+  async function loadSeries() {
+    try {
+      const res = await fetch('/api/series');
+      const data = await res.json();
+      const container = document.getElementById('series-list');
+      const select = document.getElementById('series-select');
+
+      if (!data.ok || !data.series || data.series.length === 0) {
+        container.innerHTML = '<div class="text-gray-500 italic text-sm col-span-2">No series yet</div>';
+        select.innerHTML = '<option value="">-- Select series --</option>';
+        document.getElementById('series-count').textContent = '0';
+        return;
+      }
+
+      document.getElementById('series-count').textContent = data.series.length;
+      select.innerHTML = '<option value="">-- Select series --</option>' +
+        data.series.map(s => `<option value="${s.folder_name}">${s.display_name}</option>`).join('');
+
+      container.innerHTML = data.series.map(s => `
+        <div class="content-card rounded-lg p-3">
+          <div class="flex items-center justify-between mb-2">
+            <h4 class="font-bold text-white text-sm truncate">${s.display_name}</h4>
+            <span class="text-xs text-purple-300">${s.episode_count} ep</span>
+          </div>
+          <div class="mb-2">
+            <select class="time-select w-full bg-gray-800 text-white px-2 py-1 rounded border border-gray-600 text-xs" data-series="${s.folder_name}">
+              <option value="any" ${s.time_of_day === 'any' ? 'selected' : ''}>Any Time</option>
+              <option value="early_morning" ${s.time_of_day === 'early_morning' ? 'selected' : ''}>Early Morning</option>
+              <option value="late_morning" ${s.time_of_day === 'late_morning' ? 'selected' : ''}>Late Morning</option>
+              <option value="afternoon" ${s.time_of_day === 'afternoon' ? 'selected' : ''}>Afternoon</option>
+              <option value="evening" ${s.time_of_day === 'evening' ? 'selected' : ''}>Evening</option>
+              <option value="night" ${s.time_of_day === 'night' ? 'selected' : ''}>Night</option>
+            </select>
+          </div>
+          <button onclick="deleteSeries('${s.folder_name}', '${s.display_name}')" class="text-red-400 hover:underline text-xs">Delete</button>
+        </div>
+      `).join('');
+
+      document.querySelectorAll('.time-select').forEach(sel => {
+        sel.addEventListener('change', async function() {
+          await fetch('/api/series/time_of_day', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ series_name: this.dataset.series, time_of_day: this.value })
+          });
+        });
+      });
+    } catch (e) { console.error(e); }
+  }
+
+  async function deleteSeries(folderName, displayName) {
+    if (!confirm(`Delete "${displayName}" and all episodes?`)) return;
+    await fetch(`/series/delete/${encodeURIComponent(folderName)}`, { method: 'POST' });
+    loadSeries();
+  }
+
+  // ============================================
+  // MOVIES
+  // ============================================
+  setupUploader({
+    dropzoneId: 'movies-dropzone',
+    fileInputId: 'movies-file-input',
+    fileListId: 'movies-file-list',
+    fileItemsId: 'movies-file-items',
+    uploadBtnId: 'movies-upload-btn',
+    statusId: 'movies-upload-status',
+    uploadUrl: '/upload/movies',
+    onComplete: loadMovies
+  });
+
+  async function loadMovies() {
+    try {
+      const res = await fetch('/api/movies');
+      const data = await res.json();
+      const container = document.getElementById('movies-list');
+
+      if (!data.ok || !data.movies || data.movies.length === 0) {
+        container.innerHTML = '<div class="text-gray-500 italic text-sm col-span-3">No movies yet</div>';
+        document.getElementById('movies-count').textContent = '0';
+        return;
+      }
+
+      document.getElementById('movies-count').textContent = data.movies.length;
+      container.innerHTML = data.movies.map(m => `
+        <div class="content-card rounded-lg p-3">
+          <div class="flex gap-2 mb-2">
+            <img src="/thumbnails/${m.video_id}.jpg" onerror="this.src='/thumbnails/default_thumbnail.png'"
+                 class="w-14 h-14 object-cover rounded border border-gray-600">
+            <div class="flex-1 min-w-0">
+              <h4 class="font-semibold text-xs truncate text-white">${m.title}</h4>
+              <p class="text-xs text-gray-400">${formatDuration(m.duration)}</p>
+            </div>
+          </div>
+          <div class="flex gap-2">
+            <a href="/edit/${m.video_id}" class="flex-1 text-center text-xs bg-gray-600 hover:bg-gray-700 text-white py-1 rounded">Edit</a>
+            <button onclick="deleteMovie('${m.video_id}')" class="flex-1 text-center text-xs bg-red-600 hover:bg-red-700 text-white py-1 rounded">Delete</button>
+          </div>
+        </div>
+      `).join('');
+    } catch (e) { console.error(e); }
+  }
+
+  async function deleteMovie(videoId) {
+    if (!confirm('Delete this movie?')) return;
+    await fetch(`/api/movies/${videoId}`, { method: 'DELETE' });
+    loadMovies();
+  }
+
+  // ============================================
+  // COMMERCIALS
+  // ============================================
+  setupUploader({
+    dropzoneId: 'commercials-dropzone',
+    fileInputId: 'commercials-file-input',
+    fileListId: 'commercials-file-list',
+    fileItemsId: 'commercials-file-items',
+    uploadBtnId: 'commercials-upload-btn',
+    statusId: 'commercials-upload-status',
+    uploadUrl: '/upload/commercials',
+    onComplete: loadCommercials
+  });
+
+  async function loadCommercials() {
+    try {
+      const res = await fetch('/api/commercials');
+      const data = await res.json();
+      const container = document.getElementById('commercials-list');
+
+      if (!data.ok || !data.commercials || data.commercials.length === 0) {
+        container.innerHTML = '<div class="text-gray-500 italic text-sm col-span-3">No commercials yet</div>';
+        document.getElementById('commercials-count').textContent = '0';
+        return;
+      }
+
+      document.getElementById('commercials-count').textContent = data.commercials.length;
+      container.innerHTML = data.commercials.map(c => `
+        <div class="content-card rounded-lg p-3">
+          <div class="flex gap-2 mb-2">
+            <img src="/thumbnails/${c.video_id}.jpg" onerror="this.src='/thumbnails/default_thumbnail.png'"
+                 class="w-14 h-14 object-cover rounded border border-gray-600">
+            <div class="flex-1 min-w-0">
+              <h4 class="font-semibold text-xs truncate text-white">${c.title}</h4>
+              <p class="text-xs text-gray-400">${formatDuration(c.duration)}</p>
+            </div>
+          </div>
+          <div class="flex gap-2">
+            <a href="/edit/${c.video_id}" class="flex-1 text-center text-xs bg-gray-600 hover:bg-gray-700 text-white py-1 rounded">Edit</a>
+            <button onclick="deleteCommercial('${c.video_id}')" class="flex-1 text-center text-xs bg-red-600 hover:bg-red-700 text-white py-1 rounded">Delete</button>
+          </div>
+        </div>
+      `).join('');
+    } catch (e) { console.error(e); }
+  }
+
+  async function deleteCommercial(videoId) {
+    if (!confirm('Delete this commercial?')) return;
+    await fetch(`/api/commercials/${videoId}`, { method: 'DELETE' });
+    loadCommercials();
+  }
+
+  // ============================================
+  // VHS TAPES
+  // ============================================
+  let currentInsertedTapeUid = null;
+
+  async function loadVhsVideos() {
+    try {
+      const res = await fetch('/api/vcr/videos');
+      const data = await res.json();
+      if (data.ok) {
+        const select = document.getElementById('register-video');
+        select.innerHTML = '<option value="">-- Select video --</option>' +
+          (data.videos || []).map(v => `<option value="${v.video_id}">${v.title} (${formatDuration(v.duration)})</option>`).join('');
+      }
+    } catch (e) { console.error(e); }
+  }
+
+  async function loadVhsTapes() {
+    try {
+      const res = await fetch('/api/vcr/tapes');
+      const data = await res.json();
+      const container = document.getElementById('vhs-list');
+
+      if (!data.ok || !data.tapes || data.tapes.length === 0) {
+        container.innerHTML = '<div class="text-gray-500 italic text-sm">No tapes registered</div>';
+        document.getElementById('vhs-count').textContent = '0';
+        return;
+      }
+
+      document.getElementById('vhs-count').textContent = data.tapes.length;
+      container.innerHTML = data.tapes.map(tape => {
+        const isInserted = tape.uid === currentInsertedTapeUid;
+        return `
+          <div class="content-card rounded-lg p-3 flex items-center gap-3 ${isInserted ? 'tape-inserted' : ''}" data-tape-uid="${tape.uid}">
+            <span class="text-2xl">📼</span>
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center gap-2">
+                <h4 class="font-bold text-sm text-white truncate">${tape.title || tape.video_id}</h4>
+                ${isInserted ? '<span class="inserted-badge bg-green-500 text-black text-[10px] px-1.5 py-0.5 rounded font-bold">INSERTED</span>' : ''}
+              </div>
+              <p class="text-xs text-gray-400 truncate">Video: ${tape.video_title || tape.video_id}</p>
+              <p class="text-xs text-gray-500">Position: ${formatDuration(tape.position_sec || 0)}</p>
+            </div>
+            <div class="flex flex-col gap-1">
+              <button onclick="reassignTape('${tape.uid}')" class="text-yellow-400 hover:underline text-xs">Reassign</button>
+              <button onclick="deleteTape('${tape.uid}')" class="text-red-400 hover:underline text-xs">Delete</button>
+            </div>
+          </div>
+        `;
+      }).join('');
+    } catch (e) { console.error(e); }
+  }
+
+  async function updateReaderStatus() {
+    try {
+      const res = await fetch('/api/vcr/state');
+      const data = await res.json();
+
+      const statusEl = document.getElementById('reader-status');
+      const iconEl = document.getElementById('reader-icon');
+      const textEl = document.getElementById('reader-text');
+      const detailEl = document.getElementById('reader-detail');
+      const registerSection = document.getElementById('register-tape-section');
+
+      if (!data.ok) {
+        statusEl.className = 'mb-4 p-3 rounded-lg border-2 border-red-600 bg-red-900/30';
+        iconEl.textContent = '❌';
+        textEl.textContent = 'Error';
+        detailEl.textContent = data.error || '';
+        registerSection.classList.add('hidden');
+        currentInsertedTapeUid = null;
+        return;
+      }
+
+      if (!data.reader_attached) {
+        statusEl.className = 'mb-4 p-3 rounded-lg border-2 border-gray-600 bg-gray-900/50';
+        iconEl.textContent = '🔌';
+        textEl.textContent = 'NFC Reader Not Connected';
+        detailEl.textContent = 'Connect USB NFC reader';
+        registerSection.classList.add('hidden');
+        currentInsertedTapeUid = null;
+      } else if (data.tape_inserted) {
+        statusEl.className = 'mb-4 p-3 rounded-lg border-2 border-green-600 bg-green-900/30';
+        iconEl.textContent = '▶️';
+        textEl.textContent = 'Playing: ' + (data.title || data.video_id);
+        detailEl.textContent = 'Tape inserted';
+        registerSection.classList.add('hidden');
+        currentInsertedTapeUid = data.tape_uid || null;
+        // Update tape list to show inserted badge
+        document.querySelectorAll('[data-tape-uid]').forEach(el => {
+          const isThis = el.dataset.tapeUid === currentInsertedTapeUid;
+          el.classList.toggle('tape-inserted', isThis);
+          const badge = el.querySelector('.inserted-badge');
+          if (isThis && !badge) {
+            el.querySelector('h4').insertAdjacentHTML('afterend', '<span class="inserted-badge bg-green-500 text-black text-[10px] px-1.5 py-0.5 rounded font-bold ml-2">INSERTED</span>');
+          } else if (!isThis && badge) {
+            badge.remove();
+          }
+        });
+      } else if (data.unknown_tape_uid) {
+        statusEl.className = 'mb-4 p-3 rounded-lg border-2 border-yellow-600 bg-yellow-900/30';
+        iconEl.textContent = '❓';
+        textEl.textContent = 'Unregistered Tape';
+        detailEl.textContent = 'Register it below';
+        registerSection.classList.remove('hidden');
+        document.getElementById('detected-uid').textContent = data.unknown_tape_uid;
+        document.getElementById('register-uid').value = data.unknown_tape_uid;
+        currentInsertedTapeUid = null;
+      } else {
+        statusEl.className = 'mb-4 p-3 rounded-lg border-2 border-blue-600 bg-blue-900/30';
+        iconEl.textContent = '📡';
+        textEl.textContent = 'Ready';
+        detailEl.textContent = 'Place tape on reader';
+        registerSection.classList.add('hidden');
+        currentInsertedTapeUid = null;
+      }
+    } catch (e) { console.error(e); }
+  }
+
+  document.getElementById('register-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const uid = document.getElementById('register-uid').value;
+    const videoId = document.getElementById('register-video').value;
+    const title = document.getElementById('register-title').value;
+
+    if (!uid || !videoId) { alert('Select a video'); return; }
+
+    const res = await fetch('/api/vcr/tapes/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ uid, video_id: videoId, title: title || null })
+    });
+    const data = await res.json();
+    if (data.ok) {
+      document.getElementById('register-form').reset();
+      loadVhsTapes();
+      updateReaderStatus();
+    } else {
+      alert('Error: ' + (data.error || 'Unknown'));
+    }
+  });
+
+  async function deleteTape(uid) {
+    if (!confirm('Delete this tape?')) return;
+    await fetch(`/api/vcr/tapes/${encodeURIComponent(uid)}`, { method: 'DELETE' });
+    loadVhsTapes();
+  }
+
+  async function reassignTape(uid) {
+    const videoId = prompt('Enter new video ID (or leave empty to cancel):');
+    if (!videoId) return;
+    // For now, delete and re-register
+    await fetch(`/api/vcr/tapes/${encodeURIComponent(uid)}`, { method: 'DELETE' });
+    await fetch('/api/vcr/tapes/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ uid, video_id: videoId })
+    });
+    loadVhsTapes();
+  }
+
+  // ============================================
+  // INIT
+  // ============================================
+  document.addEventListener('DOMContentLoaded', () => {
+    loadSeries();
+    loadMovies();
+    loadCommercials();
+    loadVhsVideos();
+    loadVhsTapes();
+    updateReaderStatus();
+
+    setInterval(updateReaderStatus, 2000);
+    setInterval(loadVhsTapes, 10000);
+  });
 {% endblock %}

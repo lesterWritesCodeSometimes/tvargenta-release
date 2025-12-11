@@ -2348,10 +2348,129 @@ def api_commercials():
     return jsonify({"ok": True, "commercials": commercials})
 
 
-@app.route("/content")
-def content_manager():
-    """Unified Content Manager page."""
-    return render_template("content_manager.html", active_page='content')
+# --- Movies API ---
+@app.route("/api/movies")
+def api_movies():
+    """Return list of movies."""
+    global metadata
+    metadata = load_metadata()
+
+    movies = []
+    for video_id, data in metadata.items():
+        if data.get("category") == "movie":
+            movies.append({
+                "video_id": video_id,
+                "title": data.get("title", video_id),
+                "duration": data.get("duracion", 0)
+            })
+
+    movies.sort(key=lambda x: x["title"].lower())
+    return jsonify({"ok": True, "movies": movies})
+
+
+@app.route("/api/movies/<video_id>", methods=["DELETE"])
+def delete_movie(video_id):
+    """Delete a movie (file, metadata, and thumbnail)."""
+    global metadata
+    metadata = load_metadata()
+
+    if video_id not in metadata:
+        return jsonify({"ok": False, "error": "Movie not found"}), 404
+
+    video_data = metadata[video_id]
+    if video_data.get("category") != "movie":
+        return jsonify({"ok": False, "error": "Video is not a movie"}), 400
+
+    try:
+        # Delete video file
+        video_path = VIDEO_DIR / f"{video_id}.mp4"
+        if video_path.exists():
+            video_path.unlink()
+
+        # Delete thumbnail
+        thumb_path = THUMB_DIR / f"{video_id}.jpg"
+        if thumb_path.exists():
+            thumb_path.unlink()
+
+        # Delete metadata
+        del metadata[video_id]
+        with open(METADATA_FILE, "w", encoding="utf-8") as f:
+            json.dump(metadata, f, indent=2, ensure_ascii=False)
+
+        logger.info(f"[MOVIES] Deleted movie: {video_id}")
+        return jsonify({"ok": True})
+
+    except Exception as e:
+        logger.error(f"[MOVIES] Error deleting {video_id}: {e}")
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
+@app.route("/upload/movies", methods=["POST"])
+def upload_movies_post():
+    """Handle movie file uploads."""
+    global metadata
+    metadata = load_metadata()
+
+    files = request.files.getlist("videos[]")
+    if not files:
+        return jsonify({"ok": False, "error": "No files provided"}), 400
+
+    results = []
+
+    for file in files:
+        if not file.filename:
+            continue
+
+        try:
+            # Get video_id from filename
+            video_id = secure_filename(file.filename).rsplit(".", 1)[0]
+
+            # Check if already exists
+            if video_id in metadata:
+                results.append({"filename": file.filename, "ok": False, "error": "already_exists"})
+                continue
+
+            # Save to temp, then move
+            temp_path = VIDEO_DIR / f"_temp_{video_id}.mp4"
+            final_path = VIDEO_DIR / f"{video_id}.mp4"
+
+            file.save(temp_path)
+
+            # Get duration
+            duration = get_video_duration(temp_path)
+            if duration is None:
+                duration = 0
+
+            # Move to final location
+            temp_path.rename(final_path)
+
+            # Generate thumbnail
+            generate_thumbnail(final_path, THUMB_DIR / f"{video_id}.jpg")
+
+            # Create metadata
+            title = video_id.replace("_", " ").replace("-", " ").title()
+            metadata[video_id] = {
+                "title": title,
+                "category": "movie",
+                "duracion": duration,
+                "fecha": datetime.now().strftime("%Y-%m-%d"),
+                "tags": [],
+                "personaje": "",
+                "modo": []
+            }
+
+            results.append({"filename": file.filename, "ok": True, "video_id": video_id})
+            logger.info(f"[MOVIES] Uploaded: {video_id} ({duration}s)")
+
+        except Exception as e:
+            logger.error(f"[MOVIES] Error processing {file.filename}: {e}")
+            results.append({"filename": file.filename, "ok": False, "error": str(e)})
+
+    # Save metadata
+    with open(METADATA_FILE, "w", encoding="utf-8") as f:
+        json.dump(metadata, f, indent=2, ensure_ascii=False)
+
+    return jsonify({"ok": True, "results": results})
 
 
 @app.route("/canales")
