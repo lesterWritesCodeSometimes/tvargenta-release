@@ -42,8 +42,22 @@
             <span class="text-purple-300 font-semibold">{{ series.episode_count }}</span> episode{% if series.episode_count != 1 %}s{% endif %}
           </p>
           {% if series.created %}
-          <p class="text-xs text-gray-500">Created: {{ series.created }}</p>
+          <p class="text-xs text-gray-500 mb-2">Created: {{ series.created }}</p>
           {% endif %}
+
+          <!-- Time of Day Preference -->
+          <div class="mt-3 mb-3">
+            <label class="block text-xs text-gray-400 mb-1">Broadcast Time Slot</label>
+            <select class="time-of-day-select w-full bg-gray-800 text-white px-2 py-1 rounded border border-gray-600 text-sm"
+                    data-series="{{ series.folder_name }}">
+              <option value="any" {% if series.time_of_day == 'any' %}selected{% endif %}>Any Time (24h)</option>
+              <option value="early_morning" {% if series.time_of_day == 'early_morning' %}selected{% endif %}>Early Morning (4am-7am)</option>
+              <option value="late_morning" {% if series.time_of_day == 'late_morning' %}selected{% endif %}>Late Morning (7am-12pm)</option>
+              <option value="afternoon" {% if series.time_of_day == 'afternoon' %}selected{% endif %}>Afternoon (12pm-5pm)</option>
+              <option value="evening" {% if series.time_of_day == 'evening' %}selected{% endif %}>Evening (5pm-9pm)</option>
+              <option value="night" {% if series.time_of_day == 'night' %}selected{% endif %}>Night (9pm-2am)</option>
+            </select>
+          </div>
 
           <div class="flex justify-end gap-4 mt-4">
             <a href="{{ url_for('upload_series') }}?series={{ series.folder_name }}"
@@ -87,5 +101,51 @@
       <a href="{{ url_for('index') }}" class="text-blue-400 hover:underline text-sm">Back to Admin</a>
     </div>
   </div>
+
+  <script>
+    // Handle time-of-day dropdown changes
+    document.querySelectorAll('.time-of-day-select').forEach(select => {
+      select.addEventListener('change', async function() {
+        const seriesName = this.dataset.series;
+        const timeOfDay = this.value;
+
+        // Visual feedback
+        this.style.opacity = '0.5';
+
+        try {
+          const response = await fetch('/api/series/time_of_day', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              series_name: seriesName,
+              time_of_day: timeOfDay
+            })
+          });
+
+          const data = await response.json();
+
+          if (data.ok) {
+            // Brief green flash to indicate success
+            this.style.borderColor = '#22c55e';
+            setTimeout(() => {
+              this.style.borderColor = '';
+            }, 1000);
+          } else {
+            alert('Error: ' + (data.error || 'Unknown error'));
+            // Revert selection
+            location.reload();
+          }
+        } catch (err) {
+          console.error('Error updating time of day:', err);
+          alert('Network error. Please try again.');
+          location.reload();
+        } finally {
+          this.style.opacity = '1';
+        }
+      });
+    });
+  </script>
 </body>
 </html>

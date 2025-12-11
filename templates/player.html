@@ -780,7 +780,14 @@
 	let playedReportedFor = null;   // video_id para el que ya se reportó play
 	let playedTimer = null;         // timeout a 10s
 	let playedArmed = false;        // evita múltiples enganches
-	
+
+	// Broadcast TV state tracking
+	let isBroadcastChannel = false;        // true if current channel uses broadcast scheduling
+	let lastBroadcastVideoId = null;       // last scheduled video ID
+	let lastBroadcastSeekTo = 0;           // last scheduled seek position
+	let broadcastSyncInterval = null;      // interval for syncing broadcast content
+	const BROADCAST_SYNC_INTERVAL_MS = 2000; // check for content changes every 2 seconds
+
 	// Idiomas disponibles (orden = visual en el menú)
 	const AVAILABLE_LANGS = [
 	  { code: "es", key: "lang.es", label: "Español" },
@@ -1060,16 +1067,34 @@
 		  const cambioDeVideo = data.video_id !== currentVideo;
 		  const cambioDeCanal = data.modo !== ultimoCanal;
 
+		  // Track if this is a broadcast channel for special handling
+		  const isBroadcast = data.is_broadcast === true;
+		  const seekTo = data.seek_to || 0;
+
 		  // Solo cambiamos el src si verdaderamente cambia el video o es forzado
 		  if (cambioDeVideo ) {
 			currentVideo = data.video_id;
 			video.src = data.video_url || `/videos/${data.video_id}.mp4`;
 			video.load();
+
+			// For broadcast channels, seek to the scheduled timestamp after loading
+			if (isBroadcast && seekTo > 0) {
+			  video.addEventListener('loadedmetadata', function seekHandler() {
+				video.currentTime = seekTo;
+				video.removeEventListener('loadedmetadata', seekHandler);
+				console.log(`[TV] Broadcast seek to ${seekTo}s`);
+			  }, { once: true });
+			}
+
 			video.play().catch(e => console.warn("[TV] play() rechazado:", e));
 			// Channel badge removed for immersion
 
 			// --- armado del umbral de "play real" ---
-			playedReportedFor = null;
+			// Skip play reporting for broadcast system videos (test pattern, commercials)
+			if (isBroadcast && (data.broadcast_type === 'test_pattern' || data.broadcast_type === 'commercial')) {
+			  // Don't track plays for system content
+			  playedReportedFor = currentVideo;
+			}
 			playedArmed = false;
 			clearTimeout(playedTimer);
 
@@ -1115,6 +1140,25 @@
 			if (typeof updateVcrChannelMode === 'function') {
 			  updateVcrChannelMode(data.modo);
 			}
+
+			// Handle broadcast channel state
+			if (isBroadcast) {
+			  isBroadcastChannel = true;
+			  lastBroadcastVideoId = data.video_id;
+			  lastBroadcastSeekTo = data.seek_to || 0;
+			  startBroadcastSync();
+			} else {
+			  isBroadcastChannel = false;
+			  lastBroadcastVideoId = null;
+			  lastBroadcastSeekTo = 0;
+			  stopBroadcastSync();
+			}
+		  } else if (isBroadcast && !isBroadcastChannel) {
+			// Already on this channel but now recognizing it as broadcast
+			isBroadcastChannel = true;
+			lastBroadcastVideoId = data.video_id;
+			lastBroadcastSeekTo = data.seek_to || 0;
+			startBroadcastSync();
 		  }
 		})
 		.catch(err => {
@@ -1214,6 +1258,79 @@
 		console.error("Error checking reload trigger", e);
 	  }
 	}, 300);
+
+	// Broadcast channel sync polling
+	// For broadcast channels, periodically check if scheduled content has changed
+	function startBroadcastSync() {
+	  if (broadcastSyncInterval) return; // Already running
+
+	  broadcastSyncInterval = setInterval(async () => {
+		if (!isBroadcastChannel) return;
+
+		try {
+		  const res = await fetch("/api/next_video");
+		  const data = await res.json();
+
+		  if (!data.is_broadcast) {
+			// Channel changed to non-broadcast
+			isBroadcastChannel = false;
+			stopBroadcastSync();
+			return;
+		  }
+
+		  // Check if content has changed
+		  const videoChanged = data.video_id !== lastBroadcastVideoId;
+		  const currentPos = video.currentTime || 0;
+		  const targetPos = data.seek_to || 0;
+		  const seekDrift = Math.abs(targetPos - currentPos);
+
+		  // Detect if same video is looping (seek target is significantly behind current position)
+		  // This happens when a commercial/video repeats in the schedule
+		  const isLooping = !videoChanged && (currentPos - targetPos > 10);
+
+		  if (videoChanged || isLooping) {
+			// New video scheduled OR same video looping - reload it
+			if (isLooping) {
+			  console.log(`[TV] Broadcast video looping: ${data.video_id} (${currentPos.toFixed(1)}s -> ${targetPos.toFixed(1)}s)`);
+			} else {
+			  console.log(`[TV] Broadcast content change: ${lastBroadcastVideoId} -> ${data.video_id}`);
+			}
+			lastBroadcastVideoId = data.video_id;
+			lastBroadcastSeekTo = targetPos;
+
+			currentVideo = data.video_id;
+			video.src = data.video_url || `/videos/${data.video_id}.mp4`;
+			video.load();
+
+			if (lastBroadcastSeekTo > 0) {
+			  video.addEventListener('loadedmetadata', function seekHandler() {
+				video.currentTime = lastBroadcastSeekTo;
+				video.removeEventListener('loadedmetadata', seekHandler);
+			  }, { once: true });
+			}
+
+			video.play().catch(e => console.warn("[TV] play() rechazado:", e));
+		  } else if (seekDrift > 5) {
+			// Same video but we've drifted more than 5 seconds - resync
+			console.log(`[TV] Broadcast resync: drift=${seekDrift.toFixed(1)}s`);
+			video.currentTime = targetPos;
+		  }
+
+		} catch (e) {
+		  console.warn("[TV] Broadcast sync error:", e);
+		}
+	  }, BROADCAST_SYNC_INTERVAL_MS);
+
+	  console.log("[TV] Broadcast sync started");
+	}
+
+	function stopBroadcastSync() {
+	  if (broadcastSyncInterval) {
+		clearInterval(broadcastSyncInterval);
+		broadcastSyncInterval = null;
+		console.log("[TV] Broadcast sync stopped");
+	  }
+	}
 
 	
 	let volumenTimer = null;
