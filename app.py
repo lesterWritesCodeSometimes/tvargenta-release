@@ -2531,23 +2531,8 @@ def eliminar_canal(canal_id):
 
 @app.route("/editar_canal/<canal_id>")
 def editar_canal(canal_id):
-    canales = load_canales()
-    canal = canales.get(canal_id)
-    if not canal:
-        return redirect(url_for("canales"))
-
-    # Get series with display names
-    all_series = [
-        {"folder_name": name, "display_name": series_display_name(name)}
-        for name in _get_all_series()
-    ]
-
-    return render_template("canales.html",
-                           canal_actual=canal,
-                           canal_id=canal_id,
-                           canales=canales,
-                           all_series=all_series,
-                           active_page='channels')
+    # Editing is now inline, redirect to main channels page
+    return redirect(url_for("canales"))
 
 @app.route("/api/set_canal_activo", methods=["POST"])
 def api_set_canal_activo():

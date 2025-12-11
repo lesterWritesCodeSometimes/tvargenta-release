@@ -11,11 +11,53 @@
   .channel-card {
     background: rgba(17,24,39,.6);
     backdrop-filter: blur(2px);
-    transition: transform 0.2s, box-shadow 0.2s;
+    transition: all 0.3s ease;
   }
   .channel-card:hover {
-    transform: translateY(-2px);
     box-shadow: 0 4px 12px rgba(234, 179, 8, 0.2);
+  }
+  .channel-card.expanded {
+    border-color: #facc15;
+    box-shadow: 0 4px 20px rgba(234, 179, 8, 0.3);
+  }
+  .card-form {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.3s ease, padding 0.3s ease, margin 0.3s ease;
+    padding-top: 0;
+    margin-top: 0;
+  }
+  .channel-card.expanded .card-form {
+    max-height: 600px;
+    padding-top: 1rem;
+    margin-top: 1rem;
+    border-top: 1px solid #4b5563;
+  }
+  .create-card {
+    border: 2px dashed #4b5563;
+    background: rgba(17,24,39,.3);
+    transition: all 0.3s ease;
+    cursor: pointer;
+  }
+  .create-card:hover {
+    border-color: #22c55e;
+    background: rgba(34, 197, 94, 0.1);
+  }
+  .create-card.expanded {
+    border-style: solid;
+    border-color: #22c55e;
+    cursor: default;
+    background: rgba(17,24,39,.6);
+  }
+  .create-card .card-form {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.3s ease, padding 0.3s ease;
+    padding-top: 0;
+  }
+  .create-card.expanded .card-form {
+    max-height: 600px;
+    padding-top: 1rem;
   }
 {% endblock %}
 
@@ -24,130 +66,217 @@
     {{ tr("canales.header") }}
   </h1>
 
-  <!-- CHANNEL LISTING -->
-  <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+  <!-- CHANNEL CARDS -->
+  <div class="space-y-4">
     {% for key, canal in canales.items() %}
-      <div class="channel-card border border-yellow-600 rounded-lg p-4 shadow-lg">
-        <div class="flex items-center justify-between mb-3">
-          <h2 class="text-xl font-bold text-white flex items-center gap-2">
-            {% if canal.icono %}
-              <span class="text-2xl">{{ canal.icono }}</span>
+    <div class="channel-card border border-yellow-600 rounded-lg p-4 shadow-lg" data-card-id="{{ key }}">
+      <!-- Collapsed View -->
+      <div class="card-header">
+        <div class="flex items-start justify-between gap-4">
+          <div class="flex-1">
+            <h2 class="text-xl font-bold text-white flex items-center gap-2 mb-1">
+              {% if canal.icono %}
+                <span class="text-2xl">{{ canal.icono }}</span>
+              {% endif %}
+              {{ canal.nombre }}
+            </h2>
+            <p class="text-sm text-gray-300 italic">{{ canal.descripcion or 'No description' }}</p>
+            {% if canal.series_filter %}
+            <div class="flex flex-wrap gap-1 mt-2">
+              {% for s in canal.series_filter %}
+                <span class="bg-purple-900 text-purple-300 text-xs px-2 py-0.5 rounded">{{ s | replace('_', ' ') }}</span>
+              {% endfor %}
+            </div>
+            {% else %}
+            <p class="text-xs text-gray-500 mt-2">All content (no filter)</p>
             {% endif %}
-            {{ canal.nombre }}
-          </h2>
-        </div>
-        <p class="text-sm text-gray-300 italic mb-3">{{ canal.descripcion }}</p>
-
-        {% if canal.series_filter %}
-        <div class="mb-3">
-          <p class="text-sm text-purple-400 font-semibold mb-1">Series Filter</p>
-          <div class="flex flex-wrap gap-1">
-            {% for s in canal.series_filter %}
-              <span class="bg-purple-900 text-purple-300 text-xs px-2 py-0.5 rounded">{{ s | replace('_', ' ') }}</span>
-            {% endfor %}
+          </div>
+          <div class="flex gap-3">
+            <button type="button" onclick="toggleCard('{{ key }}')" class="text-blue-400 hover:text-blue-300 text-sm font-medium">
+              {{ tr("canales.card.edit") }}
+            </button>
+            <button type="button" onclick="deleteChannel('{{ key }}', '{{ canal.nombre }}')" class="text-red-400 hover:text-red-300 text-sm">
+              {{ tr("canales.card.delete") }}
+            </button>
           </div>
         </div>
-        {% else %}
-        <p class="text-xs text-gray-500 mb-3 italic">All content (no filter)</p>
-        {% endif %}
-
-        <div class="flex justify-end gap-4">
-          <form action="/editar_canal/{{ key }}" method="get">
-            <button type="submit" class="text-blue-400 hover:underline text-sm">{{ tr("canales.card.edit") }}</button>
-          </form>
-          <form action="/eliminar_canal/{{ key }}" method="post">
-            <button type="submit" class="text-red-400 hover:underline text-sm">{{ tr("canales.card.delete") }}</button>
-          </form>
-        </div>
-      </div>
-    {% else %}
-      <div class="col-span-2 text-center py-8 bg-gray-900/50 rounded-lg border border-gray-700">
-        <p class="text-gray-400">No channels created yet.</p>
-        <p class="text-sm text-gray-500 mt-1">Create your first channel below!</p>
-      </div>
-    {% endfor %}
-  </div>
-
-  <!-- NEW/EDIT CHANNEL FORM -->
-  <div class="bg-gray-900/50 border border-yellow-600 rounded-lg p-4 shadow-lg">
-    <h2 class="text-xl font-bold text-green-400 mb-4 text-center">
-      {% if canal_actual %}
-        {{ tr("canales.form.title_edit") }}
-      {% else %}
-        {{ tr("canales.form.title_new") }}
-      {% endif %}
-    </h2>
-
-    <form action="/guardar_canal" method="post" class="space-y-4">
-      {% if canal_actual %}
-        <input type="hidden" name="canal_id" value="{{ canal_id }}">
-      {% endif %}
-
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div>
-          <label class="block text-sm mb-1 text-gray-300">{{ tr("canales.form.label_name") }}</label>
-          <input type="text" name="nombre"
-                 value="{{ canal_actual.nombre if canal_actual else '' }}"
-                 class="w-full bg-gray-800 text-white px-3 py-2 rounded border border-gray-600 focus:border-yellow-500" required>
-        </div>
-
-        <div>
-          <label class="block text-sm mb-1 text-gray-300">{{ tr("canales.form.label_icon") }}</label>
-          <select name="icono" class="w-full bg-gray-800 text-white px-3 py-2 rounded border border-gray-600">
-            <option value="">{{ tr("canales.form.icon_none") }}</option>
-            {% set iconos = ["📺", "🎉", "🏠", "😂", "🧸", "⚽", "📼", "🧉", "🎬", "🎵", "🌙", "☀️"] %}
-            {% for icon in iconos %}
-              <option value="{{ icon }}" {% if canal_actual and canal_actual.icono == icon %}selected{% endif %}>{{ icon }}</option>
-            {% endfor %}
-          </select>
-        </div>
       </div>
 
-      <div>
-        <label class="block text-sm mb-1 text-gray-300">{{ tr("canales.form.label_desc") }}</label>
-        <textarea name="descripcion" rows="2"
-                  class="w-full bg-gray-800 text-white px-3 py-2 rounded border border-gray-600"
-                  placeholder="Brief description of this channel...">{{ canal_actual.descripcion if canal_actual else '' }}</textarea>
-      </div>
+      <!-- Expanded Edit Form -->
+      <div class="card-form">
+        <form action="/guardar_canal" method="post" class="space-y-4">
+          <input type="hidden" name="canal_id" value="{{ key }}">
 
-      <!-- TV Series Filter -->
-      {% if all_series %}
-      <div class="pt-4 border-t border-gray-600">
-        <label class="block text-sm mb-2 text-purple-300 font-semibold">TV Series Filter</label>
-        <p class="text-xs text-gray-400 mb-3">Select series to include in this channel. Leave empty to show all content.</p>
-        <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-48 overflow-y-auto p-2 bg-gray-800 rounded border border-gray-600">
-          {% for series in all_series %}
-          <label class="flex items-center gap-2 text-sm">
-            <input type="checkbox" name="series_filter" value="{{ series.folder_name }}"
-                   {% if canal_actual and series.folder_name in (canal_actual.series_filter or []) %}checked{% endif %}
-                   class="accent-purple-400">
-            <span class="truncate">{{ series.display_name }}</span>
-          </label>
-          {% endfor %}
-        </div>
-      </div>
-      {% else %}
-      <div class="pt-4 border-t border-gray-600">
-        <p class="text-xs text-gray-500 italic">No TV series available. Create series in the Content Manager to filter channels by series.</p>
-      </div>
-      {% endif %}
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-xs mb-1 text-gray-400">{{ tr("canales.form.label_name") }}</label>
+              <input type="text" name="nombre" value="{{ canal.nombre }}"
+                     class="w-full bg-gray-800 text-white px-3 py-2 rounded border border-gray-600 focus:border-yellow-500 text-sm" required>
+            </div>
+            <div>
+              <label class="block text-xs mb-1 text-gray-400">{{ tr("canales.form.label_icon") }}</label>
+              <select name="icono" class="w-full bg-gray-800 text-white px-3 py-2 rounded border border-gray-600 text-sm">
+                <option value="">{{ tr("canales.form.icon_none") }}</option>
+                {% set iconos = ["📺", "🎉", "🏠", "😂", "🧸", "⚽", "📼", "🧉", "🎬", "🎵", "🌙", "☀️"] %}
+                {% for icon in iconos %}
+                  <option value="{{ icon }}" {% if canal.icono == icon %}selected{% endif %}>{{ icon }}</option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
 
-      <div class="flex justify-center items-center gap-4 pt-4">
-        <button type="submit"
-                class="bg-green-500 hover:bg-green-600 text-black font-bold px-6 py-2 rounded shadow">
-          {% if canal_actual %}
-            {{ tr("canales.form.submit_update") }}
-          {% else %}
-            {{ tr("canales.form.submit_create") }}
+          <div>
+            <label class="block text-xs mb-1 text-gray-400">{{ tr("canales.form.label_desc") }}</label>
+            <textarea name="descripcion" rows="2"
+                      class="w-full bg-gray-800 text-white px-3 py-2 rounded border border-gray-600 text-sm">{{ canal.descripcion or '' }}</textarea>
+          </div>
+
+          {% if all_series %}
+          <div>
+            <label class="block text-xs mb-2 text-purple-300 font-semibold">Series Filter</label>
+            <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-32 overflow-y-auto p-2 bg-gray-800 rounded border border-gray-600">
+              {% for series in all_series %}
+              <label class="flex items-center gap-2 text-xs">
+                <input type="checkbox" name="series_filter" value="{{ series.folder_name }}"
+                       {% if series.folder_name in (canal.series_filter or []) %}checked{% endif %}
+                       class="accent-purple-400">
+                <span class="truncate">{{ series.display_name }}</span>
+              </label>
+              {% endfor %}
+            </div>
+          </div>
           {% endif %}
-        </button>
 
-        {% if canal_actual %}
-          <a href="{{ url_for('canales') }}" class="text-red-400 hover:underline text-sm">
-            {{ tr("canales.form.cancel_edit") }}
-          </a>
-        {% endif %}
+          <div class="flex items-center gap-3 pt-2">
+            <button type="submit" class="bg-yellow-500 hover:bg-yellow-600 text-black font-bold px-4 py-1.5 rounded text-sm">
+              Save Changes
+            </button>
+            <button type="button" onclick="toggleCard('{{ key }}')" class="text-gray-400 hover:text-white text-sm">
+              Cancel
+            </button>
+          </div>
+        </form>
       </div>
-    </form>
+    </div>
+    {% endfor %}
+
+    <!-- CREATE NEW CHANNEL CARD -->
+    <div class="create-card rounded-lg p-4" data-card-id="new" onclick="toggleCard('new', event)">
+      <!-- Collapsed View -->
+      <div class="card-header text-center">
+        <span class="text-3xl text-gray-500">➕</span>
+        <p class="text-gray-400 mt-1">Create New Channel</p>
+      </div>
+
+      <!-- Expanded Create Form -->
+      <div class="card-form" onclick="event.stopPropagation()">
+        <h3 class="text-lg font-bold text-green-400 mb-4 text-center">New Channel</h3>
+        <form action="/guardar_canal" method="post" class="space-y-4">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-xs mb-1 text-gray-400">{{ tr("canales.form.label_name") }}</label>
+              <input type="text" name="nombre" placeholder="e.g. Retro Cartoons"
+                     class="w-full bg-gray-800 text-white px-3 py-2 rounded border border-gray-600 focus:border-green-500 text-sm" required>
+            </div>
+            <div>
+              <label class="block text-xs mb-1 text-gray-400">{{ tr("canales.form.label_icon") }}</label>
+              <select name="icono" class="w-full bg-gray-800 text-white px-3 py-2 rounded border border-gray-600 text-sm">
+                <option value="">{{ tr("canales.form.icon_none") }}</option>
+                {% set iconos = ["📺", "🎉", "🏠", "😂", "🧸", "⚽", "📼", "🧉", "🎬", "🎵", "🌙", "☀️"] %}
+                {% for icon in iconos %}
+                  <option value="{{ icon }}">{{ icon }}</option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-xs mb-1 text-gray-400">{{ tr("canales.form.label_desc") }}</label>
+            <textarea name="descripcion" rows="2" placeholder="Brief description..."
+                      class="w-full bg-gray-800 text-white px-3 py-2 rounded border border-gray-600 text-sm"></textarea>
+          </div>
+
+          {% if all_series %}
+          <div>
+            <label class="block text-xs mb-2 text-purple-300 font-semibold">Series Filter</label>
+            <p class="text-xs text-gray-500 mb-2">Select series to include, or leave empty for all content.</p>
+            <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-32 overflow-y-auto p-2 bg-gray-800 rounded border border-gray-600">
+              {% for series in all_series %}
+              <label class="flex items-center gap-2 text-xs">
+                <input type="checkbox" name="series_filter" value="{{ series.folder_name }}" class="accent-purple-400">
+                <span class="truncate">{{ series.display_name }}</span>
+              </label>
+              {% endfor %}
+            </div>
+          </div>
+          {% endif %}
+
+          <div class="flex items-center gap-3 pt-2">
+            <button type="submit" class="bg-green-500 hover:bg-green-600 text-black font-bold px-4 py-1.5 rounded text-sm">
+              Create Channel
+            </button>
+            <button type="button" onclick="toggleCard('new')" class="text-gray-400 hover:text-white text-sm">
+              Cancel
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
   </div>
+
+  {% if not canales %}
+  <p class="text-center text-gray-500 mt-4 text-sm">Click the card above to create your first channel!</p>
+  {% endif %}
+{% endblock %}
+
+{% block extra_scripts %}
+  let expandedCard = null;
+
+  function toggleCard(cardId, event) {
+    // If clicking on the create card header when not expanded, expand it
+    if (event && cardId === 'new') {
+      const card = document.querySelector(`[data-card-id="${cardId}"]`);
+      if (!card.classList.contains('expanded')) {
+        // Allow expansion
+      } else {
+        // If already expanded, don't collapse when clicking inside
+        return;
+      }
+    }
+
+    const card = document.querySelector(`[data-card-id="${cardId}"]`);
+    const isExpanding = !card.classList.contains('expanded');
+
+    // Collapse any currently expanded card
+    if (expandedCard && expandedCard !== cardId) {
+      const prevCard = document.querySelector(`[data-card-id="${expandedCard}"]`);
+      if (prevCard) {
+        prevCard.classList.remove('expanded');
+      }
+    }
+
+    // Toggle this card
+    if (isExpanding) {
+      card.classList.add('expanded');
+      expandedCard = cardId;
+      // Scroll into view
+      setTimeout(() => {
+        card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }, 100);
+    } else {
+      card.classList.remove('expanded');
+      expandedCard = null;
+    }
+  }
+
+  function deleteChannel(channelId, channelName) {
+    if (confirm(`Delete channel "${channelName}"?`)) {
+      // Create a form and submit it
+      const form = document.createElement('form');
+      form.method = 'POST';
+      form.action = `/eliminar_canal/${channelId}`;
+      document.body.appendChild(form);
+      form.submit();
+    }
+  }
 {% endblock %}
