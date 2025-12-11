@@ -424,9 +424,17 @@
   // UPLOAD HELPER (reusable)
   // ============================================
 
-  // Get video_id from filename (same logic as backend)
+  // Get video_id from filename (mimics Python's secure_filename + extension removal)
   function getVideoIdFromFilename(filename) {
-    return filename.replace(/\.[^/.]+$/, '');  // Remove extension
+    // Mimic Werkzeug's secure_filename behavior
+    let safe = filename
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')  // Remove accents
+      .replace(/[^\w.\s-]/g, '')  // Keep only word chars, dots, spaces, hyphens
+      .trim()
+      .replace(/[\s]+/g, '_')  // Replace whitespace with underscores
+      .replace(/^[._]+|[._]+$/g, '');  // Strip leading/trailing dots and underscores
+    // Remove extension
+    return safe.replace(/\.[^/.]+$/, '');
   }
 
   // Upload a single file with XMLHttpRequest for progress tracking
