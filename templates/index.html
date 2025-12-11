@@ -3,586 +3,297 @@
      © 2025. No comercial, atribución y consulta previa. TAL CUAL, sin garantías.
      Ver LICENSE para términos completos.
 -->
-<!DOCTYPE html>
-<html lang="{{ lang }}">
-<head>
-  <meta charset="UTF-8">
-  <title>{{ tr("index.title") }}</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-  <script src="https://cdn.tailwindcss.com"></script>
-  <style>
-	 html, body { touch-action: manipulation; }
-    .chip { display:inline-flex; align-items:center; gap:.25rem; padding:.25rem .5rem; border-radius:9999px; font-size:.72rem; border:1px solid; cursor:pointer; user-select:none; }
-    .chip-neutral { background:#1f2937; color:#e5e7eb; border-color:#4b5563; }
-    .chip-neutral:hover { border-color:#f59e0b; }
-    .chip-include { background:#facc15; color:#000; border-color:#eab308; }
-    .chip-exclude { background:#7f1d1d; color:#fff; border-color:#b91c1c; }
-    .hide { display:none !important; }
-    .kbd { padding:.125rem .25rem; font-size:.7rem; border:1px solid #6b7280; border-radius:.25rem; background:#1f2937; }
+{% extends "base.html" %}
 
-    /* ---------- Control de opacidad del logo de fondo ---------- */
-    :root { 
-		--logo-opacity: 0.07; 
-		--roll-height: 48%;     /* ALTURA de la banda (subí/bajá: 35–80%) */
-		--roll-overshoot: 140%; /* RECORRIDO: de -140% a +140% (más = entra/sale más lejos) */
-		--roll-opacity: 0.20;   /* Intensidad del brillo de la banda */
-		--roll-duration: 12s;   /* Duración del recorrido (más grande = más lento) */
-		
-		--crt-from: #0a0a0a;   /* arriba */
-		--crt-via:  #131111;   /* centro, un poco más cálido que #111 */
-		--crt-to:   #3a0000;   /* abajo: rojo más visible que #1a0000 */
-		--crt-strength: 1;     /* 1 = pleno; podés bajarlo si querés atenuar */
-		} 
-    .logo-mark { opacity: var(--logo-opacity); }
+{% block title %}{{ tr("index.title") }}{% endblock %}
 
-    /* ---------- CRT: scanlines ESTÁTICAS (sin flicker) ---------- */
-    .crt-scanlines{
-      background-image: repeating-linear-gradient(
-        to bottom,
-        rgba(255,255,255,0.10) 0px,
-        rgba(255,255,255,0.10) 1px,
-        rgba(0,0,0,0.04) 2px
-      );
-      opacity: .14;
-      pointer-events: none;
-    }
-	
-	/* Capa de degradé */
-	.crt-gradient{
-	  background: linear-gradient(to bottom,
-				  color-mix(in lab, var(--crt-from) calc(var(--crt-strength)*100%), #000 0%),
-				  color-mix(in lab, var(--crt-via)  calc(var(--crt-strength)*100%), #000 0%),
-				  color-mix(in lab, var(--crt-to)   calc(var(--crt-strength)*100%), #000 0%)
-				);
-	}
+{% block extra_styles %}
+  .video-card {
+    background: rgba(17,24,39,.45);
+    backdrop-filter: blur(2px);
+    position: relative;
+  }
+  .video-card .delete-btn { position:absolute; top:.5rem; right:.5rem; z-index:30; }
+  .category-badge {
+    font-size: 0.65rem;
+    padding: 0.125rem 0.5rem;
+    border-radius: 9999px;
+  }
+{% endblock %}
 
-    /* ---------- CRT: estática (ruido) ESTÁTICO ---------- */
-    .crt-noise{
-      background-image: url("data:image/svg+xml;utf8,\
-<svg xmlns='http://www.w3.org/2000/svg' width='128' height='128'>\
-<filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' seed='7'/></filter>\
-<rect width='100%' height='100%' filter='url(%23n)'/>\
-</svg>");
-      background-repeat: repeat;
-      background-size: 220px 220px;
-      mix-blend-mode: overlay;
-      opacity: .03;
-      pointer-events: none;
-    }
+{% block content %}
+  <!-- Stats -->
+  <p class="text-xs sm:text-sm text-gray-400 text-center mb-4">
+    {{ tr("index.stats.total_time") }}
+    <span class="text-yellow-300 font-semibold">{{ recuerdos }}</span>
+  </p>
 
-    /* ---------- CRT: rolling (sync vertical) ---------- */
-	@keyframes rollSweep {
-	  0%, 94%   { transform: translateY(calc(-1 * var(--roll-overshoot))); opacity: 0; }
-	  95%       { opacity: var(--roll-opacity); }
-	  100%      { transform: translateY(var(--roll-overshoot)); opacity: 0; }
-	}
-
-	.crt-roll { position: absolute; inset: 0; pointer-events: none; mix-blend-mode: screen; }
-
-	.crt-roll::before{
-	  content:"";
-	  position:absolute; left:0; right:0;
-	  height: var(--roll-height);              /* ← banda más ALTA */
-	  background: linear-gradient(
-		to bottom,
-		rgba(255,255,255,0) 0%,
-		rgba(255,255,255, calc(var(--roll-opacity) * .6)) 45%,
-		rgba(255,255,255, var(--roll-opacity)) 50%,
-		rgba(255,255,255, calc(var(--roll-opacity) * .6)) 55%,
-		rgba(255,255,255,0) 100%
-	  );
-	  filter: blur(1px);
-	  transform: translateY(calc(-1 * var(--roll-overshoot)));
-	  animation: rollSweep var(--roll-duration) ease-in-out infinite;
-	}
-
-    /* ---------- Tarjetas semitransparentes ---------- */
-    .video-card {
-      background: rgba(17,24,39,.45);         /* bg-gray-900/50 */
-      backdrop-filter: blur(2px);            /* leve vidrio */
-      position: relative;
-    }
-    /* botón borrar por encima de la miniatura */
-    .video-card .delete-btn { position:absolute; top:.5rem; right:.5rem; z-index:30; }
-
-    /* ---------- Ajustes móviles ---------- */
-	@media (max-width: 900px), (hover: none) and (pointer: coarse){
-	  /* 🔆 Logo más presente en móvil */
-	  :root { 
-	  --logo-opacity: 0.3; 
-	  --crt-from: #0b0b0b;
-	  --crt-via:  #171111;   /* un toque más cálido */
-	  --crt-to:   #4a0000;   /* rojo más claro para que se note en OLED */
-	  --crt-strength: 1;     /* pleno */  
-	    }      
-	  .logo-mark {
-		mix-blend-mode: screen;             /* screen ayuda a “levantar” sobre negro */
-		filter: brightness(1.25) contrast(1.35);
-	  }
-
-	  /* 🔉 Menos “competencia” del fondo en móvil */
-	  .crt-noise{ opacity: .012; }          /* antes .025–.03 */
-	  .crt-scanlines{ opacity: .06; }       /* antes .12; más bajo para que el logo gane */
-
-	  /* 👇 si querés aún más logo, podés bajar un poco el vidrio de las cards en móvil: */
-	  .video-card { background: rgba(17,24,39,.35); } /* opcional: .40–.45 */
-	}
-	
-	#lang-switcher {
-	  position: fixed;
-	  top: 10px;
-	  right: 12px;
-	  z-index: 9999;
-	  background: rgba(0, 0, 0, 0.7);
-	  padding: 4px 8px;
-	  border-radius: 6px;
-	  font-size: 12px;
-	  color: #fff;
-	}
-
-	#lang-switcher select {
-	  background: transparent;
-	  border: none;
-	  color: #fff;
-	  font-size: 12px;
-	  padding: 2px 4px;
-	  cursor: pointer;
-	  outline: none;
-	}
-
-	/* Por si alguna fuente vieja no soporta las banderas, que al menos no rompa layout */
-	#lang-switcher option {
-	  font-size: 12px;
-	}
-
-
-  </style>
-</head>
-<body class="relative bg-black text-white min-h-screen font-mono overflow-x-hidden">
-  <!-- 🎞️ Fondo CRT retro -->
-  <div class="fixed inset-0 bg-black z-0">
-    <!-- Degradado base -->
-    <div class="absolute inset-0 bg-gradient-to-b from-[#0a0a0a] via-[#111] to-[#1a0000] "></div>
-
-    <!-- Estática (ruido) -->
-    <div class="absolute inset-0 crt-noise style="z-index:1""></div>
-
-    <!-- Scanlines (estáticas) -->
-    <div class="absolute inset-0 crt-scanlines" style="z-index:2"></div>
-
-    <!-- Banda de rolling -->
-    <div class="absolute inset-0 crt-roll" style="z-index:3"></div>
-
-    <!-- Logo central (marca de agua) -->
-    <div class="absolute inset-0 flex items-center justify-center pointer-events-none" style="z-index:4">
-      <img
-        id="logoMark"
-        src="{{ url_for('static', filename='background.png') }}"
-        alt="TVArgenta logo"
-        class="logo-mark filter blur-[1px] brightness-95 contrast-125 mix-blend-screen"
-        style="height:auto; max-width:90vw;"
-      >
+  <!-- Title + Counter -->
+  <div class="flex items-center justify-between mb-2">
+    <h2 class="text-xl sm:text-2xl text-green-400 font-bold">{{ tr("index.videos.title") }}</h2>
+    <div class="text-xs sm:text-sm text-gray-300">
+      <span id="conteoTop" class="font-semibold">0</span> {{ tr("index.videos.count_label") }}
     </div>
   </div>
 
-  <div class="relative z-10 max-w-screen-lg mx-auto py-6 sm:py-8 px-3 sm:px-4">
+  <!-- Toggle filters -->
+  <div class="flex items-center justify-end mb-3">
+    <button
+      id="toggleFiltros"
+      class="text-xs sm:text-sm bg-gray-900/70 border border-gray-600 hover:border-yellow-500 rounded px-3 py-2"
+      data-label-show="{{ tr('index.filters.toggle_show') }}"
+      data-label-hide="{{ tr('index.filters.toggle_hide') }}"
+    >
+      {{ tr("index.filters.toggle_show") }}
+    </button>
+  </div>
 
-    
-	<div class="flex justify-center mb-4 sm:mb-6">
-	  <img
-		src="{{ url_for('static', filename='logo_tvar.png') }}"
-		alt="TVArgenta"
-		class="w-3/4 sm:w-3/5 md:w-2/5 lg:w-1/3 h-auto"
-		loading="eager"
-	  >
-	</div>
-	
-	
-	<!-- Selector de idioma (mini menú arriba a la derecha) -->
-	<div id="lang-switcher">
-	  <select id="lang-select">
-		<option value="es" {{ 'selected' if lang == 'es' else '' }}>🇦🇷 ES</option>
-		<option value="en" {{ 'selected' if lang == 'en' else '' }}>🇺🇸 EN</option>
-		<option value="de" {{ 'selected' if lang == 'de' else '' }}>🇩🇪 DE</option>
-	  </select>
-	</div>
-
-	<p class="text-xs sm:text-sm text-gray-400">
-	  {{ tr("index.stats.total_time") }}
-	  <span class="text-yellow-300 font-semibold">{{ recuerdos }}</span>
-	</p>
-
-
-    <!-- Acciones principales -->
-    <div class="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:justify-center sm:gap-3 mb-6 sm:mb-8">
-      <a href="{{ url_for('vertele') }}" class="text-xs sm:text-sm bg-green-600 hover:bg-green-700 text-white font-bold px-3 py-2 sm:px-5 rounded shadow text-center"> {{ tr("index.actions.watch_tv") }}</a>
-      <a href="{{ url_for('canales') }}" class="text-xs sm:text-sm bg-green-700 hover:bg-green-800 text-white font-bold px-3 py-2 sm:px-6 rounded shadow text-center"> {{ tr("index.actions.channels") }}</a>
-      <a href="{{ url_for('series_page') }}" class="text-xs sm:text-sm bg-purple-600 hover:bg-purple-700 text-white font-bold px-3 py-2 sm:px-5 rounded shadow text-center">TV Series</a>
-      <!-- Upload Dropdown -->
-      <div class="relative inline-block upload-dropdown">
-        <button type="button" class="text-xs sm:text-sm bg-yellow-600 hover:bg-yellow-700 text-black font-bold px-3 py-2 sm:px-5 rounded shadow text-center flex items-center gap-1" onclick="toggleUploadDropdown(event)">
-          {{ tr("index.actions.upload") }}
-          <svg class="w-3 h-3 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
-        </button>
-        <div class="upload-dropdown-menu absolute left-0 mt-1 w-40 bg-gray-800 border border-yellow-600 rounded shadow-lg z-50 hidden">
-          <a href="{{ url_for('upload_series') }}" class="block px-4 py-2 text-sm text-white hover:bg-yellow-600 hover:text-black rounded-t">📺 TV Series</a>
-          <a href="{{ url_for('upload_commercials') }}" class="block px-4 py-2 text-sm text-white hover:bg-yellow-600 hover:text-black">📢 Commercials</a>
-          <a href="{{ url_for('vcr_admin') }}" class="block px-4 py-2 text-sm text-white hover:bg-yellow-600 hover:text-black rounded-b">📼 VCR Tapes</a>
-        </div>
-      </div>
-      <a href="{{ url_for('configuracion') }}" class="text-xs sm:text-sm bg-blue-600 hover:bg-blue-700 text-white font-bold px-3 py-2 sm:px-5 rounded shadow text-center"> {{ tr("index.actions.config") }}</a>
-      <a href="{{ url_for('tags') }}" class="text-xs sm:text-sm bg-pink-600 hover:bg-pink-700 text-white font-bold px-3 py-2 sm:px-5 rounded shadow text-center"> {{ tr("index.actions.tags") }}</a>
-      <a href="{{ url_for('vcr_admin') }}" class="text-xs sm:text-sm bg-purple-800 hover:bg-purple-900 text-white font-bold px-3 py-2 sm:px-5 rounded shadow text-center"> {{ tr("index.actions.vcr") }}</a>
-    </div>
-
-    <!-- Barra título + contador -->
-    <div class="flex items-center justify-between mb-2">
-      <h2 class="text-xl sm:text-2xl text-green-400 font-bold"> {{ tr("index.videos.title") }}</h2>
-      <div class="text-xs sm:text-sm text-gray-300">
-        <span id="conteoTop" class="font-semibold">0</span> {{ tr("index.videos.count_label") }}
-      </div>
-    </div>
-
-    <!-- Toggle filtros -->
-    <div class="flex items-center justify-end mb-3">
-      <button
-	  id="toggleFiltros"
-	  class="text-xs sm:text-sm bg-gray-900/70 border border-gray-600 hover:border-yellow-500 rounded px-3 py-2"
-	  data-label-show="{{ tr('index.filters.toggle_show') }}"
-	  data-label-hide="{{ tr('index.filters.toggle_hide') }}"
-	>
-	  {{ tr("index.filters.toggle_show") }}
-	</button>
-    </div>
-
-    <!-- Panel de filtros / orden -->
-    <section id="panelFiltros" class="mb-6 sm:mb-8 border border-yellow-700/40 rounded-lg p-3 sm:p-4 bg-gray-900/50 hide">
-      <div class="flex flex-col gap-4">
-        <div class="flex-1">
-          <label class="block text-xs sm:text-sm text-gray-300 mb-1">{{ tr("index.filters.by_channel_label") }}</label>
-          <select id="canalSelect" class="w-full bg-gray-800 border border-gray-600 rounded px-3 py-2 text-sm">
-            <option value="">{{ tr("index.filters.by_channel_all") }}</option>
-            {% if canales %}
-              {% for canal_id, canal in (canales or {}).items() %}
-                <option value="{{ canal_id }}">{{ canal.nombre or canal_id }}</option>
-              {% endfor %}
-            {% endif %}
-          </select>
-          <p class="text-[11px] sm:text-xs text-gray-400 mt-1">{{ tr("index.filters.rule_hint") }}</p>
-        </div>
-
-        <div class="w-full">
-          <label class="block text-xs sm:text-sm text-gray-300 mb-1">{{ tr("index.filters.order_label") }}</label>
-          <select id="ordenSelect" class="w-full bg-gray-800 border border-gray-600 rounded px-3 py-2 text-sm">
-            <option value="dur_asc">{{ tr("index.filters.order.dur_asc") }}</option>
-            <option value="dur_desc">{{ tr("index.filters.order.dur_desc") }}</option>
-            <option value="titulo_asc">{{ tr("index.filters.order.title_asc") }}</option>
-            <option value="titulo_desc">{{ tr("index.filters.order.title_desc") }}</option>
-            <option value="fecha_desc">{{ tr("index.filters.order.date_desc") }}</option>
-            <option value="fecha_asc">{{ tr("index.filters.order.date_asc") }}</option>
-          </select>
-        </div>
-      </div>
-
-      <!-- Tags -->
-      <div class="mt-5">
-        <div class="flex items-center justify-between gap-3 mb-2">
-          <label class="block text-xs sm:text-sm text-gray-300">{{ tr("index.filters.tags_label") }}</label>
-          <div class="flex items-center gap-2">
-            <input id="buscarTag" type="text" placeholder={{ tr("index.filters.search_placeholder") }} class="w-36 sm:w-56 bg-gray-800 border border-gray-600 rounded px-2 py-1 text-xs">
-            <button id="limpiarBtn" class="text-xs bg-gray-800 border border-gray-600 px-2 py-1 rounded hover:border-yellow-500">{{ tr("index.filters.clear_button") }}</button>
-          </div>
-        </div>
-        <div id="chipsTags" class="flex flex-wrap gap-2"></div>
-        <p class="text-[11px] sm:text-xs text-gray-400 mt-2">
-          {{ tr("index.filters.legend") }}
-          <span class="hidden sm:inline">Tip: <span class="kbd">Alt</span>{{ tr("index.filters.legend_tip") }}</span>
-        </p>
-      </div>
-    </section>
-
-    <!-- NUEVOS SIN METADATA -->
-    {% if nuevos %}
-      <h3 class="text-lg sm:text-2xl text-blue-400 font-bold mt-2 mb-3 sm:mb-4">{{ tr("index.new_videos.header") }}</h3>
-      <ul class="space-y-2 mb-6 sm:mb-10">
-        {% for video_id in nuevos %}
-        <li class="bg-gray-900/50 border border-blue-500 p-3 sm:p-4 rounded flex items-center justify-between">
-          <div>
-            <p class="text-base sm:text-lg font-semibold break-all">{{ video_id }}</p>
-            <a href="{{ url_for('edit_video', video_id=video_id) }}" class="text-xs sm:text-sm text-blue-300 underline">{{ tr("index.new_videos.fill_metadata") }}</a>
-          </div>
-          <span class="text-[11px] sm:text-xs text-gray-300">{{ tr("index.new_videos.no_duration") }}</span>
-        </li>
-        {% endfor %}
-      </ul>
-    {% endif %}
-
-    <!-- LISTA DE VIDEOS -->
-    <div id="listaVideos" class="grid grid-cols-1 gap-4 sm:gap-6">
-      {% for video_id, video in videos.items() %}
-      <div class="video-card relative rounded-lg p-3 sm:p-4 shadow-lg border border-yellow-500 flex flex-col sm:flex-row gap-3 sm:gap-4 items-start"
-           data-id="{{ video_id }}"
-           data-title="{{ (video.title or '')|lower }}"
-           data-fecha="{{ video.fecha or '' }}"
-           data-tags="{{ (video.tags or [])|join(',') }}"
-           data-duration="{{ video.duracion or 0 }}"
-           data-category="{{ video.category or 'vhs_tape' }}"
-           data-series="{{ video.series or '' }}">
-        <!-- Botón eliminar video completo -->
-        <button onclick="confirmFullDelete('{{ video_id }}')" class="delete-btn text-red-500 hover:text-white text-lg font-bold" title="Eliminar video completo">🗑</button>
-
-        <!-- Miniatura + Duración -->
-        <div class="relative w-full sm:w-28 sm:h-28">
-          <img src="{{ url_for('serve_thumbnail', filename=video_id + '.jpg') }}"
-               onerror="this.onerror=null;this.src='{{ url_for('serve_thumbnail', filename='default_thumbnail.png') }}';"
-               class="w-full sm:w-28 sm:h-28 h-auto aspect-square object-cover rounded border border-yellow-600 relative z-0">
-          <span class="absolute left-1 bottom-1 text-[11px] sm:text-xs px-1.5 py-0.5 rounded bg-gray-900/90 border border-gray-600" data-role="dur-label">—</span>
-        </div>
-
-        <!-- Info -->
-        <div class="flex-1 w-full">
-          <div class="flex items-center gap-2 mb-1">
-            <h4 class="text-lg sm:text-xl font-semibold break-words">{{ video.title }}</h4>
-            {% set cat = video.category or 'vhs_tape' %}
-            {% if cat == 'tv_episode' %}
-              <span class="bg-purple-600 text-white text-[10px] px-1.5 py-0.5 rounded">📺 TV</span>
-            {% elif cat == 'movie' %}
-              <span class="bg-blue-600 text-white text-[10px] px-1.5 py-0.5 rounded">🎬 Movie</span>
-            {% elif cat == 'commercial' %}
-              <span class="bg-green-600 text-white text-[10px] px-1.5 py-0.5 rounded">📢 Ad</span>
-            {% else %}
-              <span class="bg-gray-600 text-white text-[10px] px-1.5 py-0.5 rounded">📼 VHS</span>
-            {% endif %}
-          </div>
-          {% if video.category == 'tv_episode' and video.series %}
-          <p class="text-xs sm:text-sm text-purple-300"><strong>Serie:</strong> {{ video.series }}{% if video.season %} S{{ video.season }}{% endif %}{% if video.episode %}E{{ video.episode }}{% endif %}</p>
-          {% endif %}
-          <p class="text-xs sm:text-sm text-gray-300"><strong>{{ tr("index.video_card.date") }}:</strong> {{ video.fecha }}</p>
-          <p class="text-xs sm:text-sm text-gray-300"><strong>{{ tr("index.video_card.character") }}</strong> {{ video.personaje }}</p>
-          <div class="flex flex-wrap gap-1.5 sm:gap-2 mt-2">
-            {% for tag in video.tags %}
-              <span class="bg-yellow-600 text-black text-[11px] sm:text-xs px-1.5 sm:px-2 py-0.5 rounded-full">{{ tag }}</span>
+  <!-- Filter Panel -->
+  <section id="panelFiltros" class="mb-6 sm:mb-8 border border-yellow-700/40 rounded-lg p-3 sm:p-4 bg-gray-900/50 hide">
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <!-- Channel Filter -->
+      <div>
+        <label class="block text-xs sm:text-sm text-gray-300 mb-1">{{ tr("index.filters.by_channel_label") }}</label>
+        <select id="canalSelect" class="w-full bg-gray-800 border border-gray-600 rounded px-3 py-2 text-sm">
+          <option value="">{{ tr("index.filters.by_channel_all") }}</option>
+          {% if canales %}
+            {% for canal_id, canal in (canales or {}).items() %}
+              <option value="{{ canal_id }}">{{ canal.nombre or canal_id }}</option>
             {% endfor %}
-          </div>
-          <div class="flex gap-2 sm:gap-4 mt-3 flex-wrap">
-            <a href="{{ url_for('video_detail', video_id=video_id) }}" class="text-xs sm:text-sm bg-blue-600 hover:bg-blue-700 text-white px-3 sm:px-4 py-1 rounded">{{ tr("index.video_card.view") }}</a>
-            <a href="{{ url_for('edit_video', video_id=video_id) }}" class="text-xs sm:text-sm bg-blue-600 hover:bg-blue-700 text-black px-3 sm:px-4 py-1 rounded">{{ tr("index.video_card.edit") }}</a>
-          </div>
+          {% endif %}
+        </select>
+      </div>
+
+      <!-- Category Filter -->
+      <div>
+        <label class="block text-xs sm:text-sm text-gray-300 mb-1">Category</label>
+        <select id="categorySelect" class="w-full bg-gray-800 border border-gray-600 rounded px-3 py-2 text-sm">
+          <option value="">All Categories</option>
+          <option value="tv_episode">TV Episodes</option>
+          <option value="movie">Movies</option>
+          <option value="commercial">Commercials</option>
+          <option value="vhs_tape">VHS Tapes</option>
+        </select>
+      </div>
+
+      <!-- Sort Order -->
+      <div>
+        <label class="block text-xs sm:text-sm text-gray-300 mb-1">{{ tr("index.filters.order_label") }}</label>
+        <select id="ordenSelect" class="w-full bg-gray-800 border border-gray-600 rounded px-3 py-2 text-sm">
+          <option value="fecha_desc">{{ tr("index.filters.order.date_desc") }}</option>
+          <option value="fecha_asc">{{ tr("index.filters.order.date_asc") }}</option>
+          <option value="titulo_asc">{{ tr("index.filters.order.title_asc") }}</option>
+          <option value="titulo_desc">{{ tr("index.filters.order.title_desc") }}</option>
+          <option value="dur_asc">{{ tr("index.filters.order.dur_asc") }}</option>
+          <option value="dur_desc">{{ tr("index.filters.order.dur_desc") }}</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Clear button -->
+    <div class="mt-3 text-right">
+      <button id="limpiarBtn" class="text-xs bg-gray-800 border border-gray-600 px-3 py-1.5 rounded hover:border-yellow-500">
+        {{ tr("index.filters.clear_button") }}
+      </button>
+    </div>
+  </section>
+
+  <!-- NEW VIDEOS WITHOUT METADATA -->
+  {% if nuevos %}
+    <h3 class="text-lg sm:text-2xl text-blue-400 font-bold mt-2 mb-3 sm:mb-4">{{ tr("index.new_videos.header") }}</h3>
+    <ul class="space-y-2 mb-6 sm:mb-10">
+      {% for video_id in nuevos %}
+      <li class="bg-gray-900/50 border border-blue-500 p-3 sm:p-4 rounded flex items-center justify-between">
+        <div>
+          <p class="text-base sm:text-lg font-semibold break-all">{{ video_id }}</p>
+          <a href="{{ url_for('edit_video', video_id=video_id) }}" class="text-xs sm:text-sm text-blue-300 underline">{{ tr("index.new_videos.fill_metadata") }}</a>
         </div>
+        <span class="text-[11px] sm:text-xs text-gray-300">{{ tr("index.new_videos.no_duration") }}</span>
+      </li>
+      {% endfor %}
+    </ul>
+  {% endif %}
+
+  <!-- VIDEO LIST -->
+  <div id="listaVideos" class="grid grid-cols-1 gap-4 sm:gap-6">
+    {% for video_id, video in videos.items() %}
+    <div class="video-card relative rounded-lg p-3 sm:p-4 shadow-lg border border-yellow-500 flex flex-col sm:flex-row gap-3 sm:gap-4 items-start"
+         data-id="{{ video_id }}"
+         data-title="{{ (video.title or '')|lower }}"
+         data-fecha="{{ video.fecha or '' }}"
+         data-duration="{{ video.duracion or 0 }}"
+         data-category="{{ video.category or 'vhs_tape' }}"
+         data-series="{{ video.series or '' }}">
+      <!-- Delete button -->
+      <button onclick="confirmFullDelete('{{ video_id }}')" class="delete-btn text-red-500 hover:text-white text-lg font-bold" title="Delete video">🗑</button>
+
+      <!-- Thumbnail + Duration -->
+      <div class="relative w-full sm:w-28 sm:h-28">
+        <img src="{{ url_for('serve_thumbnail', filename=video_id + '.jpg') }}"
+             onerror="this.onerror=null;this.src='{{ url_for('serve_thumbnail', filename='default_thumbnail.png') }}';"
+             class="w-full sm:w-28 sm:h-28 h-auto aspect-square object-cover rounded border border-yellow-600 relative z-0">
+        <span class="absolute left-1 bottom-1 text-[11px] sm:text-xs px-1.5 py-0.5 rounded bg-gray-900/90 border border-gray-600" data-role="dur-label">—</span>
+      </div>
+
+      <!-- Info -->
+      <div class="flex-1 w-full">
+        <div class="flex items-center gap-2 mb-1 flex-wrap">
+          <h4 class="text-lg sm:text-xl font-semibold break-words">{{ video.title }}</h4>
+          {% set cat = video.category or 'vhs_tape' %}
+          {% if cat == 'tv_episode' %}
+            <span class="category-badge bg-purple-600 text-white">TV</span>
+          {% elif cat == 'movie' %}
+            <span class="category-badge bg-blue-600 text-white">Movie</span>
+          {% elif cat == 'commercial' %}
+            <span class="category-badge bg-green-600 text-white">Ad</span>
+          {% else %}
+            <span class="category-badge bg-gray-600 text-white">VHS</span>
+          {% endif %}
+        </div>
+        {% if video.category == 'tv_episode' and video.series %}
+        <p class="text-xs sm:text-sm text-purple-300">
+          <strong>Series:</strong> {{ video.series }}
+          {% if video.season %}S{{ video.season }}{% endif %}
+          {% if video.episode %}E{{ video.episode }}{% endif %}
+        </p>
+        {% endif %}
+        <p class="text-xs sm:text-sm text-gray-300"><strong>{{ tr("index.video_card.date") }}:</strong> {{ video.fecha }}</p>
+        {% if video.personaje %}
+        <p class="text-xs sm:text-sm text-gray-300"><strong>{{ tr("index.video_card.character") }}</strong> {{ video.personaje }}</p>
+        {% endif %}
+        <div class="flex gap-2 sm:gap-4 mt-3 flex-wrap">
+          <a href="{{ url_for('video_detail', video_id=video_id) }}" class="text-xs sm:text-sm bg-blue-600 hover:bg-blue-700 text-white px-3 sm:px-4 py-1 rounded">{{ tr("index.video_card.view") }}</a>
+          <a href="{{ url_for('edit_video', video_id=video_id) }}" class="text-xs sm:text-sm bg-yellow-600 hover:bg-yellow-700 text-black px-3 sm:px-4 py-1 rounded">{{ tr("index.video_card.edit") }}</a>
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <!-- GHOST ENTRIES -->
+  {% if fantasmas %}
+    <div class="flex justify-between items-center mt-10 mb-3 sm:mb-4">
+      <h3 class="text-lg sm:text-2xl text-red-400 font-bold">{{ tr("index.ghosts.header") }}</h3>
+      <button onclick="confirmDeleteAll()" class="text-xs sm:text-sm bg-red-600 hover:bg-red-700 text-white px-3 sm:px-4 py-1 rounded">{{ tr("index.ghosts.delete_all") }}</button>
+    </div>
+    <div class="grid grid-cols-1 gap-3 sm:gap-4">
+      {% for video_id, video in fantasmas.items() %}
+      <div class="bg-gray-900/50 p-3 sm:p-4 border border-red-500 rounded relative">
+        <button onclick="confirmDelete('{{ video_id }}')" class="absolute top-2 right-2 text-red-400 hover:text-white font-bold text-lg">×</button>
+        <h3 class="text-lg sm:text-xl font-bold text-red-300 break-words">{{ video.title or video_id }}</h3>
+        <p class="text-xs sm:text-sm text-gray-400">Date: {{ video.fecha or "?" }} | Character: {{ video.personaje or "?" }}</p>
+        <a href="{{ url_for('edit_video', video_id=video_id) }}" class="text-xs sm:text-sm text-red-300 underline mt-2 inline-block">{{ tr("index.ghosts.edit_metadata") }}</a>
       </div>
       {% endfor %}
     </div>
+  {% endif %}
+{% endblock %}
 
-    <!-- FANTASMAS -->
-    {% if fantasmas %}
-      <div class="flex justify-between items-center mt-10 mb-3 sm:mb-4">
-        <h3 class="text-lg sm:text-2xl text-red-400 font-bold">{{ tr("index.ghosts.header") }}</h3>
-        <button onclick="confirmDeleteAll()" class="text-xs sm:text-sm bg-red-600 hover:bg-red-700 text-white px-3 sm:px-4 py-1 rounded">{{ tr("index.ghosts.delete_all") }}</button>
-      </div>
-      <div class="grid grid-cols-1 gap-3 sm:gap-4">
-        {% for video_id, video in fantasmas.items() %}
-        <div class="bg-gray-900/50 p-3 sm:p-4 border border-red-500 rounded relative">
-          <button onclick="confirmDelete('{{ video_id }}')" class="absolute top-2 right-2 text-red-400 hover:text-white font-bold text-lg">×</button>
-          <h3 class="text-lg sm:text-xl font-bold text-red-300 break-words">{{ video.title or video_id }}</h3>
-          <p class="text-xs sm:text-sm text-gray-400">Fecha: {{ video.fecha or "?" }} | Personaje: {{ video.personaje or "?" }}</p>
-          <div class="flex flex-wrap gap-1.5 sm:gap-2 mt-2">
-            {% for tag in video.tags %}
-              <span class="bg-red-600 text-white text-[11px] sm:text-xs px-1.5 sm:px-2 py-0.5 rounded-full">{{ tag }}</span>
-            {% endfor %}
-          </div>
-          <a href="{{ url_for('edit_video', video_id=video_id) }}" class="text-xs sm:text-sm text-red-300 underline mt-2 inline-block">{{ tr("index.ghosts.edit_metadata") }}</a>
-        </div>
-        {% endfor %}
-      </div>
-    {% endif %}
-  </div>
+{% block extra_scripts %}
+  // Helpers
+  function confirmDelete(videoId){ if(confirm("Delete metadata for '" + videoId + "'?")) window.location.href="/delete/"+videoId; }
+  function confirmDeleteAll(){ if(confirm("This will delete ALL ghost entries (no video file). Continue?")) window.location.href="/delete_fantasmas"; }
+  function confirmFullDelete(videoId){ if(confirm("This will delete the video file, metadata, and thumbnail. Are you sure?")) window.location.href="/delete_full/"+videoId; }
+  function fmtDur(s){ s=Number(s)||0; const m=Math.floor(s/60); const ss=Math.floor(s%60); return `${m}:${ss.toString().padStart(2,'0')}`; }
 
-  <script>
-    // Helpers
-    function confirmDelete(videoId){ if(confirm("¿Estás seguro de que querés eliminar la metadata de '" + videoId + "'?")) window.location.href="/delete/"+videoId; }
-    function confirmDeleteAll(){ if(confirm("⚠️ Esto eliminará TODAS las entradas fantasmas (sin archivo de video).\n¿Querés continuar?")) window.location.href="/delete_fantasmas"; }
-    function confirmFullDelete(videoId){ if(confirm("⚠️ Esto eliminará el archivo de video, su metadata y su thumbnail.\n¿Estás seguro?")) window.location.href="/delete_full/"+videoId; }
-    function fmtDur(s){ s=Number(s)||0; const m=Math.floor(s/60); const ss=Math.floor(s%60); return `${m}:${ss.toString().padStart(2,'0')}`; }
-    function normalizarTag(t){ return (t||"").toString().toLowerCase(); }
+  // Toggle filters
+  const panelFiltros=document.getElementById('panelFiltros');
+  const toggleBtn=document.getElementById('toggleFiltros');
+  const STORAGE_KEY='tvargenta_filtros_visible';
+  const labelShow = toggleBtn.dataset.labelShow || 'Show filters';
+  const labelHide = toggleBtn.dataset.labelHide || 'Hide filters';
 
-    // Upload dropdown
-    function toggleUploadDropdown(e) {
-      e.stopPropagation();
-      const dropdown = e.currentTarget.closest('.upload-dropdown');
-      const menu = dropdown.querySelector('.upload-dropdown-menu');
-      menu.classList.toggle('hidden');
-    }
-    document.addEventListener('click', function(e) {
-      document.querySelectorAll('.upload-dropdown-menu').forEach(menu => {
-        if (!menu.classList.contains('hidden')) menu.classList.add('hidden');
-      });
-    });
+  function setFiltroVisible(on){
+    panelFiltros.classList.toggle('hide', !on);
+    toggleBtn.textContent = on ? labelHide : labelShow;
+    try { localStorage.setItem(STORAGE_KEY, on ? '1' : '0'); } catch(e){}
+  }
 
-    // Toggle filtros
-    const panelFiltros=document.getElementById('panelFiltros');
-    const toggleBtn=document.getElementById('toggleFiltros');
-    const STORAGE_KEY='tvargenta_filtros_visible';
-    const labelShow = toggleBtn.dataset.labelShow || '🔎 Mostrar filtros';
-	const labelHide = toggleBtn.dataset.labelHide || '🔎 Ocultar filtros';
-	function setFiltroVisible(on){
-	  panelFiltros.classList.toggle('hide', !on);
-	  toggleBtn.textContent = on ? labelHide : labelShow;
-	  try { localStorage.setItem(STORAGE_KEY, on ? '1' : '0'); } catch(e){}
-	}
+  const visibleInicial=(typeof localStorage!=='undefined' && localStorage.getItem(STORAGE_KEY)==='1');
+  setFiltroVisible(visibleInicial);
+  toggleBtn.addEventListener('click',()=>{ setFiltroVisible(panelFiltros.classList.contains('hide')); });
 
-    const visibleInicial=(typeof localStorage!=='undefined' && localStorage.getItem(STORAGE_KEY)==='1'); setFiltroVisible(visibleInicial);
-    toggleBtn.addEventListener('click',()=>{ setFiltroVisible(panelFiltros.classList.contains('hide')); syncLogoWidth(); });
+  // Data
+  const CANALES={{ (canales or {}) | tojson }};
+  const lista=document.getElementById('listaVideos');
+  const cards=Array.from(document.querySelectorAll('.video-card'));
+  const canalSelect=document.getElementById('canalSelect');
+  const categorySelect=document.getElementById('categorySelect');
+  const ordenSelect=document.getElementById('ordenSelect');
+  const limpiarBtn=document.getElementById('limpiarBtn');
+  const conteoTop=document.getElementById('conteoTop');
 
-    // Datos
-    const CANALES={{ (canales or {}) | tojson }};
-    const lista=document.getElementById('listaVideos');
-    const cards=Array.from(document.querySelectorAll('.video-card'));
-    const canalSelect=document.getElementById('canalSelect');
-    const ordenSelect=document.getElementById('ordenSelect');
-    const chipsTags=document.getElementById('chipsTags');
-    const buscarTag=document.getElementById('buscarTag');
-    const limpiarBtn=document.getElementById('limpiarBtn');
-    const conteoTop=document.getElementById('conteoTop');
+  // Duration labels
+  cards.forEach(card=>{
+    const s=Number(card.dataset.duration||0);
+    const label=card.querySelector('[data-role="dur-label"]');
+    label.textContent=s>0?fmtDur(s):'—';
+  });
 
-    // Duración
-    cards.forEach(card=>{ const s=Number(card.dataset.duration||0); const label=card.querySelector('[data-role="dur-label"]'); label.textContent=s>0?fmtDur(s):'—'; });
-
-    // Tags
-    const allTags=new Set(); cards.forEach(c=>(c.dataset.tags||'').split(',').filter(Boolean).forEach(t=>allTags.add(t)));
-    const tagState=new Map(Array.from(allTags).map(t=>[t,0])); // 0 neutro, 1 incluye, 2 excluye
-    function clasePorEstado(s){ return s===1?'chip chip-include':(s===2?'chip chip-exclude':'chip chip-neutral'); }
-    function renderChips(q=""){ chipsTags.innerHTML=''; Array.from(allTags).sort((a,b)=>a.localeCompare(b,'es')).forEach(tag=>{ if(q && !tag.toLowerCase().includes(q.toLowerCase())) return; const s=tagState.get(tag)||0; const el=document.createElement('button'); el.className=clasePorEstado(s); el.textContent=tag+(s===2?' (–)':''); el.title='Tocar para: neutro → incluir → excluir'; el.addEventListener('click',ev=>{ let next=s; if(ev.altKey) next=2; else next=(s+1)%3; tagState.set(tag,next); renderChips(buscarTag.value.trim()); aplicarFiltrosYOrden(); }); chipsTags.appendChild(el); }); }
-    renderChips(); buscarTag.addEventListener('input',()=>renderChips(buscarTag.value.trim()));
-    limpiarBtn.addEventListener('click',()=>{ Array.from(allTags).forEach(t=>tagState.set(t,0)); canalSelect.value=''; ordenSelect.value='dur_asc'; buscarTag.value=''; renderChips(); aplicarFiltrosYOrden(); });
-
-    canalSelect.addEventListener('change',aplicarFiltrosYOrden);
-    ordenSelect.addEventListener('change',aplicarFiltrosYOrden);
-
-    function pasaFiltroCanal(card){
-      const canalId=canalSelect.value; if(!canalId) return true;
-      const regla=CANALES[canalId]; if(!regla) return true;
-
-      // Series filter: when channel has series_filter, only show TV Episodes from those series
-      const seriesFilter = regla.series_filter || [];
-      if(seriesFilter.length > 0) {
-        const cardCategory = card.dataset.category || 'vhs_tape';
-        const cardSeries = card.dataset.series || '';
-        if(cardCategory !== 'tv_episode') return false;
-        if(!seriesFilter.includes(cardSeries)) return false;
-      }
-
-      const cardTags=new Set((card.dataset.tags||'').split(',').filter(Boolean).map(normalizarTag));
-      const excl=(regla.tags_excluidos||[]).map(normalizarTag);
-      const pri =(regla.tags_prioridad||[]).map(normalizarTag);
-      if(excl.some(t=>cardTags.has(t))) return false;
-      if(pri.length>0) return pri.some(t=>cardTags.has(t));
-      return true;
-    }
-    function pasaFiltroTags(card){
-      const tags=new Set((card.dataset.tags||'').split(',').filter(Boolean));
-      for(const [t,st] of tagState.entries()){ if(st===1 && !tags.has(t)) return false; }
-      for(const [t,st] of tagState.entries()){ if(st===2 && tags.has(t)) return false; }
-      return true;
-    }
-
-    function aplicarFiltrosYOrden(){
-      let visibles=[];
-      cards.forEach(c=>{ const ok=pasaFiltroCanal(c) && pasaFiltroTags(c); c.classList.toggle('hide',!ok); if(ok) visibles.push(c); });
-      conteoTop.textContent=String(visibles.length);
-      const criterio=ordenSelect.value;
-      visibles.sort((a,b)=>{
-        const da=Number(a.dataset.duration||0), db=Number(b.dataset.duration||0);
-        const ta=a.dataset.title||'', tb=b.dataset.title||'';
-        const fa=a.dataset.fecha||'', fb=b.dataset.fecha||'';
-        switch(criterio){
-          case 'dur_asc': return da-db;
-          case 'dur_desc': return db-da;
-          case 'titulo_asc': return ta.localeCompare(tb,'es');
-          case 'titulo_desc': return tb.localeCompare(ta,'es');
-          case 'fecha_desc': return (fb||'').localeCompare(fa||'');
-          case 'fecha_asc': return (fa||'').localeCompare(fb||'');
-          default: return 0;
-        }
-      });
-      const frag=document.createDocumentFragment(); visibles.forEach(c=>frag.appendChild(c)); lista.appendChild(frag);
-      syncLogoWidth(); // por si cambió layout
-    }
-
-    // --- Ancho del logo de fondo = ancho del primer video-card ---
-	  function firstVisibleCard() {
-		const all = document.querySelectorAll('.video-card');
-		for (const el of all) {
-		  if (!el.classList.contains('hide')) return el; // sólo visibles
-		}
-		return null;
-	  }
-
-	  function referenceWidth() {
-		// Si no hay cards visibles, usamos el contenedor o 90vw
-		const cont = document.getElementById('listaVideos') 
-					 || document.querySelector('.max-w-screen-lg') 
-					 || document.body;
-		const w = cont.getBoundingClientRect().width;
-		return w > 0 ? w : Math.min(window.innerWidth * 0.9, 900);
-	  }
-
-	  function syncLogoWidth() {
-		const img  = document.getElementById('logoMark');
-		if (!img) return;
-
-		const card = firstVisibleCard();
-		let w = 0;
-		if (card) {
-		  w = card.getBoundingClientRect().width;
-		}
-		if (!w || w <= 0) {
-		  w = referenceWidth();
-		}
-		// límite de seguridad para que nunca quede en 0
-		w = Math.max(w, Math.min(window.innerWidth * 0.9, 900));
-		img.style.width = w + 'px';
-	  }
-    window.addEventListener('load', syncLogoWidth);
-    window.addEventListener('resize', syncLogoWidth);
-    window.addEventListener('orientationchange', syncLogoWidth);
-    document.addEventListener('DOMContentLoaded', () => setTimeout(syncLogoWidth, 0));
-
-    // Primera pasada
+  // Clear filters
+  limpiarBtn.addEventListener('click',()=>{
+    canalSelect.value='';
+    categorySelect.value='';
+    ordenSelect.value='fecha_desc';
     aplicarFiltrosYOrden();
-	
-  (function() {
-    const select = document.getElementById("lang-select");
-    if (!select) return;
+  });
 
-    select.addEventListener("change", async (e) => {
-      const newLang = e.target.value;
+  canalSelect.addEventListener('change',aplicarFiltrosYOrden);
+  categorySelect.addEventListener('change',aplicarFiltrosYOrden);
+  ordenSelect.addEventListener('change',aplicarFiltrosYOrden);
 
-      try {
-        const res = await fetch("/api/language", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify({ lang: newLang })
-        });
+  function pasaFiltroCanal(card){
+    const canalId=canalSelect.value;
+    if(!canalId) return true;
+    const regla=CANALES[canalId];
+    if(!regla) return true;
 
-        const data = await res.json().catch(() => ({}));
+    // Series filter
+    const seriesFilter = regla.series_filter || [];
+    if(seriesFilter.length > 0) {
+      const cardCategory = card.dataset.category || 'vhs_tape';
+      const cardSeries = card.dataset.series || '';
+      if(cardCategory !== 'tv_episode') return false;
+      if(!seriesFilter.includes(cardSeries)) return false;
+    }
+    return true;
+  }
 
-        if (res.ok && data.ok) {
-          console.log("[I18N] Idioma cambiado a", newLang, "→ recargando UI");
-          // Recargamos para que Jinja vuelva a renderizar con el nuevo diccionario
-          window.location.reload();
-        } else {
-          console.error("[I18N] Error cambiando idioma:", data);
-          alert("No se pudo cambiar el idioma (" + (data.error || "error desconocido") + ")");
-        }
-      } catch (err) {
-        console.error("[I18N] Excepción cambiando idioma:", err);
-        alert("Error al cambiar el idioma (ver logs)");
+  function pasaFiltroCategory(card){
+    const cat = categorySelect.value;
+    if(!cat) return true;
+    return card.dataset.category === cat;
+  }
+
+  function aplicarFiltrosYOrden(){
+    let visibles=[];
+    cards.forEach(c=>{
+      const ok = pasaFiltroCanal(c) && pasaFiltroCategory(c);
+      c.classList.toggle('hide',!ok);
+      if(ok) visibles.push(c);
+    });
+    conteoTop.textContent=String(visibles.length);
+
+    const criterio=ordenSelect.value;
+    visibles.sort((a,b)=>{
+      const da=Number(a.dataset.duration||0), db=Number(b.dataset.duration||0);
+      const ta=a.dataset.title||'', tb=b.dataset.title||'';
+      const fa=a.dataset.fecha||'', fb=b.dataset.fecha||'';
+      switch(criterio){
+        case 'dur_asc': return da-db;
+        case 'dur_desc': return db-da;
+        case 'titulo_asc': return ta.localeCompare(tb,'es');
+        case 'titulo_desc': return tb.localeCompare(ta,'es');
+        case 'fecha_desc': return (fb||'').localeCompare(fa||'');
+        case 'fecha_asc': return (fa||'').localeCompare(fb||'');
+        default: return 0;
       }
     });
-  })();	
+    const frag=document.createDocumentFragment();
+    visibles.forEach(c=>frag.appendChild(c));
+    lista.appendChild(frag);
+  }
 
-  </script>
-</body>
-</html>
+  // Initial pass
+  aplicarFiltrosYOrden();
+{% endblock %}

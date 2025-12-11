@@ -1021,7 +1021,8 @@ def _ctx_gestion():
         tags=load_tags(),
         config=load_config(),
         recuerdos=get_total_recuerdos(),
-        canales=load_canales()
+        canales=load_canales(),
+        active_page='library'
     )
 
 
@@ -1890,17 +1891,26 @@ def series_delete(series_name):
 
 @app.route("/api/series")
 def api_series():
-    """Return list of series names for API use."""
+    """Return list of series with episode counts and time_of_day."""
     series_data = load_series()
-    return jsonify({
-        "series": [
-            {
-                "folder_name": name,
-                "display_name": series_display_name(name)
-            }
-            for name in sorted(series_data.keys())
-        ]
-    })
+    global metadata
+    metadata = load_metadata()
+
+    result = []
+    for name in sorted(series_data.keys()):
+        # Count episodes in this series
+        episode_count = sum(1 for v in metadata.values()
+                          if v.get("category") == "tv_episode" and v.get("series") == name)
+
+        result.append({
+            "folder_name": name,
+            "display_name": series_display_name(name),
+            "episode_count": episode_count,
+            "time_of_day": series_data[name].get("time_of_day", "any"),
+            "created": series_data[name].get("created", "")
+        })
+
+    return jsonify({"ok": True, "series": result})
 
 
 @app.route("/api/series/time_of_day", methods=["POST"])
@@ -2316,11 +2326,37 @@ def delete_commercial(video_id):
         return jsonify({"ok": False, "error": str(e)}), 500
 
 
+@app.route("/api/commercials")
+def api_commercials():
+    """Return list of commercials for Content Manager."""
+    global metadata
+    metadata = load_metadata()
+
+    commercials = []
+    for video_id, data in metadata.items():
+        if data.get("category") == "commercial":
+            commercials.append({
+                "video_id": video_id,
+                "title": data.get("title", video_id),
+                "duration": data.get("duracion", 0),
+                "tags": data.get("tags", [])
+            })
+
+    # Sort by title
+    commercials.sort(key=lambda x: x["title"].lower())
+
+    return jsonify({"ok": True, "commercials": commercials})
+
+
+@app.route("/content")
+def content_manager():
+    """Unified Content Manager page."""
+    return render_template("content_manager.html", active_page='content')
+
+
 @app.route("/canales")
 def canales():
-    canales_data = load_canales()  # ya lo tenÃ©s definido
-    tags_data = load_tags()
-    config_data = load_config()
+    canales_data = load_canales()
 
     # Get series with display names
     all_series = [
@@ -2328,7 +2364,7 @@ def canales():
         for name in _get_all_series()
     ]
 
-    return render_template("canales.html", canales=canales_data, tags=tags_data, config=config_data, all_series=all_series, series_display_name=series_display_name)
+    return render_template("canales.html", canales=canales_data, all_series=all_series, active_page='channels')
 
 @app.route("/guardar_canal", methods=["POST"])
 def guardar_canal():
@@ -2381,34 +2417,18 @@ def editar_canal(canal_id):
     if not canal:
         return redirect(url_for("canales"))
 
-    tags_data = load_tags()
-    config = load_config()
-
     # Get series with display names
     all_series = [
         {"folder_name": name, "display_name": series_display_name(name)}
         for name in _get_all_series()
     ]
 
-    # lista plana de todos los tags del tags.json
-    todos_los_tags = [t for grupo in tags_data.values() for t in grupo.get("tags", [])]
-
-    incluidos = set(config.get("tags_incluidos") or [])
-    if incluidos:
-        tags_disponibles = [t for t in todos_los_tags if t in incluidos]
-    else:
-        # Fallback: si no hay incluidos en config, mostrar TODOS
-        tags_disponibles = todos_los_tags
-
     return render_template("canales.html",
                            canal_actual=canal,
                            canal_id=canal_id,
                            canales=canales,
-                           tags=tags_data,
-                           tags_disponibles=tags_disponibles,
-                           config=config,
                            all_series=all_series,
-                           series_display_name=series_display_name)
+                           active_page='channels')
 
 @app.route("/api/set_canal_activo", methods=["POST"])
 def api_set_canal_activo():

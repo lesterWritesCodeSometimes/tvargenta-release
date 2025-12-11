@@ -3,202 +3,151 @@
      © 2025. No comercial, atribución y consulta previa. TAL CUAL, sin garantías.
      Ver LICENSE para términos completos.
 -->
+{% extends "base.html" %}
 
-<!DOCTYPE html>
-<html lang="{{ lang }}">
-<head>
-  <meta charset="UTF-8">
-  <title>{{ tr("canales.page_title") }}</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <script src="https://cdn.tailwindcss.com"></script>
-</head>
-<body class="bg-black text-white font-mono min-h-screen p-4">
-  <div class="max-w-4xl mx-auto">
-  <header class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
-    <h1 class="text-2xl sm:text-3xl text-yellow-400 font-bold">
-      {{ tr("canales.header") }}
-    </h1>
+{% block title %}{{ tr("canales.page_title") }}{% endblock %}
 
-    <div class="flex items-center gap-4">
-      <a href="{{ url_for('index') }}"
-         class="text-blue-400 hover:underline text-sm sm:text-base whitespace-nowrap">
-        {{ tr("canales.nav.back_home") }}
-      </a>
+{% block extra_styles %}
+  .channel-card {
+    background: rgba(17,24,39,.6);
+    backdrop-filter: blur(2px);
+    transition: transform 0.2s, box-shadow 0.2s;
+  }
+  .channel-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(234, 179, 8, 0.2);
+  }
+{% endblock %}
 
-      <select id="canales-lang-select"
-              class="bg-gray-900 border border-gray-600 text-xs sm:text-sm px-2 py-1 rounded">
-        <option value="es">🇦🇷 ES</option>
-        <option value="en">🇺🇸 EN</option>
-        <option value="de">🇩🇪 DE</option>
-      </select>
-    </div>
-  </header>
+{% block content %}
+  <h1 class="text-2xl sm:text-3xl text-yellow-400 font-bold text-center mb-6">
+    {{ tr("canales.header") }}
+  </h1>
 
-    <!-- LISTADO DE CANALES EXISTENTES -->
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-      {% for key, canal in canales.items() %}
-        <div class="bg-gray-900 border border-yellow-600 rounded-lg p-4 shadow-lg">
-          <div class="flex items-center justify-between mb-3">
-            <h2 class="text-xl font-bold text-white flex items-center gap-2">
-              {% if canal.icono %}
-                <span class="text-2xl">{{ canal.icono }}</span>
-              {% endif %}
-              {{ canal.nombre }}
-            </h2>
-          </div>
-          <p class="text-sm text-gray-300 italic mb-2">{{ canal.descripcion }}</p>
+  <!-- CHANNEL LISTING -->
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+    {% for key, canal in canales.items() %}
+      <div class="channel-card border border-yellow-600 rounded-lg p-4 shadow-lg">
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="text-xl font-bold text-white flex items-center gap-2">
+            {% if canal.icono %}
+              <span class="text-2xl">{{ canal.icono }}</span>
+            {% endif %}
+            {{ canal.nombre }}
+          </h2>
+        </div>
+        <p class="text-sm text-gray-300 italic mb-3">{{ canal.descripcion }}</p>
 
-          <p class="text-sm text-yellow-400 font-semibold mb-1">{{ tr("canales.card.tags_title") }}</p>
-          <p class="text-xs text-gray-200">{{ canal.tags_prioridad | join(', ') }}</p>
-
-          {% if canal.series_filter %}
-          <p class="text-sm text-purple-400 font-semibold mb-1 mt-2">📺 Series Filter</p>
-          <p class="text-xs text-gray-200">{% for s in canal.series_filter %}{{ s | replace('_', ' ') }}{% if not loop.last %}, {% endif %}{% endfor %}</p>
-          {% endif %}
-
-          <div class="flex justify-end gap-4 mt-4">
-            <form action="/editar_canal/{{ key }}" method="get">
-              <button type="submit" class="text-blue-400 hover:underline text-sm">{{ tr("canales.card.edit") }}</button>
-            </form>
-            <form action="/eliminar_canal/{{ key }}" method="post">
-              <button type="submit" class="text-red-400 hover:underline text-sm">{{ tr("canales.card.delete") }}</button>
-            </form>
+        {% if canal.series_filter %}
+        <div class="mb-3">
+          <p class="text-sm text-purple-400 font-semibold mb-1">Series Filter</p>
+          <div class="flex flex-wrap gap-1">
+            {% for s in canal.series_filter %}
+              <span class="bg-purple-900 text-purple-300 text-xs px-2 py-0.5 rounded">{{ s | replace('_', ' ') }}</span>
+            {% endfor %}
           </div>
         </div>
-      {% endfor %}
-    </div>
+        {% else %}
+        <p class="text-xs text-gray-500 mb-3 italic">All content (no filter)</p>
+        {% endif %}
 
-    <!-- FORMULARIO PARA NUEVO O EDICIÓN DE CANAL -->
-    <hr class="my-10 border-yellow-700">
-	<h2 class="text-2xl font-bold text-green-400 mb-4 text-center">
-	  {% if canal_actual %}
-		{{ tr("canales.form.title_edit") }}
-	  {% else %}
-		{{ tr("canales.form.title_new") }}
-	  {% endif %}
-	</h2>
+        <div class="flex justify-end gap-4">
+          <form action="/editar_canal/{{ key }}" method="get">
+            <button type="submit" class="text-blue-400 hover:underline text-sm">{{ tr("canales.card.edit") }}</button>
+          </form>
+          <form action="/eliminar_canal/{{ key }}" method="post">
+            <button type="submit" class="text-red-400 hover:underline text-sm">{{ tr("canales.card.delete") }}</button>
+          </form>
+        </div>
+      </div>
+    {% else %}
+      <div class="col-span-2 text-center py-8 bg-gray-900/50 rounded-lg border border-gray-700">
+        <p class="text-gray-400">No channels created yet.</p>
+        <p class="text-sm text-gray-500 mt-1">Create your first channel below!</p>
+      </div>
+    {% endfor %}
+  </div>
 
-    <form action="/guardar_canal" method="post" class="space-y-4 bg-gray-800 p-4 rounded border border-yellow-600 shadow">
+  <!-- NEW/EDIT CHANNEL FORM -->
+  <div class="bg-gray-900/50 border border-yellow-600 rounded-lg p-4 shadow-lg">
+    <h2 class="text-xl font-bold text-green-400 mb-4 text-center">
+      {% if canal_actual %}
+        {{ tr("canales.form.title_edit") }}
+      {% else %}
+        {{ tr("canales.form.title_new") }}
+      {% endif %}
+    </h2>
 
+    <form action="/guardar_canal" method="post" class="space-y-4">
       {% if canal_actual %}
         <input type="hidden" name="canal_id" value="{{ canal_id }}">
       {% endif %}
 
-      <div>
-        <label class="block text-sm mb-1">{{ tr("canales.form.label_name") }}</label>
-        <input type="text" name="nombre"
-               value="{{ canal_actual.nombre if canal_actual else '' }}"
-               class="w-full bg-gray-900 text-white px-3 py-2 rounded" required>
-      </div>
-
-      <div>
-        <label class="block text-sm mb-1">{{ tr("canales.form.label_desc") }}</label>
-        <textarea name="descripcion" rows="2"
-                  class="w-full bg-gray-900 text-white px-3 py-2 rounded">{{ canal_actual.descripcion if canal_actual else '' }}</textarea>
-      </div>
-
-      <div>
-        <label class="block text-sm mb-1">{{ tr("canales.form.label_icon") }}</label>
-        <select name="icono" class="w-full bg-gray-900 text-white px-3 py-2 rounded">
-          <option value="">{{ tr("canales.form.icon_none") }}</option>
-          {% set iconos = ["📺", "🎉", "🏠", "😂", "🧸", "⚽", "📼", "🧉"] %}
-          {% for icon in iconos %}
-            <option value="{{ icon }}" {% if canal_actual and canal_actual.icono == icon %}selected{% endif %}>{{ icon }}</option>
-          {% endfor %}
-        </select>
-      </div>
-
-      <div>
-        <label class="block text-sm mb-1">{{ tr("canales.form.label_tags") }}</label>
-        <div class="grid grid-cols-2 gap-2 text-sm">
-          {% for grupo, info in tags.items() %}
-            {% for tag in info.tags %}
-              {% if tag in config.tags_incluidos %}
-              <label class="flex items-center gap-2">
-                <input type="checkbox" name="tags_prioridad" value="{{ tag }}"
-                       {% if canal_actual and tag in canal_actual.tags_prioridad %}checked{% endif %}
-                       class="accent-yellow-400">
-                <span>{{ tag }}</span>
-              </label>
-              {% endif %}
-            {% endfor %}
-          {% endfor %}
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <label class="block text-sm mb-1 text-gray-300">{{ tr("canales.form.label_name") }}</label>
+          <input type="text" name="nombre"
+                 value="{{ canal_actual.nombre if canal_actual else '' }}"
+                 class="w-full bg-gray-800 text-white px-3 py-2 rounded border border-gray-600 focus:border-yellow-500" required>
         </div>
+
+        <div>
+          <label class="block text-sm mb-1 text-gray-300">{{ tr("canales.form.label_icon") }}</label>
+          <select name="icono" class="w-full bg-gray-800 text-white px-3 py-2 rounded border border-gray-600">
+            <option value="">{{ tr("canales.form.icon_none") }}</option>
+            {% set iconos = ["📺", "🎉", "🏠", "😂", "🧸", "⚽", "📼", "🧉", "🎬", "🎵", "🌙", "☀️"] %}
+            {% for icon in iconos %}
+              <option value="{{ icon }}" {% if canal_actual and canal_actual.icono == icon %}selected{% endif %}>{{ icon }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+
+      <div>
+        <label class="block text-sm mb-1 text-gray-300">{{ tr("canales.form.label_desc") }}</label>
+        <textarea name="descripcion" rows="2"
+                  class="w-full bg-gray-800 text-white px-3 py-2 rounded border border-gray-600"
+                  placeholder="Brief description of this channel...">{{ canal_actual.descripcion if canal_actual else '' }}</textarea>
       </div>
 
       <!-- TV Series Filter -->
       {% if all_series %}
-      <div class="mt-4 pt-4 border-t border-gray-600">
-        <label class="block text-sm mb-1 text-purple-300">📺 TV Series Filter</label>
-        <p class="text-xs text-gray-400 mb-2">When series are selected, this channel will only show episodes from those series.</p>
-        <div class="grid grid-cols-2 gap-2 text-sm">
+      <div class="pt-4 border-t border-gray-600">
+        <label class="block text-sm mb-2 text-purple-300 font-semibold">TV Series Filter</label>
+        <p class="text-xs text-gray-400 mb-3">Select series to include in this channel. Leave empty to show all content.</p>
+        <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-48 overflow-y-auto p-2 bg-gray-800 rounded border border-gray-600">
           {% for series in all_series %}
-          <label class="flex items-center gap-2">
+          <label class="flex items-center gap-2 text-sm">
             <input type="checkbox" name="series_filter" value="{{ series.folder_name }}"
                    {% if canal_actual and series.folder_name in (canal_actual.series_filter or []) %}checked{% endif %}
                    class="accent-purple-400">
-            <span>{{ series.display_name }}</span>
+            <span class="truncate">{{ series.display_name }}</span>
           </label>
           {% endfor %}
         </div>
       </div>
+      {% else %}
+      <div class="pt-4 border-t border-gray-600">
+        <p class="text-xs text-gray-500 italic">No TV series available. Create series in the Content Manager to filter channels by series.</p>
+      </div>
       {% endif %}
 
-      <div class="flex justify-center items-center mt-6 gap-4 flex-wrap">
-		  <button type="submit"
-		  class="bg-green-500 hover:bg-green-600 text-black font-bold px-6 py-2 rounded shadow">
-			  {% if canal_actual %}
-				{{ tr("canales.form.submit_update") }}
-			  {% else %}
-				{{ tr("canales.form.submit_create") }}
-			  {% endif %}
-		  </button>
+      <div class="flex justify-center items-center gap-4 pt-4">
+        <button type="submit"
+                class="bg-green-500 hover:bg-green-600 text-black font-bold px-6 py-2 rounded shadow">
+          {% if canal_actual %}
+            {{ tr("canales.form.submit_update") }}
+          {% else %}
+            {{ tr("canales.form.submit_create") }}
+          {% endif %}
+        </button>
 
-
-		  {% if canal_actual %}
-			<a href="{{ url_for('canales') }}" class="text-red-400 hover:underline text-sm">
-			  {{ tr("canales.form.cancel_edit") }}
-			</a>
-		  {% endif %}
-		</div>
+        {% if canal_actual %}
+          <a href="{{ url_for('canales') }}" class="text-red-400 hover:underline text-sm">
+            {{ tr("canales.form.cancel_edit") }}
+          </a>
+        {% endif %}
+      </div>
     </form>
-
-    <div class="text-center mt-8">
-      <a href="{{ url_for('index') }}" class="text-blue-400 hover:underline text-sm">{{ tr("canales.nav.back_home") }}</a>
-    </div>
   </div>
-  
-  <script>
-(function() {
-  const sel = document.getElementById('canales-lang-select');
-  if (!sel) return;
-
-  // Setear valor inicial según /api/lang
-  fetch("/api/lang")
-    .then(r => r.json())
-    .then(data => {
-      if (data && data.lang && sel.querySelector(`option[value="${data.lang}"]`)) {
-        sel.value = data.lang;
-      }
-    })
-    .catch(() => {});
-
-  // Al cambiar idioma -> guardar y recargar
-  sel.addEventListener('change', () => {
-    const lang = sel.value;
-    fetch("/api/language", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ lang })
-    }).then(() => {
-      location.reload();
-    }).catch(() => {
-      location.reload();
-    });
-  });
-})();
-</script>
-
-  
-</body>
-</html>
+{% endblock %}

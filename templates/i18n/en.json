@@ -1,4 +1,8 @@
 {
+  "nav.watch_tv": "Watch TV",
+  "nav.library": "Library",
+  "nav.content": "Content",
+  "nav.channels": "Channels",
 
   "settings.language": "Language",
   "lang.es": "Spanish",
