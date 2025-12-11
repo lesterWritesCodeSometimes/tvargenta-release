@@ -759,14 +759,25 @@ def sincronizar_videos():
                     if f.is_file() and f.suffix.lower() in ('.mp4', '.webm', '.mov'):
                         archivos_video.add(f.stem)
 
+    # Scan commercials in COMMERCIALS_DIR
+    if COMMERCIALS_DIR.exists():
+        for f in COMMERCIALS_DIR.iterdir():
+            if f.is_file() and f.suffix.lower() in ('.mp4', '.webm', '.mov'):
+                archivos_video.add(f.stem)
+
     entradas_metadata = set(metadata.keys())
 
-    # For series videos, check they exist at their series_path location
+    # For series/commercial videos, check they exist at their path location
     def video_exists(video_id, data):
         series_path = data.get("series_path")
+        commercials_path = data.get("commercials_path")
         if series_path:
             # Series video - check in series directory
             full_path = VIDEO_DIR / f"{series_path}.mp4"
+            return full_path.exists()
+        elif commercials_path:
+            # Commercial video - check in commercials directory
+            full_path = VIDEO_DIR / f"{commercials_path}.mp4"
             return full_path.exists()
         else:
             # Regular video - check in VIDEO_DIR
