@@ -218,7 +218,17 @@
       <a href="{{ url_for('vertele') }}" class="text-xs sm:text-sm bg-green-600 hover:bg-green-700 text-white font-bold px-3 py-2 sm:px-5 rounded shadow text-center"> {{ tr("index.actions.watch_tv") }}</a>
       <a href="{{ url_for('canales') }}" class="text-xs sm:text-sm bg-green-700 hover:bg-green-800 text-white font-bold px-3 py-2 sm:px-6 rounded shadow text-center"> {{ tr("index.actions.channels") }}</a>
       <a href="{{ url_for('series_page') }}" class="text-xs sm:text-sm bg-purple-600 hover:bg-purple-700 text-white font-bold px-3 py-2 sm:px-5 rounded shadow text-center">TV Series</a>
-      <a href="{{ url_for('upload') }}" class="text-xs sm:text-sm bg-yellow-600 hover:bg-yellow-700 text-black font-bold px-3 py-2 sm:px-5 rounded shadow text-center">{{ tr("index.actions.upload") }}</a>
+      <!-- Upload Dropdown -->
+      <div class="relative inline-block upload-dropdown">
+        <button type="button" class="text-xs sm:text-sm bg-yellow-600 hover:bg-yellow-700 text-black font-bold px-3 py-2 sm:px-5 rounded shadow text-center flex items-center gap-1" onclick="toggleUploadDropdown(event)">
+          {{ tr("index.actions.upload") }}
+          <svg class="w-3 h-3 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+        </button>
+        <div class="upload-dropdown-menu absolute left-0 mt-1 w-40 bg-gray-800 border border-yellow-600 rounded shadow-lg z-50 hidden">
+          <a href="{{ url_for('upload_series') }}" class="block px-4 py-2 text-sm text-white hover:bg-yellow-600 hover:text-black rounded-t">📺 TV Series</a>
+          <a href="{{ url_for('vcr_admin') }}" class="block px-4 py-2 text-sm text-white hover:bg-yellow-600 hover:text-black rounded-b">📼 VCR Tapes</a>
+        </div>
+      </div>
       <a href="{{ url_for('configuracion') }}" class="text-xs sm:text-sm bg-blue-600 hover:bg-blue-700 text-white font-bold px-3 py-2 sm:px-5 rounded shadow text-center"> {{ tr("index.actions.config") }}</a>
       <a href="{{ url_for('tags') }}" class="text-xs sm:text-sm bg-pink-600 hover:bg-pink-700 text-white font-bold px-3 py-2 sm:px-5 rounded shadow text-center"> {{ tr("index.actions.tags") }}</a>
       <a href="{{ url_for('vcr_admin') }}" class="text-xs sm:text-sm bg-purple-800 hover:bg-purple-900 text-white font-bold px-3 py-2 sm:px-5 rounded shadow text-center"> {{ tr("index.actions.vcr") }}</a>
@@ -393,6 +403,19 @@
     function confirmFullDelete(videoId){ if(confirm("⚠️ Esto eliminará el archivo de video, su metadata y su thumbnail.\n¿Estás seguro?")) window.location.href="/delete_full/"+videoId; }
     function fmtDur(s){ s=Number(s)||0; const m=Math.floor(s/60); const ss=Math.floor(s%60); return `${m}:${ss.toString().padStart(2,'0')}`; }
     function normalizarTag(t){ return (t||"").toString().toLowerCase(); }
+
+    // Upload dropdown
+    function toggleUploadDropdown(e) {
+      e.stopPropagation();
+      const dropdown = e.currentTarget.closest('.upload-dropdown');
+      const menu = dropdown.querySelector('.upload-dropdown-menu');
+      menu.classList.toggle('hidden');
+    }
+    document.addEventListener('click', function(e) {
+      document.querySelectorAll('.upload-dropdown-menu').forEach(menu => {
+        if (!menu.classList.contains('hidden')) menu.classList.add('hidden');
+      });
+    });
 
     // Toggle filtros
     const panelFiltros=document.getElementById('panelFiltros');
