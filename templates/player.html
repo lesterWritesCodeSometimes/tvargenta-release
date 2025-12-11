@@ -1280,13 +1280,23 @@
 
 		  // Check if content has changed
 		  const videoChanged = data.video_id !== lastBroadcastVideoId;
-		  const seekDrift = Math.abs((data.seek_to || 0) - video.currentTime);
+		  const currentPos = video.currentTime || 0;
+		  const targetPos = data.seek_to || 0;
+		  const seekDrift = Math.abs(targetPos - currentPos);
 
-		  if (videoChanged) {
-			// New video scheduled - load it
-			console.log(`[TV] Broadcast content change: ${lastBroadcastVideoId} -> ${data.video_id}`);
+		  // Detect if same video is looping (seek target is significantly behind current position)
+		  // This happens when a commercial/video repeats in the schedule
+		  const isLooping = !videoChanged && (currentPos - targetPos > 10);
+
+		  if (videoChanged || isLooping) {
+			// New video scheduled OR same video looping - reload it
+			if (isLooping) {
+			  console.log(`[TV] Broadcast video looping: ${data.video_id} (${currentPos.toFixed(1)}s -> ${targetPos.toFixed(1)}s)`);
+			} else {
+			  console.log(`[TV] Broadcast content change: ${lastBroadcastVideoId} -> ${data.video_id}`);
+			}
 			lastBroadcastVideoId = data.video_id;
-			lastBroadcastSeekTo = data.seek_to || 0;
+			lastBroadcastSeekTo = targetPos;
 
 			currentVideo = data.video_id;
 			video.src = data.video_url || `/videos/${data.video_id}.mp4`;
@@ -1303,7 +1313,7 @@
 		  } else if (seekDrift > 5) {
 			// Same video but we've drifted more than 5 seconds - resync
 			console.log(`[TV] Broadcast resync: drift=${seekDrift.toFixed(1)}s`);
-			video.currentTime = data.seek_to || 0;
+			video.currentTime = targetPos;
 		  }
 
 		} catch (e) {
