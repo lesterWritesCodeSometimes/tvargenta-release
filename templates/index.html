@@ -423,6 +423,42 @@
   // ============================================
   // UPLOAD HELPER (reusable)
   // ============================================
+
+  // Get video_id from filename (same logic as backend)
+  function getVideoIdFromFilename(filename) {
+    return filename.replace(/\.[^/.]+$/, '');  // Remove extension
+  }
+
+  // Upload a single file with XMLHttpRequest for progress tracking
+  function uploadFileWithProgress(url, formData, onProgress) {
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', url);
+
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable && onProgress) {
+          const percent = Math.round((e.loaded / e.total) * 100);
+          onProgress(percent);
+        }
+      };
+
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          try {
+            resolve(JSON.parse(xhr.responseText));
+          } catch {
+            resolve({ ok: true });
+          }
+        } else {
+          reject(new Error(`Upload failed: ${xhr.status}`));
+        }
+      };
+
+      xhr.onerror = () => reject(new Error('Network error'));
+      xhr.send(formData);
+    });
+  }
+
   function setupUploader(config) {
     const dropzone = document.getElementById(config.dropzoneId);
     const fileInput = document.getElementById(config.fileInputId);
@@ -430,6 +466,25 @@
     const fileItems = document.getElementById(config.fileItemsId);
     const uploadBtn = document.getElementById(config.uploadBtnId);
     const statusEl = document.getElementById(config.statusId);
+
+    let existingIds = new Set();
+    let duplicateFiles = new Set();
+
+    // Load existing IDs for duplicate detection
+    async function loadExistingIds() {
+      if (config.existingIdsUrl) {
+        try {
+          const res = await fetch(config.existingIdsUrl);
+          const data = await res.json();
+          if (data.ok) {
+            const items = data.movies || data.commercials || [];
+            existingIds = new Set(items.map(item => item.video_id));
+          }
+        } catch (e) { console.error('Failed to load existing IDs:', e); }
+      }
+    }
+
+    loadExistingIds();
 
     dropzone.addEventListener('click', () => fileInput.click());
     dropzone.addEventListener('dragover', e => { e.preventDefault(); dropzone.classList.add('dragover'); });
@@ -449,65 +504,109 @@
     function updateFileList() {
       const files = fileInput.files;
       fileItems.innerHTML = '';
+      duplicateFiles.clear();
+
       if (files.length === 0) {
         fileList.classList.add('hidden');
         uploadBtn.disabled = true;
         return;
       }
+
       fileList.classList.remove('hidden');
       for (const f of files) {
+        const videoId = getVideoIdFromFilename(f.name);
+        const isDuplicate = existingIds.has(videoId);
+
+        if (isDuplicate) {
+          duplicateFiles.add(f.name);
+        }
+
         const item = document.createElement('div');
         item.className = 'file-item';
-        item.innerHTML = `<div class="progress-bar"><div class="progress-fill"></div></div><span class="flex-1 truncate text-xs">${f.name}</span>`;
+        item.dataset.filename = f.name;
+
+        if (isDuplicate) {
+          item.innerHTML = `<span class="text-yellow-400 mr-2">⊘</span><span class="flex-1 truncate text-xs text-yellow-300">${f.name}</span><span class="text-xs text-yellow-500 ml-2">Already exists</span>`;
+        } else {
+          item.innerHTML = `<div class="progress-bar"><div class="progress-fill"></div></div><span class="flex-1 truncate text-xs">${f.name}</span>`;
+        }
         fileItems.appendChild(item);
       }
+
+      // Enable upload only if there are non-duplicate files
+      const hasNewFiles = files.length > duplicateFiles.size;
       if (config.checkReady) config.checkReady();
-      else uploadBtn.disabled = false;
+      else uploadBtn.disabled = !hasNewFiles;
     }
 
     uploadBtn.addEventListener('click', async () => {
-      const files = Array.from(fileInput.files);
-      if (files.length === 0) return;
+      const allFiles = Array.from(fileInput.files);
+      // Filter out duplicates
+      const files = allFiles.filter(f => !duplicateFiles.has(f.name));
+      const skipped = duplicateFiles.size;
+
+      if (files.length === 0) {
+        statusEl.textContent = skipped > 0 ? `All ${skipped} file(s) already exist` : 'No files';
+        setTimeout(() => { statusEl.textContent = ''; }, 2000);
+        return;
+      }
 
       uploadBtn.disabled = true;
       uploadBtn.textContent = 'Uploading...';
-      const fileItemEls = fileItems.querySelectorAll('.file-item');
 
       let completed = 0;
+      let errors = 0;
+
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
-        const itemEl = fileItemEls[i];
-        statusEl.textContent = `${completed + 1}/${files.length}...`;
-
-        // Show uploading state
+        const itemEl = fileItems.querySelector(`[data-filename="${CSS.escape(file.name)}"]`);
         const progressFill = itemEl?.querySelector('.progress-fill');
-        if (progressFill) progressFill.style.width = '50%';
+
+        statusEl.textContent = `Uploading ${completed + 1}/${files.length}...`;
 
         const formData = new FormData();
         formData.append('videos[]', file);
         if (config.extraFormData) config.extraFormData(formData);
 
         try {
-          await fetch(config.uploadUrl, { method: 'POST', body: formData });
-          completed++;
-          // Mark complete
-          if (progressFill) progressFill.style.width = '100%';
-          if (itemEl) itemEl.innerHTML = `<span class="text-green-400 mr-2">&#10003;</span><span class="flex-1 truncate text-xs text-green-300">${file.name}</span>`;
+          const result = await uploadFileWithProgress(
+            config.uploadUrl,
+            formData,
+            (percent) => {
+              if (progressFill) progressFill.style.width = `${percent}%`;
+            }
+          );
+
+          if (result.error === 'already_exists') {
+            if (itemEl) itemEl.innerHTML = `<span class="text-yellow-400 mr-2">⊘</span><span class="flex-1 truncate text-xs text-yellow-300">${file.name}</span><span class="text-xs text-yellow-500 ml-2">Already exists</span>`;
+            existingIds.add(getVideoIdFromFilename(file.name));
+          } else {
+            completed++;
+            if (itemEl) itemEl.innerHTML = `<span class="text-green-400 mr-2">&#10003;</span><span class="flex-1 truncate text-xs text-green-300">${file.name}</span>`;
+            existingIds.add(getVideoIdFromFilename(file.name));
+          }
         } catch (e) {
           console.error(e);
-          // Mark error
+          errors++;
           if (itemEl) itemEl.innerHTML = `<span class="text-red-400 mr-2">&#10007;</span><span class="flex-1 truncate text-xs text-red-300">${file.name}</span>`;
         }
       }
 
-      statusEl.textContent = `Done! (${completed}/${files.length})`;
+      let msg = `Done! ${completed} uploaded`;
+      if (skipped > 0) msg += `, ${skipped} skipped`;
+      if (errors > 0) msg += `, ${errors} failed`;
+      statusEl.textContent = msg;
       uploadBtn.textContent = 'Upload';
       fileInput.value = '';
       if (config.onComplete) config.onComplete();
-      setTimeout(() => { statusEl.textContent = ''; fileList.classList.add('hidden'); uploadBtn.disabled = true; }, 2000);
+      setTimeout(() => { statusEl.textContent = ''; fileList.classList.add('hidden'); uploadBtn.disabled = true; }, 2500);
     });
 
-    return { updateFileList, checkReady: () => { if (config.checkReady) config.checkReady(); } };
+    return {
+      updateFileList,
+      checkReady: () => { if (config.checkReady) config.checkReady(); },
+      refreshExistingIds: loadExistingIds
+    };
   }
 
   // ============================================
@@ -609,6 +708,22 @@
     uploadBtn.addEventListener('click', () => uploadSeriesFiles(seriesName));
   }
 
+  // Get existing episode video_ids for a series
+  function getSeriesExistingIds(seriesName) {
+    const series = seriesData.find(s => s.folder_name === seriesName);
+    if (!series || !series.seasons) return new Set();
+    const ids = new Set();
+    for (const season of series.seasons) {
+      for (const ep of season.episodes) {
+        ids.add(ep.video_id);
+      }
+    }
+    return ids;
+  }
+
+  // Track duplicates per series
+  const seriesDuplicates = {};
+
   function updateSeriesFileList(seriesName) {
     const fileInput = document.getElementById(`file-input-${seriesName}`);
     const fileList = document.getElementById(`file-list-${seriesName}`);
@@ -617,19 +732,40 @@
 
     const files = fileInput.files;
     fileItems.innerHTML = '';
+    seriesDuplicates[seriesName] = new Set();
+
     if (files.length === 0) {
       fileList.classList.add('hidden');
       uploadBtn.disabled = true;
       return;
     }
+
+    const existingIds = getSeriesExistingIds(seriesName);
     fileList.classList.remove('hidden');
+
     for (const f of files) {
+      const videoId = getVideoIdFromFilename(f.name);
+      const isDuplicate = existingIds.has(videoId);
+
+      if (isDuplicate) {
+        seriesDuplicates[seriesName].add(f.name);
+      }
+
       const item = document.createElement('div');
       item.className = 'file-item';
-      item.innerHTML = `<div class="progress-bar"><div class="progress-fill"></div></div><span class="flex-1 truncate text-xs">${f.name}</span>`;
+      item.dataset.filename = f.name;
+
+      if (isDuplicate) {
+        item.innerHTML = `<span class="text-yellow-400 mr-2">⊘</span><span class="flex-1 truncate text-xs text-yellow-300">${f.name}</span><span class="text-xs text-yellow-500 ml-2">Already exists</span>`;
+      } else {
+        item.innerHTML = `<div class="progress-bar"><div class="progress-fill"></div></div><span class="flex-1 truncate text-xs">${f.name}</span>`;
+      }
       fileItems.appendChild(item);
     }
-    uploadBtn.disabled = false;
+
+    // Enable upload only if there are non-duplicate files
+    const hasNewFiles = files.length > seriesDuplicates[seriesName].size;
+    uploadBtn.disabled = !hasNewFiles;
   }
 
   async function uploadSeriesFiles(seriesName) {
@@ -639,45 +775,64 @@
     const fileList = document.getElementById(`file-list-${seriesName}`);
     const fileItems = document.getElementById(`file-items-${seriesName}`);
 
-    const files = Array.from(fileInput.files);
-    if (files.length === 0) return;
+    const allFiles = Array.from(fileInput.files);
+    const duplicates = seriesDuplicates[seriesName] || new Set();
+    const files = allFiles.filter(f => !duplicates.has(f.name));
+    const skipped = duplicates.size;
+
+    if (files.length === 0) {
+      statusEl.textContent = skipped > 0 ? `All ${skipped} file(s) already exist` : 'No files';
+      setTimeout(() => { statusEl.textContent = ''; }, 2000);
+      return;
+    }
 
     uploadBtn.disabled = true;
     uploadBtn.textContent = 'Uploading...';
-    const fileItemEls = fileItems.querySelectorAll('.file-item');
 
     let completed = 0;
+    let errors = 0;
+
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
-      const itemEl = fileItemEls[i];
-      statusEl.textContent = `${completed + 1}/${files.length}...`;
-
-      // Show uploading state
+      const itemEl = fileItems.querySelector(`[data-filename="${CSS.escape(file.name)}"]`);
       const progressFill = itemEl?.querySelector('.progress-fill');
-      if (progressFill) progressFill.style.width = '50%';
+
+      statusEl.textContent = `Uploading ${completed + 1}/${files.length}...`;
 
       const formData = new FormData();
       formData.append('videos[]', file);
       formData.append('series', seriesName);
 
       try {
-        await fetch('/upload/series', { method: 'POST', body: formData });
-        completed++;
-        // Mark complete
-        if (progressFill) progressFill.style.width = '100%';
-        if (itemEl) itemEl.innerHTML = `<span class="text-green-400 mr-2">&#10003;</span><span class="flex-1 truncate text-xs text-green-300">${file.name}</span>`;
+        const result = await uploadFileWithProgress(
+          '/upload/series',
+          formData,
+          (percent) => {
+            if (progressFill) progressFill.style.width = `${percent}%`;
+          }
+        );
+
+        if (result.error === 'already_exists') {
+          if (itemEl) itemEl.innerHTML = `<span class="text-yellow-400 mr-2">⊘</span><span class="flex-1 truncate text-xs text-yellow-300">${file.name}</span><span class="text-xs text-yellow-500 ml-2">Already exists</span>`;
+        } else {
+          completed++;
+          if (itemEl) itemEl.innerHTML = `<span class="text-green-400 mr-2">&#10003;</span><span class="flex-1 truncate text-xs text-green-300">${file.name}</span>`;
+        }
       } catch (e) {
         console.error(e);
-        // Mark error
+        errors++;
         if (itemEl) itemEl.innerHTML = `<span class="text-red-400 mr-2">&#10007;</span><span class="flex-1 truncate text-xs text-red-300">${file.name}</span>`;
       }
     }
 
-    statusEl.textContent = `Done! (${completed}/${files.length})`;
+    let msg = `Done! ${completed} uploaded`;
+    if (skipped > 0) msg += `, ${skipped} skipped`;
+    if (errors > 0) msg += `, ${errors} failed`;
+    statusEl.textContent = msg;
     uploadBtn.textContent = 'Upload';
     fileInput.value = '';
     loadSeries();
-    setTimeout(() => { statusEl.textContent = ''; fileList.classList.add('hidden'); uploadBtn.disabled = true; }, 2000);
+    setTimeout(() => { statusEl.textContent = ''; fileList.classList.add('hidden'); uploadBtn.disabled = true; }, 2500);
   }
 
   async function updateSeriesTimeOfDay(seriesName, timeOfDay) {
@@ -900,7 +1055,7 @@
   // ============================================
   // MOVIES
   // ============================================
-  setupUploader({
+  const moviesUploader = setupUploader({
     dropzoneId: 'movies-dropzone',
     fileInputId: 'movies-file-input',
     fileListId: 'movies-file-list',
@@ -908,7 +1063,8 @@
     uploadBtnId: 'movies-upload-btn',
     statusId: 'movies-upload-status',
     uploadUrl: '/upload/movies',
-    onComplete: loadMovies
+    existingIdsUrl: '/api/movies',
+    onComplete: () => { loadMovies(); moviesUploader.refreshExistingIds(); }
   });
 
   async function loadMovies() {
@@ -952,7 +1108,7 @@
   // ============================================
   // COMMERCIALS
   // ============================================
-  setupUploader({
+  const commercialsUploader = setupUploader({
     dropzoneId: 'commercials-dropzone',
     fileInputId: 'commercials-file-input',
     fileListId: 'commercials-file-list',
@@ -960,7 +1116,8 @@
     uploadBtnId: 'commercials-upload-btn',
     statusId: 'commercials-upload-status',
     uploadUrl: '/upload/commercials',
-    onComplete: loadCommercials
+    existingIdsUrl: '/api/commercials',
+    onComplete: () => { loadCommercials(); commercialsUploader.refreshExistingIds(); }
   });
 
   async function loadCommercials() {
