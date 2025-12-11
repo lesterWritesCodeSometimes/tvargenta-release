@@ -82,6 +82,86 @@
     50% { opacity: 0.6; }
   }
   .scanning { animation: pulse-glow 1.5s ease-in-out infinite; }
+
+  /* Series expanding cards */
+  .series-card {
+    background: rgba(17,24,39,.6);
+    backdrop-filter: blur(2px);
+    transition: all 0.3s ease;
+  }
+  .series-card:hover {
+    box-shadow: 0 4px 12px rgba(147, 51, 234, 0.2);
+  }
+  .series-card.expanded {
+    border-color: #a855f7;
+    box-shadow: 0 4px 20px rgba(147, 51, 234, 0.3);
+  }
+  .series-card .card-form {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.3s ease, padding 0.3s ease, margin 0.3s ease;
+    padding-top: 0;
+    margin-top: 0;
+  }
+  .series-card.expanded .card-form {
+    max-height: 2000px;
+    padding-top: 1rem;
+    margin-top: 1rem;
+    border-top: 1px solid #4b5563;
+  }
+  .create-series-card {
+    border: 2px dashed #4b5563;
+    background: rgba(17,24,39,.3);
+    transition: all 0.3s ease;
+    cursor: pointer;
+  }
+  .create-series-card:hover {
+    border-color: #22c55e;
+    background: rgba(34, 197, 94, 0.1);
+  }
+  .create-series-card.expanded {
+    border-style: solid;
+    border-color: #22c55e;
+    cursor: default;
+    background: rgba(17,24,39,.6);
+  }
+  .create-series-card .card-form {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.3s ease, padding 0.3s ease;
+    padding-top: 0;
+  }
+  .create-series-card.expanded .card-form {
+    max-height: 200px;
+    padding-top: 1rem;
+  }
+
+  /* Season expansion */
+  .season-item {
+    background: rgba(31,41,55,0.8);
+    transition: all 0.2s ease;
+  }
+  .season-item:hover {
+    background: rgba(31,41,55,1);
+  }
+  .season-item.expanded {
+    background: rgba(88,28,135,0.3);
+  }
+  .season-episodes {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.3s ease;
+  }
+  .season-item.expanded .season-episodes {
+    max-height: 1000px;
+  }
+  .episode-item {
+    background: rgba(17,24,39,0.6);
+    transition: background 0.2s ease;
+  }
+  .episode-item:hover {
+    background: rgba(17,24,39,0.9);
+  }
 {% endblock %}
 
 {% block content %}
@@ -107,40 +187,8 @@
     </div>
 
     <div id="series-content" class="p-4">
-      <!-- Upload Episodes -->
-      <div class="mb-4 p-3 bg-gray-900/50 rounded-lg border border-purple-500/50">
-        <h3 class="text-sm font-bold text-purple-300 mb-2">Upload Episodes</h3>
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
-          <div>
-            <label class="block text-xs mb-1 text-gray-300">Select Series:</label>
-            <select id="series-select" class="w-full bg-gray-800 text-white px-2 py-1.5 rounded border border-gray-600 text-sm">
-              <option value="">-- Select series --</option>
-            </select>
-          </div>
-          <div>
-            <label class="block text-xs mb-1 text-gray-300">Or Create New:</label>
-            <input type="text" id="new-series-input" placeholder="e.g. Los Simuladores"
-                   class="w-full bg-gray-800 text-white px-2 py-1.5 rounded border border-gray-600 text-sm">
-          </div>
-        </div>
-        <div id="series-dropzone" class="dropzone rounded-lg p-4 text-center cursor-pointer mb-2">
-          <input type="file" id="series-file-input" multiple accept=".mp4" class="hidden">
-          <p class="text-gray-300 text-sm">Drop episode files here <span class="text-gray-500">(S01E05.mp4, 1x05.mp4)</span></p>
-        </div>
-        <div id="series-file-list" class="hidden mb-2">
-          <div id="series-file-items"></div>
-        </div>
-        <div class="flex justify-end gap-2">
-          <span id="series-upload-status" class="text-xs text-gray-400 self-center"></span>
-          <button id="series-upload-btn" disabled
-                  class="bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-bold px-3 py-1.5 rounded text-sm">
-            Upload
-          </button>
-        </div>
-      </div>
-
-      <!-- Series List -->
-      <div id="series-list" class="grid grid-cols-1 md:grid-cols-2 gap-3">
+      <!-- Series Cards Container -->
+      <div id="series-list" class="space-y-3">
         <div class="text-gray-500 italic text-sm">Loading...</div>
       </div>
     </div>
@@ -451,89 +499,373 @@
   // ============================================
   // TV SERIES
   // ============================================
-  const seriesUploader = setupUploader({
-    dropzoneId: 'series-dropzone',
-    fileInputId: 'series-file-input',
-    fileListId: 'series-file-list',
-    fileItemsId: 'series-file-items',
-    uploadBtnId: 'series-upload-btn',
-    statusId: 'series-upload-status',
-    uploadUrl: '/upload/series',
-    extraFormData: (fd) => {
-      fd.append('series', document.getElementById('series-select').value);
-      fd.append('new_series', document.getElementById('new-series-input').value.trim());
-    },
-    checkReady: () => {
-      const hasFiles = document.getElementById('series-file-input').files.length > 0;
-      const hasSeries = document.getElementById('series-select').value || document.getElementById('new-series-input').value.trim();
-      document.getElementById('series-upload-btn').disabled = !(hasFiles && hasSeries);
-    },
-    onComplete: loadSeries
-  });
+  let expandedSeriesCard = null;
+  let expandedSeason = {};  // { seriesName: seasonNum }
+  let seriesData = [];      // Store loaded series data for re-rendering
 
-  document.getElementById('series-select').addEventListener('change', () => {
-    if (document.getElementById('series-select').value) document.getElementById('new-series-input').value = '';
-    seriesUploader.checkReady();
-  });
-  document.getElementById('new-series-input').addEventListener('input', () => {
-    if (document.getElementById('new-series-input').value.trim()) document.getElementById('series-select').value = '';
-    seriesUploader.checkReady();
-  });
+  const TIME_OF_DAY_LABELS = {
+    'any': 'Any Time',
+    'early_morning': 'Early Morning',
+    'late_morning': 'Late Morning',
+    'afternoon': 'Afternoon',
+    'evening': 'Evening',
+    'night': 'Night'
+  };
 
-  async function loadSeries() {
-    try {
-      const res = await fetch('/api/series');
-      const data = await res.json();
-      const container = document.getElementById('series-list');
-      const select = document.getElementById('series-select');
+  function toggleSeriesCard(seriesName, event) {
+    if (event) event.stopPropagation();
 
-      if (!data.ok || !data.series || data.series.length === 0) {
-        container.innerHTML = '<div class="text-gray-500 italic text-sm col-span-2">No series yet</div>';
-        select.innerHTML = '<option value="">-- Select series --</option>';
-        document.getElementById('series-count').textContent = '0';
-        return;
+    const card = document.querySelector(`[data-series-id="${seriesName}"]`);
+    if (!card) return;
+
+    const isExpanding = !card.classList.contains('expanded');
+
+    // Collapse any currently expanded card
+    if (expandedSeriesCard && expandedSeriesCard !== seriesName) {
+      const prevCard = document.querySelector(`[data-series-id="${expandedSeriesCard}"]`);
+      if (prevCard) prevCard.classList.remove('expanded');
+    }
+
+    // Toggle this card
+    if (isExpanding) {
+      card.classList.add('expanded');
+      expandedSeriesCard = seriesName;
+      // Reset expanded season for this series
+      expandedSeason[seriesName] = null;
+      // Initialize dropzone for this series
+      setTimeout(() => initSeriesDropzone(seriesName), 100);
+      // Scroll into view
+      setTimeout(() => card.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 100);
+    } else {
+      card.classList.remove('expanded');
+      expandedSeriesCard = null;
+    }
+  }
+
+  function toggleSeason(seriesName, seasonNum, event) {
+    if (event) event.stopPropagation();
+
+    const seasonItem = document.querySelector(`[data-series="${seriesName}"][data-season="${seasonNum}"]`);
+    if (!seasonItem) return;
+
+    const isExpanding = !seasonItem.classList.contains('expanded');
+
+    // Collapse any currently expanded season in this series
+    if (expandedSeason[seriesName] && expandedSeason[seriesName] !== seasonNum) {
+      const prevSeason = document.querySelector(`[data-series="${seriesName}"][data-season="${expandedSeason[seriesName]}"]`);
+      if (prevSeason) prevSeason.classList.remove('expanded');
+    }
+
+    // Toggle this season
+    if (isExpanding) {
+      seasonItem.classList.add('expanded');
+      expandedSeason[seriesName] = seasonNum;
+    } else {
+      seasonItem.classList.remove('expanded');
+      expandedSeason[seriesName] = null;
+    }
+  }
+
+  function initSeriesDropzone(seriesName) {
+    const dropzone = document.getElementById(`dropzone-${seriesName}`);
+    const fileInput = document.getElementById(`file-input-${seriesName}`);
+    const fileList = document.getElementById(`file-list-${seriesName}`);
+    const fileItems = document.getElementById(`file-items-${seriesName}`);
+    const uploadBtn = document.getElementById(`upload-btn-${seriesName}`);
+    const statusEl = document.getElementById(`upload-status-${seriesName}`);
+
+    if (!dropzone || dropzone.dataset.initialized) return;
+    dropzone.dataset.initialized = 'true';
+
+    dropzone.addEventListener('click', () => fileInput.click());
+    dropzone.addEventListener('dragover', e => { e.preventDefault(); dropzone.classList.add('dragover'); });
+    dropzone.addEventListener('dragleave', () => dropzone.classList.remove('dragover'));
+    dropzone.addEventListener('drop', e => {
+      e.preventDefault();
+      dropzone.classList.remove('dragover');
+      const dt = new DataTransfer();
+      for (const f of e.dataTransfer.files) {
+        if (f.name.toLowerCase().endsWith('.mp4')) dt.items.add(f);
       }
+      fileInput.files = dt.files;
+      updateSeriesFileList(seriesName);
+    });
+    fileInput.addEventListener('change', () => updateSeriesFileList(seriesName));
 
-      document.getElementById('series-count').textContent = data.series.length;
-      select.innerHTML = '<option value="">-- Select series --</option>' +
-        data.series.map(s => `<option value="${s.folder_name}">${s.display_name}</option>`).join('');
+    uploadBtn.addEventListener('click', () => uploadSeriesFiles(seriesName));
+  }
 
-      container.innerHTML = data.series.map(s => `
-        <div class="content-card rounded-lg p-3">
-          <div class="flex items-center justify-between mb-2">
-            <h4 class="font-bold text-white text-sm truncate">${s.display_name}</h4>
-            <span class="text-xs text-purple-300">${s.episode_count} ep</span>
-          </div>
-          <div class="mb-2">
-            <select class="time-select w-full bg-gray-800 text-white px-2 py-1 rounded border border-gray-600 text-xs" data-series="${s.folder_name}">
-              <option value="any" ${s.time_of_day === 'any' ? 'selected' : ''}>Any Time</option>
-              <option value="early_morning" ${s.time_of_day === 'early_morning' ? 'selected' : ''}>Early Morning</option>
-              <option value="late_morning" ${s.time_of_day === 'late_morning' ? 'selected' : ''}>Late Morning</option>
-              <option value="afternoon" ${s.time_of_day === 'afternoon' ? 'selected' : ''}>Afternoon</option>
-              <option value="evening" ${s.time_of_day === 'evening' ? 'selected' : ''}>Evening</option>
-              <option value="night" ${s.time_of_day === 'night' ? 'selected' : ''}>Night</option>
-            </select>
-          </div>
-          <button onclick="deleteSeries('${s.folder_name}', '${s.display_name}')" class="text-red-400 hover:underline text-xs">Delete</button>
-        </div>
-      `).join('');
+  function updateSeriesFileList(seriesName) {
+    const fileInput = document.getElementById(`file-input-${seriesName}`);
+    const fileList = document.getElementById(`file-list-${seriesName}`);
+    const fileItems = document.getElementById(`file-items-${seriesName}`);
+    const uploadBtn = document.getElementById(`upload-btn-${seriesName}`);
 
-      document.querySelectorAll('.time-select').forEach(sel => {
-        sel.addEventListener('change', async function() {
-          await fetch('/api/series/time_of_day', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ series_name: this.dataset.series, time_of_day: this.value })
-          });
-        });
-      });
-    } catch (e) { console.error(e); }
+    const files = fileInput.files;
+    fileItems.innerHTML = '';
+    if (files.length === 0) {
+      fileList.classList.add('hidden');
+      uploadBtn.disabled = true;
+      return;
+    }
+    fileList.classList.remove('hidden');
+    for (const f of files) {
+      const item = document.createElement('div');
+      item.className = 'file-item';
+      item.innerHTML = `<div class="progress-bar"><div class="progress-fill"></div></div><span class="flex-1 truncate text-xs">${f.name}</span>`;
+      fileItems.appendChild(item);
+    }
+    uploadBtn.disabled = false;
+  }
+
+  async function uploadSeriesFiles(seriesName) {
+    const fileInput = document.getElementById(`file-input-${seriesName}`);
+    const uploadBtn = document.getElementById(`upload-btn-${seriesName}`);
+    const statusEl = document.getElementById(`upload-status-${seriesName}`);
+    const fileList = document.getElementById(`file-list-${seriesName}`);
+
+    const files = Array.from(fileInput.files);
+    if (files.length === 0) return;
+
+    uploadBtn.disabled = true;
+    uploadBtn.textContent = 'Uploading...';
+
+    let completed = 0;
+    for (const file of files) {
+      statusEl.textContent = `${completed + 1}/${files.length}...`;
+      const formData = new FormData();
+      formData.append('videos[]', file);
+      formData.append('series', seriesName);
+
+      try {
+        await fetch('/upload/series', { method: 'POST', body: formData });
+        completed++;
+      } catch (e) { console.error(e); }
+    }
+
+    statusEl.textContent = `Done! (${completed})`;
+    uploadBtn.textContent = 'Upload';
+    fileInput.value = '';
+    fileList.classList.add('hidden');
+    loadSeries();
+    setTimeout(() => { statusEl.textContent = ''; uploadBtn.disabled = true; }, 2000);
+  }
+
+  async function updateSeriesTimeOfDay(seriesName, timeOfDay) {
+    await fetch('/api/series/time_of_day', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ series_name: seriesName, time_of_day: timeOfDay })
+    });
+  }
+
+  async function deleteEpisode(videoId, seriesName) {
+    if (!confirm('Delete this episode?')) return;
+    await fetch(`/delete/${videoId}`);
+    loadSeries();
   }
 
   async function deleteSeries(folderName, displayName) {
     if (!confirm(`Delete "${displayName}" and all episodes?`)) return;
     await fetch(`/series/delete/${encodeURIComponent(folderName)}`, { method: 'POST' });
     loadSeries();
+  }
+
+  function renderSeriesCards() {
+    const container = document.getElementById('series-list');
+
+    if (seriesData.length === 0) {
+      container.innerHTML = renderCreateSeriesCard();
+      initCreateSeriesCard();
+      return;
+    }
+
+    let html = seriesData.map(s => {
+      const timeLabel = TIME_OF_DAY_LABELS[s.time_of_day] || 'Any Time';
+      const isExpanded = expandedSeriesCard === s.folder_name;
+
+      // Build seasons HTML
+      let seasonsHtml = '';
+      if (s.seasons && s.seasons.length > 0) {
+        seasonsHtml = s.seasons.map(season => {
+          const isSeasonExpanded = expandedSeason[s.folder_name] === season.season;
+          const episodesHtml = season.episodes.map(ep => `
+            <div class="episode-item flex items-center justify-between p-2 rounded text-sm">
+              <div class="flex-1 min-w-0">
+                <span class="text-white">${ep.title}</span>
+                <span class="text-gray-500 ml-2">S${String(ep.season).padStart(2,'0')}E${String(ep.episode).padStart(2,'0')}</span>
+                <span class="text-gray-500 ml-2">${formatDuration(ep.duration)}</span>
+              </div>
+              <div class="flex gap-2 ml-2">
+                <a href="/edit/${ep.video_id}" class="text-blue-400 hover:underline text-xs">Edit</a>
+                <button onclick="deleteEpisode('${ep.video_id}', '${s.folder_name}')" class="text-red-400 hover:underline text-xs">Delete</button>
+              </div>
+            </div>
+          `).join('');
+
+          return `
+            <div class="season-item rounded-lg overflow-hidden ${isSeasonExpanded ? 'expanded' : ''}"
+                 data-series="${s.folder_name}" data-season="${season.season}">
+              <div class="flex items-center justify-between p-3 cursor-pointer" onclick="toggleSeason('${s.folder_name}', ${season.season}, event)">
+                <span class="font-semibold text-purple-300">Season ${season.season}</span>
+                <div class="flex items-center gap-2">
+                  <span class="text-xs text-gray-400">${season.episodes.length} episodes</span>
+                  <span class="text-gray-400">${isSeasonExpanded ? '▼' : '▶'}</span>
+                </div>
+              </div>
+              <div class="season-episodes">
+                <div class="p-2 pt-0 space-y-1">
+                  ${episodesHtml || '<p class="text-gray-500 text-xs p-2">No episodes</p>'}
+                </div>
+              </div>
+            </div>
+          `;
+        }).join('');
+      } else {
+        seasonsHtml = '<p class="text-gray-500 text-sm">No episodes uploaded yet</p>';
+      }
+
+      return `
+        <div class="series-card border border-purple-600 rounded-lg p-4 ${isExpanded ? 'expanded' : ''}" data-series-id="${s.folder_name}">
+          <!-- Collapsed View -->
+          <div class="card-header cursor-pointer" onclick="toggleSeriesCard('${s.folder_name}')">
+            <div class="flex items-center justify-between">
+              <div class="flex-1 min-w-0">
+                <h3 class="text-lg font-bold text-white truncate">${s.display_name}</h3>
+              </div>
+              <div class="flex items-center gap-4 ml-4">
+                <span class="text-sm text-purple-300">${s.episode_count} ep</span>
+                <span class="text-xs text-gray-400 px-2 py-0.5 bg-gray-700 rounded">${timeLabel}</span>
+                <span class="text-gray-400">${isExpanded ? '▼' : '▶'}</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Expanded Form -->
+          <div class="card-form">
+            <!-- Upload Area -->
+            <div class="mb-4 p-3 bg-gray-900/50 rounded-lg border border-purple-500/30">
+              <h4 class="text-sm font-semibold text-purple-300 mb-2">Upload Episodes</h4>
+              <div id="dropzone-${s.folder_name}" class="dropzone rounded-lg p-4 text-center cursor-pointer mb-2">
+                <input type="file" id="file-input-${s.folder_name}" multiple accept=".mp4" class="hidden">
+                <p class="text-gray-300 text-sm">Drop episode files here <span class="text-gray-500">(S01E05.mp4, 1x05.mp4)</span></p>
+              </div>
+              <div id="file-list-${s.folder_name}" class="hidden mb-2">
+                <div id="file-items-${s.folder_name}"></div>
+              </div>
+              <div class="flex justify-end gap-2">
+                <span id="upload-status-${s.folder_name}" class="text-xs text-gray-400 self-center"></span>
+                <button id="upload-btn-${s.folder_name}" disabled
+                        class="bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-bold px-3 py-1.5 rounded text-sm">
+                  Upload
+                </button>
+              </div>
+            </div>
+
+            <!-- Broadcast Time -->
+            <div class="mb-4 flex items-center gap-3">
+              <label class="text-sm text-gray-300">Broadcast Time:</label>
+              <select class="bg-gray-800 text-white px-3 py-1.5 rounded border border-gray-600 text-sm"
+                      onchange="updateSeriesTimeOfDay('${s.folder_name}', this.value)">
+                <option value="any" ${s.time_of_day === 'any' ? 'selected' : ''}>Any Time</option>
+                <option value="early_morning" ${s.time_of_day === 'early_morning' ? 'selected' : ''}>Early Morning</option>
+                <option value="late_morning" ${s.time_of_day === 'late_morning' ? 'selected' : ''}>Late Morning</option>
+                <option value="afternoon" ${s.time_of_day === 'afternoon' ? 'selected' : ''}>Afternoon</option>
+                <option value="evening" ${s.time_of_day === 'evening' ? 'selected' : ''}>Evening</option>
+                <option value="night" ${s.time_of_day === 'night' ? 'selected' : ''}>Night</option>
+              </select>
+            </div>
+
+            <!-- Seasons List -->
+            <div class="space-y-2">
+              <h4 class="text-sm font-semibold text-gray-300 mb-2">Episodes by Season</h4>
+              ${seasonsHtml}
+            </div>
+
+            <!-- Actions -->
+            <div class="flex items-center justify-between pt-4 mt-4 border-t border-gray-600">
+              <button onclick="deleteSeries('${s.folder_name}', '${s.display_name}')" class="text-red-400 hover:text-red-300 text-sm">
+                Delete Series
+              </button>
+              <button onclick="toggleSeriesCard('${s.folder_name}')" class="text-gray-400 hover:text-white text-sm">
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    // Add create new series card
+    html += renderCreateSeriesCard();
+
+    container.innerHTML = html;
+    initCreateSeriesCard();
+
+    // Re-init dropzone if a card is expanded
+    if (expandedSeriesCard) {
+      setTimeout(() => initSeriesDropzone(expandedSeriesCard), 100);
+    }
+  }
+
+  function renderCreateSeriesCard() {
+    const isExpanded = expandedSeriesCard === '__new__';
+    return `
+      <div class="create-series-card rounded-lg p-4 ${isExpanded ? 'expanded' : ''}" data-series-id="__new__" onclick="toggleSeriesCard('__new__', event)">
+        <!-- Collapsed View -->
+        <div class="card-header text-center">
+          <span class="text-3xl text-gray-500">➕</span>
+          <p class="text-gray-400 mt-1">Create New Series</p>
+        </div>
+
+        <!-- Expanded Create Form -->
+        <div class="card-form" onclick="event.stopPropagation()">
+          <form id="create-series-form" action="/series/add" method="POST" class="space-y-3">
+            <div>
+              <label class="block text-xs mb-1 text-gray-400">Series Name</label>
+              <input type="text" name="name" id="new-series-name" placeholder="e.g. Los Simuladores"
+                     class="w-full bg-gray-800 text-white px-3 py-2 rounded border border-gray-600 focus:border-green-500 text-sm" required>
+            </div>
+            <div class="flex items-center gap-3">
+              <button type="submit" class="bg-green-500 hover:bg-green-600 text-black font-bold px-4 py-1.5 rounded text-sm">
+                Create Series
+              </button>
+              <button type="button" onclick="toggleSeriesCard('__new__')" class="text-gray-400 hover:text-white text-sm">
+                Cancel
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    `;
+  }
+
+  function initCreateSeriesCard() {
+    const form = document.getElementById('create-series-form');
+    if (form && !form.dataset.initialized) {
+      form.dataset.initialized = 'true';
+      // Form submits via POST to /series/add which redirects back
+    }
+  }
+
+  async function loadSeries() {
+    try {
+      const res = await fetch('/api/series');
+      const data = await res.json();
+
+      if (!data.ok) {
+        seriesData = [];
+      } else {
+        seriesData = data.series || [];
+      }
+
+      document.getElementById('series-count').textContent = seriesData.length;
+      renderSeriesCards();
+    } catch (e) {
+      console.error(e);
+      seriesData = [];
+      renderSeriesCards();
+    }
   }
 
   // ============================================

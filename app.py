@@ -1829,17 +1829,17 @@ def series_add():
     """Add a new series."""
     display_name = request.form.get("name", "").strip()
     if not display_name:
-        return redirect(url_for("series_page"))
+        return redirect(url_for("index"))
 
     folder_name = series_folder_name(display_name)
     if not folder_name:
-        return redirect(url_for("series_page"))
+        return redirect(url_for("index"))
 
     series_data = load_series()
 
     # Check if already exists
     if folder_name in series_data:
-        return redirect(url_for("series_page"))
+        return redirect(url_for("index"))
 
     # Create folder
     series_dir = SERIES_VIDEO_DIR / folder_name
@@ -1853,7 +1853,7 @@ def series_add():
     save_series(series_data)
 
     logger.info(f"[SERIES] Created new series: {display_name} ({folder_name})")
-    return redirect(url_for("series_page"))
+    return redirect(url_for("index"))
 
 @app.route("/series/delete/<series_name>", methods=["POST"])
 def series_delete(series_name):
@@ -1891,23 +1891,50 @@ def series_delete(series_name):
 
 @app.route("/api/series")
 def api_series():
-    """Return list of series with episode counts and time_of_day."""
+    """Return list of series with episode counts, time_of_day, and episodes grouped by season."""
     series_data = load_series()
     global metadata
     metadata = load_metadata()
 
     result = []
     for name in sorted(series_data.keys()):
-        # Count episodes in this series
-        episode_count = sum(1 for v in metadata.values()
-                          if v.get("category") == "tv_episode" and v.get("series") == name)
+        # Get all episodes for this series
+        episodes = []
+        for video_id, v in metadata.items():
+            if v.get("category") == "tv_episode" and v.get("series") == name:
+                episodes.append({
+                    "video_id": video_id,
+                    "title": v.get("title", video_id),
+                    "season": v.get("season") or 1,
+                    "episode": v.get("episode") or 0,
+                    "duration": v.get("duracion", 0)
+                })
+
+        # Group episodes by season
+        seasons = {}
+        for ep in episodes:
+            season_num = ep["season"]
+            if season_num not in seasons:
+                seasons[season_num] = []
+            seasons[season_num].append(ep)
+
+        # Sort episodes within each season
+        for season_num in seasons:
+            seasons[season_num].sort(key=lambda x: (x["episode"], x["title"]))
+
+        # Convert to sorted list of season objects
+        seasons_list = [
+            {"season": s, "episodes": seasons[s]}
+            for s in sorted(seasons.keys())
+        ]
 
         result.append({
             "folder_name": name,
             "display_name": series_display_name(name),
-            "episode_count": episode_count,
+            "episode_count": len(episodes),
             "time_of_day": series_data[name].get("time_of_day", "any"),
-            "created": series_data[name].get("created", "")
+            "created": series_data[name].get("created", ""),
+            "seasons": seasons_list
         })
 
     return jsonify({"ok": True, "series": result})
