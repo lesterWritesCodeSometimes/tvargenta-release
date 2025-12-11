@@ -471,10 +471,18 @@
 
       uploadBtn.disabled = true;
       uploadBtn.textContent = 'Uploading...';
+      const fileItemEls = fileItems.querySelectorAll('.file-item');
 
       let completed = 0;
-      for (const file of files) {
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const itemEl = fileItemEls[i];
         statusEl.textContent = `${completed + 1}/${files.length}...`;
+
+        // Show uploading state
+        const progressFill = itemEl?.querySelector('.progress-fill');
+        if (progressFill) progressFill.style.width = '50%';
+
         const formData = new FormData();
         formData.append('videos[]', file);
         if (config.extraFormData) config.extraFormData(formData);
@@ -482,15 +490,21 @@
         try {
           await fetch(config.uploadUrl, { method: 'POST', body: formData });
           completed++;
-        } catch (e) { console.error(e); }
+          // Mark complete
+          if (progressFill) progressFill.style.width = '100%';
+          if (itemEl) itemEl.innerHTML = `<span class="text-green-400 mr-2">&#10003;</span><span class="flex-1 truncate text-xs text-green-300">${file.name}</span>`;
+        } catch (e) {
+          console.error(e);
+          // Mark error
+          if (itemEl) itemEl.innerHTML = `<span class="text-red-400 mr-2">&#10007;</span><span class="flex-1 truncate text-xs text-red-300">${file.name}</span>`;
+        }
       }
 
-      statusEl.textContent = `Done! (${completed})`;
+      statusEl.textContent = `Done! (${completed}/${files.length})`;
       uploadBtn.textContent = 'Upload';
       fileInput.value = '';
-      fileList.classList.add('hidden');
       if (config.onComplete) config.onComplete();
-      setTimeout(() => { statusEl.textContent = ''; uploadBtn.disabled = true; }, 2000);
+      setTimeout(() => { statusEl.textContent = ''; fileList.classList.add('hidden'); uploadBtn.disabled = true; }, 2000);
     });
 
     return { updateFileList, checkReady: () => { if (config.checkReady) config.checkReady(); } };
@@ -623,16 +637,25 @@
     const uploadBtn = document.getElementById(`upload-btn-${seriesName}`);
     const statusEl = document.getElementById(`upload-status-${seriesName}`);
     const fileList = document.getElementById(`file-list-${seriesName}`);
+    const fileItems = document.getElementById(`file-items-${seriesName}`);
 
     const files = Array.from(fileInput.files);
     if (files.length === 0) return;
 
     uploadBtn.disabled = true;
     uploadBtn.textContent = 'Uploading...';
+    const fileItemEls = fileItems.querySelectorAll('.file-item');
 
     let completed = 0;
-    for (const file of files) {
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      const itemEl = fileItemEls[i];
       statusEl.textContent = `${completed + 1}/${files.length}...`;
+
+      // Show uploading state
+      const progressFill = itemEl?.querySelector('.progress-fill');
+      if (progressFill) progressFill.style.width = '50%';
+
       const formData = new FormData();
       formData.append('videos[]', file);
       formData.append('series', seriesName);
@@ -640,15 +663,21 @@
       try {
         await fetch('/upload/series', { method: 'POST', body: formData });
         completed++;
-      } catch (e) { console.error(e); }
+        // Mark complete
+        if (progressFill) progressFill.style.width = '100%';
+        if (itemEl) itemEl.innerHTML = `<span class="text-green-400 mr-2">&#10003;</span><span class="flex-1 truncate text-xs text-green-300">${file.name}</span>`;
+      } catch (e) {
+        console.error(e);
+        // Mark error
+        if (itemEl) itemEl.innerHTML = `<span class="text-red-400 mr-2">&#10007;</span><span class="flex-1 truncate text-xs text-red-300">${file.name}</span>`;
+      }
     }
 
-    statusEl.textContent = `Done! (${completed})`;
+    statusEl.textContent = `Done! (${completed}/${files.length})`;
     uploadBtn.textContent = 'Upload';
     fileInput.value = '';
-    fileList.classList.add('hidden');
     loadSeries();
-    setTimeout(() => { statusEl.textContent = ''; uploadBtn.disabled = true; }, 2000);
+    setTimeout(() => { statusEl.textContent = ''; fileList.classList.add('hidden'); uploadBtn.disabled = true; }, 2000);
   }
 
   async function updateSeriesTimeOfDay(seriesName, timeOfDay) {
