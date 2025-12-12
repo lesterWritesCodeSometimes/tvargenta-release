@@ -788,6 +788,39 @@
 	let broadcastSyncInterval = null;      // interval for syncing broadcast content
 	const BROADCAST_SYNC_INTERVAL_MS = 2000; // check for content changes every 2 seconds
 
+	// Loudness-based volume normalization
+	// Adjusts all content to a target loudness level (-16 LUFS)
+	let baseVolume = 0.5;                   // Base volume (0-1) from user settings
+	const TARGET_LUFS = -16;                // Target loudness level (streaming standard)
+
+	/**
+	 * Apply volume adjustment to normalize content to target loudness.
+	 * Quieter content gets boosted, louder content gets reduced.
+	 * @param {number|null} contentLufs - LUFS of current content
+	 */
+	function applyLoudnessVolumeAdjustment(contentLufs) {
+	  if (contentLufs === null || contentLufs === undefined) {
+		// No loudness data - use base volume
+		video.volume = baseVolume;
+		return;
+	  }
+
+	  // Calculate dB offset needed to reach target
+	  // Negative LUFS means quieter, so:
+	  //   Content at -20 LUFS, target -16: offset = -16 - (-20) = +4 dB (boost)
+	  //   Content at -14 LUFS, target -16: offset = -16 - (-14) = -2 dB (reduce)
+	  const dbOffset = TARGET_LUFS - contentLufs;
+
+	  // Convert dB to linear scale
+	  const volumeScale = Math.pow(10, dbOffset / 20);
+
+	  // Apply to base volume, clamping to valid range
+	  const adjustedVolume = Math.max(0.05, Math.min(1, baseVolume * volumeScale));
+
+	  video.volume = adjustedVolume;
+	  console.log(`[LOUDNESS] ${contentLufs} LUFS → target ${TARGET_LUFS} LUFS (${dbOffset > 0 ? '+' : ''}${dbOffset.toFixed(1)} dB, volume ${(adjustedVolume * 100).toFixed(0)}%)`);
+	}
+
 	// Idiomas disponibles (orden = visual en el menú)
 	const AVAILABLE_LANGS = [
 	  { code: "es", key: "lang.es", label: "Español" },
@@ -979,7 +1012,8 @@
 		  try {
 			const res = await fetch("/api/volumen");
 			const data = await res.json();
-			video.volume = data.valor / 100;
+			baseVolume = data.valor / 100;  // Track base volume for loudness adjustment
+			video.volume = baseVolume;
 			updateMuteIndicatorFromVol(data.valor);
 		  } catch (e) {
 			console.warn("[PLAYER] no pude leer volumen:", e);
@@ -1088,6 +1122,11 @@
 
 			video.play().catch(e => console.warn("[TV] play() rechazado:", e));
 			// Channel badge removed for immersion
+
+			// Apply loudness-based volume normalization for broadcast content
+			if (isBroadcast) {
+			  applyLoudnessVolumeAdjustment(data.loudness_lufs);
+			}
 
 			// --- armado del umbral de "play real" ---
 			// Skip play reporting for broadcast system videos (test pattern, commercials)
@@ -1310,6 +1349,9 @@
 			}
 
 			video.play().catch(e => console.warn("[TV] play() rechazado:", e));
+
+			// Apply loudness-based volume normalization
+			applyLoudnessVolumeAdjustment(data.loudness_lufs);
 		  } else if (seekDrift > 5) {
 			// Same video but we've drifted more than 5 seconds - resync
 			console.log(`[TV] Broadcast resync: drift=${seekDrift.toFixed(1)}s`);
@@ -1353,8 +1395,11 @@
 		contenedor.appendChild(b);
 	  }
 
-	  video.volume = valor / 100;
-	  updateMuteIndicatorFromVol(valor); 	
+	  // Update base volume for loudness normalization system
+	  baseVolume = valor / 100;
+	  video.volume = baseVolume;
+
+	  updateMuteIndicatorFromVol(valor);
 	  clearTimeout(volumenTimer);
 	  volumenTimer = setTimeout(() => {
 		barra.classList.add("oculto");

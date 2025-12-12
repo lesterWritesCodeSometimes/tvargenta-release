@@ -849,6 +849,52 @@ def verify_h264_codec(filepath):
         return False, f"Codec verification failed: {str(e)}"
 
 
+def analyze_loudness(filepath):
+    """
+    Analyze audio loudness of a video file using FFmpeg's ebur128 filter.
+    Returns integrated loudness in LUFS (Loudness Units relative to Full Scale).
+    Typical values: -23 LUFS (broadcast standard), -14 LUFS (streaming).
+    Louder audio = higher (closer to 0) LUFS values.
+    Returns None if analysis fails.
+    """
+    try:
+        # Use ebur128 filter to analyze loudness
+        # This outputs loudness stats to stderr
+        result = subprocess.run([
+            "ffmpeg", "-i", filepath,
+            "-af", "ebur128=framelog=verbose",
+            "-f", "null", "-"
+        ], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=300)
+
+        # Parse the integrated loudness from stderr
+        # Look for line like: "I:        -18.5 LUFS"
+        stderr = result.stderr
+        for line in stderr.split('\n'):
+            line = line.strip()
+            # Look for the summary integrated loudness line
+            if line.startswith('I:') and 'LUFS' in line:
+                # Extract the LUFS value
+                parts = line.split()
+                for i, part in enumerate(parts):
+                    if part == 'LUFS' and i > 0:
+                        try:
+                            lufs = float(parts[i-1])
+                            logger.info(f"[LOUDNESS] Analyzed {filepath}: {lufs} LUFS")
+                            return lufs
+                        except ValueError:
+                            continue
+
+        logger.warning(f"[LOUDNESS] Could not parse LUFS from ffmpeg output for {filepath}")
+        return None
+
+    except subprocess.TimeoutExpired:
+        logger.error(f"[LOUDNESS] Analysis timed out for {filepath}")
+        return None
+    except Exception as e:
+        logger.error(f"[LOUDNESS] Analysis failed for {filepath}: {e}")
+        return None
+
+
 def ensure_durations():
     updated = False
     for video_id, info in metadata.items():
@@ -1543,8 +1589,16 @@ def api_next_video():
                         scheduled = scheduler.get_scheduled_content(canal_id)
                         if scheduled:
                             logger.info(f"[NEXT] Broadcast channel {canal_id}: type={scheduled['type']}, video={scheduled['video_id']}, seek={scheduled.get('seek_to', 0)}")
+
+                            # Get loudness data for automatic volume adjustment
+                            video_id = scheduled["video_id"]
+                            broadcast_metadata = load_metadata()
+                            loudness_lufs = None
+                            if video_id in broadcast_metadata:
+                                loudness_lufs = broadcast_metadata[video_id].get("loudness_lufs")
+
                             return jsonify({
-                                "video_id": scheduled["video_id"],
+                                "video_id": video_id,
                                 "video_url": scheduled["video_url"],
                                 "seek_to": scheduled.get("seek_to", 0),
                                 "title": scheduled.get("title", ""),
@@ -1553,7 +1607,8 @@ def api_next_video():
                                 "canal_nombre": config.get("nombre", canal_id),
                                 "canal_numero": get_canal_numero(canal_id, canales),
                                 "broadcast_type": scheduled["type"],
-                                "is_broadcast": True
+                                "is_broadcast": True,
+                                "loudness_lufs": loudness_lufs
                             })
                     except Exception as e:
                         logger.error(f"[NEXT] Broadcast scheduling error for {canal_id}: {e}")
@@ -2105,7 +2160,7 @@ def upload_series_post():
             # Parse season/episode from filename
             season, episode = parse_episode_info(video_id)
 
-            # Create metadata
+            # Create metadata (loudness_lufs populated later by metadata_daemon)
             series_path = f"series/{series_name}/{video_id}"
             metadata[video_id] = {
                 "title": video_id,
@@ -2270,7 +2325,7 @@ def upload_commercials_post():
             # Move to final location (no transcoding)
             shutil.move(temp_path, final_path)
 
-            # Create metadata with commercials path
+            # Create metadata (loudness_lufs populated later by metadata_daemon)
             commercials_path = f"commercials/{video_id}"
             metadata[video_id] = {
                 "title": video_id,
@@ -3993,6 +4048,18 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"[APP] No se pudo lanzar el NFC reader: {e}")
 
+    # Lanzar metadata daemon para análisis de fondo
+    metadata_daemon_path = str(Path(APP_DIR, "metadata_daemon.py"))
+    metadata_proc = None
+    try:
+        # Kill any existing metadata daemon process
+        subprocess.run(["pkill", "-f", "metadata_daemon.py"], check=False)
+        time.sleep(0.2)
+        metadata_proc = subprocess.Popen(["python3", metadata_daemon_path], start_new_session=True)
+        print("[APP] Metadata daemon launched")
+    except Exception as e:
+        print(f"[APP] No se pudo lanzar el metadata daemon: {e}")
+
     # Start VCR position tracker thread
     _start_vcr_tracker()
     print("[APP] VCR position tracker started")
@@ -4011,6 +4078,9 @@ if __name__ == "__main__":
         if nfc_proc:
             print("[APP] Terminando proceso del NFC reader...")
             nfc_proc.terminate()
+        if metadata_proc:
+            print("[APP] Terminando proceso del metadata daemon...")
+            metadata_proc.terminate()
 
     atexit.register(cleanup)
 
