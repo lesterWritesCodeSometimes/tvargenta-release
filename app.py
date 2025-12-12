@@ -4048,6 +4048,18 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"[APP] No se pudo lanzar el NFC reader: {e}")
 
+    # Lanzar metadata daemon para análisis de fondo
+    metadata_daemon_path = str(Path(APP_DIR, "metadata_daemon.py"))
+    metadata_proc = None
+    try:
+        # Kill any existing metadata daemon process
+        subprocess.run(["pkill", "-f", "metadata_daemon.py"], check=False)
+        time.sleep(0.2)
+        metadata_proc = subprocess.Popen(["python3", metadata_daemon_path], start_new_session=True)
+        print("[APP] Metadata daemon launched")
+    except Exception as e:
+        print(f"[APP] No se pudo lanzar el metadata daemon: {e}")
+
     # Start VCR position tracker thread
     _start_vcr_tracker()
     print("[APP] VCR position tracker started")
@@ -4066,6 +4078,9 @@ if __name__ == "__main__":
         if nfc_proc:
             print("[APP] Terminando proceso del NFC reader...")
             nfc_proc.terminate()
+        if metadata_proc:
+            print("[APP] Terminando proceso del metadata daemon...")
+            metadata_proc.terminate()
 
     atexit.register(cleanup)
 
