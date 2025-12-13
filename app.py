@@ -347,17 +347,6 @@ def parse_episode_info(filename):
             return int(match.group(1)), int(match.group(2))
     return None, None
 
-
-def _safe_int(value, default=1):
-    """Safely convert a value to int, handling strings, None, and invalid values."""
-    if value is None:
-        return default
-    try:
-        return int(value)
-    except (ValueError, TypeError):
-        return default
-
-
 def load_series():
     """Load series data from series.json"""
     try:
@@ -415,20 +404,13 @@ def scan_series_directories():
 
             # Create or update metadata
             if video_id not in metadata or existing.get("series_path") != series_path:
-                # Use existing season/episode if valid, otherwise use parsed values
-                # Ensure values are always integers to avoid type mismatches
-                existing_season = existing.get("season")
-                existing_episode = existing.get("episode")
-                final_season = _safe_int(existing_season, season) if existing_season is not None else season
-                final_episode = _safe_int(existing_episode, episode) if existing_episode is not None else episode
-
                 metadata[video_id] = {
                     "title": existing.get("title") or video_id,
                     "category": "tv_episode",
                     "series": series_name,
                     "series_path": series_path,
-                    "season": final_season,
-                    "episode": final_episode,
+                    "season": existing.get("season") or season,
+                    "episode": existing.get("episode") or episode,
                     "tags": existing.get("tags", []),
                     "personaje": existing.get("personaje", ""),
                     "fecha": existing.get("fecha", ""),
@@ -1962,7 +1944,6 @@ def series_delete(series_name):
     logger.info(f"[SERIES] Deleted series: {series_name} ({len(to_delete)} episodes removed)")
     return redirect(url_for("series_page"))
 
-
 @app.route("/api/series")
 def api_series():
     """Return list of series with episode counts, time_of_day, and episodes grouped by season."""
@@ -1976,18 +1957,15 @@ def api_series():
         episodes = []
         for video_id, v in metadata.items():
             if v.get("category") == "tv_episode" and v.get("series") == name:
-                # Ensure season/episode are always integers to avoid type mismatches
-                season_val = _safe_int(v.get("season"), 1)
-                episode_val = _safe_int(v.get("episode"), 0)
                 episodes.append({
                     "video_id": video_id,
                     "title": v.get("title", video_id),
-                    "season": season_val,
-                    "episode": episode_val,
+                    "season": v.get("season") or 1,
+                    "episode": v.get("episode") or 0,
                     "duration": v.get("duracion", 0)
                 })
 
-        # Group episodes by season (season_num is guaranteed to be int now)
+        # Group episodes by season
         seasons = {}
         for ep in episodes:
             season_num = ep["season"]
@@ -1999,7 +1977,7 @@ def api_series():
         for season_num in seasons:
             seasons[season_num].sort(key=lambda x: (x["episode"], x["title"]))
 
-        # Convert to sorted list of season objects (all keys are int, so sorting works)
+        # Convert to sorted list of season objects
         seasons_list = [
             {"season": s, "episodes": seasons[s]}
             for s in sorted(seasons.keys())
