@@ -11,6 +11,8 @@ import threading
 import os
 import json
 import subprocess
+import fcntl
+from contextlib import contextmanager
 from werkzeug.utils import secure_filename
 import tempfile
 import shutil
@@ -276,7 +278,53 @@ def _ensure_json(path, data):
     path.parent.mkdir(parents=True, exist_ok=True)
     if not path.exists():
         _write_json_atomic(path, data)
-        
+
+
+# =============================================================================
+# METADATA FILE LOCKING
+# =============================================================================
+# Prevents race conditions between app.py and metadata_daemon.py
+# Both processes read/write metadata.json and can overwrite each other's changes
+
+METADATA_LOCK_FILE = CONTENT_DIR / ".metadata.lock"
+
+@contextmanager
+def metadata_lock(timeout=30):
+    """
+    Context manager for exclusive access to metadata.json.
+    Use this when doing read-modify-write operations on metadata.
+
+    Usage:
+        with metadata_lock():
+            data = load_metadata()
+            data[video_id]["field"] = value
+            save_metadata(data)
+    """
+    METADATA_LOCK_FILE.parent.mkdir(parents=True, exist_ok=True)
+    lock_fd = open(METADATA_LOCK_FILE, 'w')
+    try:
+        # Try to acquire exclusive lock with timeout
+        start = time.time()
+        while True:
+            try:
+                fcntl.flock(lock_fd.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+                break  # Lock acquired
+            except BlockingIOError:
+                if time.time() - start > timeout:
+                    raise TimeoutError(f"Could not acquire metadata lock within {timeout}s")
+                time.sleep(0.1)
+        yield
+    finally:
+        fcntl.flock(lock_fd.fileno(), fcntl.LOCK_UN)
+        lock_fd.close()
+
+
+def save_metadata(data):
+    """Save metadata to JSON file with locking (atomic write)."""
+    with metadata_lock():
+        _write_json_atomic(METADATA_FILE, data)
+
+
 def _all_tags_from_tagsfile():
     """Devuelve el set de todos los tags definidos en tags.json."""
     try:
@@ -432,8 +480,7 @@ def scan_series_directories():
     # Save changes
     if changes_made:
         save_series(series_data)
-        with open(METADATA_FILE, "w", encoding="utf-8") as f:
-            json.dump(metadata, f, indent=2, ensure_ascii=False)
+        save_metadata(metadata)
         logger.info("[SERIES] Saved series and metadata updates")
 
 def generate_thumbnail(video_path, thumb_path):
@@ -910,8 +957,7 @@ def ensure_durations():
                 metadata[video_id]["duracion"] = dur
                 updated = True
     if updated:
-        with open(METADATA_FILE, "w", encoding="utf-8") as f:
-            json.dump(metadata, f, indent=2, ensure_ascii=False)
+        save_metadata(metadata)
         print("ðŸ•' Duraciones actualizadas en metadata")
 
 def get_total_recuerdos():
@@ -1153,8 +1199,7 @@ def edit_video(video_id):
                     video_data[key] = metadata[video_id][key]
 
         metadata[video_id] = video_data
-        with open(METADATA_FILE, "w", encoding="utf-8") as f:
-            json.dump(metadata, f, indent=2, ensure_ascii=False)
+        save_metadata(metadata)
         return redirect(url_for("index"))
 
     # Cargar video y tags
@@ -1244,8 +1289,7 @@ def delete_full_video(video_id):
 
     if video_id in metadata:
         del metadata[video_id]
-        with open(METADATA_FILE, "w", encoding="utf-8") as f:
-            json.dump(metadata, f, indent=2, ensure_ascii=False)
+        save_metadata(metadata)
         print(f"âœ… Metadata eliminada: {video_id}")
 
     return redirect(url_for("index"))
@@ -1255,8 +1299,7 @@ def delete_video_metadata(video_id):
     removed_any = False
     if video_id in metadata:
         del metadata[video_id]
-        with open(METADATA_FILE, "w", encoding="utf-8") as f:
-            json.dump(metadata, f, indent=2, ensure_ascii=False)
+        save_metadata(metadata)
         print(f"âœ… Metadata eliminada para: {video_id}")
         removed_any = True
     else:
@@ -1432,8 +1475,7 @@ def delete_tag():
 
         # Guardar ambos archivos
         save_tags(tags_data)
-        with open(METADATA_FILE, "w", encoding="utf-8") as f:
-            json.dump(metadata, f, indent=2, ensure_ascii=False)
+        save_metadata(metadata)
 
         # Eliminar de configuracion.json tambiÃ©n
         config_path = os.path.join(CONTENT_DIR, "configuracion.json")
@@ -1482,8 +1524,7 @@ def delete_group():
             json.dump(config, f, indent=2, ensure_ascii=False)
 
         # Guardar metadata
-        with open(METADATA_FILE, "w", encoding="utf-8") as f:
-            json.dump(metadata, f, indent=2, ensure_ascii=False)
+        save_metadata(metadata)
 
         print(f"ðŸ—‘ Grupo eliminado: {group} (y sus tags)")
 
@@ -1938,8 +1979,7 @@ def series_delete(series_name):
         if thumb_path.exists():
             thumb_path.unlink()
 
-    with open(METADATA_FILE, "w", encoding="utf-8") as f:
-        json.dump(metadata, f, indent=2, ensure_ascii=False)
+    save_metadata(metadata)
 
     logger.info(f"[SERIES] Deleted series: {series_name} ({len(to_delete)} episodes removed)")
     return redirect(url_for("series_page"))
@@ -2203,8 +2243,7 @@ def upload_series_post():
                 os.remove(temp_path)
 
     # Save metadata
-    with open(METADATA_FILE, "w", encoding="utf-8") as f:
-        json.dump(metadata, f, indent=2, ensure_ascii=False)
+    save_metadata(metadata)
 
     return jsonify({"ok": True, "results": results})
 
@@ -2365,8 +2404,7 @@ def upload_commercials_post():
                 os.remove(temp_path)
 
     # Save metadata
-    with open(METADATA_FILE, "w", encoding="utf-8") as f:
-        json.dump(metadata, f, indent=2, ensure_ascii=False)
+    save_metadata(metadata)
 
     return jsonify({"ok": True, "results": results})
 
@@ -2397,8 +2435,7 @@ def delete_commercial(video_id):
 
         # Delete metadata
         del metadata[video_id]
-        with open(METADATA_FILE, "w", encoding="utf-8") as f:
-            json.dump(metadata, f, indent=2, ensure_ascii=False)
+        save_metadata(metadata)
 
         logger.info(f"[COMMERCIALS] Deleted commercial: {video_id}")
         return jsonify({"ok": True})
@@ -2476,8 +2513,7 @@ def delete_movie(video_id):
 
         # Delete metadata
         del metadata[video_id]
-        with open(METADATA_FILE, "w", encoding="utf-8") as f:
-            json.dump(metadata, f, indent=2, ensure_ascii=False)
+        save_metadata(metadata)
 
         logger.info(f"[MOVIES] Deleted movie: {video_id}")
         return jsonify({"ok": True})
@@ -2549,8 +2585,7 @@ def upload_movies_post():
             results.append({"filename": file.filename, "ok": False, "error": str(e)})
 
     # Save metadata
-    with open(METADATA_FILE, "w", encoding="utf-8") as f:
-        json.dump(metadata, f, indent=2, ensure_ascii=False)
+    save_metadata(metadata)
 
     return jsonify({"ok": True, "results": results})
 
