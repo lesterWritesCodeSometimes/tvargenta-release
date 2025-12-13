@@ -27,6 +27,8 @@ import signal
 import subprocess
 import sys
 import time
+import fcntl
+from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
 
@@ -46,6 +48,7 @@ VIDEO_DIR = CONTENT_DIR / "videos"
 SERIES_VIDEO_DIR = VIDEO_DIR / "series"
 COMMERCIALS_DIR = VIDEO_DIR / "commercials"
 METADATA_FILE = CONTENT_DIR / "metadata.json"
+METADATA_LOCK_FILE = CONTENT_DIR / ".metadata.lock"
 THUMB_DIR = CONTENT_DIR / "thumbnails"
 LOG_DIR = CONTENT_DIR / "logs"
 LOG_FILE = LOG_DIR / "metadata_daemon.log"
@@ -87,6 +90,30 @@ def setup_logging():
     return logger
 
 
+@contextmanager
+def metadata_lock(timeout=30):
+    """
+    Context manager for exclusive access to metadata.json.
+    Prevents race conditions with app.py.
+    """
+    METADATA_LOCK_FILE.parent.mkdir(parents=True, exist_ok=True)
+    lock_fd = open(METADATA_LOCK_FILE, 'w')
+    try:
+        start = time.time()
+        while True:
+            try:
+                fcntl.flock(lock_fd.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+                break
+            except BlockingIOError:
+                if time.time() - start > timeout:
+                    raise TimeoutError(f"Could not acquire metadata lock within {timeout}s")
+                time.sleep(0.1)
+        yield
+    finally:
+        fcntl.flock(lock_fd.fileno(), fcntl.LOCK_UN)
+        lock_fd.close()
+
+
 def load_metadata():
     """Load metadata from JSON file."""
     if METADATA_FILE.exists():
@@ -95,10 +122,30 @@ def load_metadata():
     return {}
 
 
-def save_metadata(metadata):
-    """Save metadata to JSON file."""
-    with open(METADATA_FILE, "w", encoding="utf-8") as f:
-        json.dump(metadata, f, indent=2, ensure_ascii=False)
+def save_metadata_fields(video_id, fields_to_update):
+    """
+    Safely update specific fields for a video in metadata.json.
+    Uses locking and reloads fresh data to avoid overwriting other changes.
+
+    Args:
+        video_id: The video ID to update
+        fields_to_update: Dict of field_name -> value to update
+    """
+    with metadata_lock():
+        # Reload fresh metadata to avoid overwriting changes made by app.py
+        current_metadata = load_metadata()
+
+        if video_id in current_metadata:
+            for field, value in fields_to_update.items():
+                current_metadata[video_id][field] = value
+
+            # Atomic write
+            tmp = METADATA_FILE.with_suffix('.json.tmp')
+            with open(tmp, "w", encoding="utf-8") as f:
+                json.dump(current_metadata, f, indent=2, ensure_ascii=False)
+                f.flush()
+                os.fsync(f.fileno())
+            os.replace(tmp, METADATA_FILE)
 
 
 def get_video_path(video_id, info):
@@ -279,18 +326,18 @@ def find_videos_needing_work(metadata):
     return needs_work
 
 
-def process_one_video(video_id, info, missing_fields, metadata):
+def process_one_video(video_id, info, missing_fields):
     """
     Process a single video to populate missing metadata.
-    Returns True if any metadata was updated.
+    Returns dict of fields that were updated, or empty dict if none.
     """
     filepath = get_video_path(video_id, info)
 
     if not filepath.exists():
         logger.warning(f"File not found: {filepath}")
-        return False
+        return {}
 
-    updated = False
+    updates = {}
     category = info.get("category", "unknown")
 
     logger.info(f"Processing: {video_id} ({category})")
@@ -301,9 +348,8 @@ def process_one_video(video_id, info, missing_fields, metadata):
         logger.info(f"  Analyzing duration...")
         duration = get_duration(filepath)
         if duration is not None:
-            metadata[video_id]["duracion"] = duration
+            updates["duracion"] = duration
             logger.info(f"  Duration: {duration:.1f}s")
-            updated = True
         else:
             logger.warning(f"  Duration: FAILED")
 
@@ -311,12 +357,11 @@ def process_one_video(video_id, info, missing_fields, metadata):
     if "loudness_lufs" in missing_fields:
         logger.info(f"  Analyzing loudness...")
         # Pass duration to enable efficient sampling (avoid re-fetching)
-        known_duration = metadata[video_id].get("duracion")
+        known_duration = info.get("duracion") or updates.get("duracion")
         lufs = analyze_loudness(filepath, duration=known_duration)
         if lufs is not None:
-            metadata[video_id]["loudness_lufs"] = lufs
+            updates["loudness_lufs"] = lufs
             logger.info(f"  Loudness: {lufs:.1f} LUFS")
-            updated = True
         else:
             logger.warning(f"  Loudness: FAILED")
 
@@ -331,7 +376,7 @@ def process_one_video(video_id, info, missing_fields, metadata):
         else:
             logger.warning(f"  Thumbnail: FAILED")
 
-    return updated
+    return updates
 
 
 def run_daemon():
@@ -376,11 +421,11 @@ def run_daemon():
                 if not running:
                     break
 
-                updated = process_one_video(video_id, info, missing_fields, metadata)
+                updates = process_one_video(video_id, info, missing_fields)
 
-                if updated:
-                    save_metadata(metadata)
-                    logger.info(f"Saved metadata for {video_id}")
+                if updates:
+                    save_metadata_fields(video_id, updates)
+                    logger.info(f"Saved metadata for {video_id}: {list(updates.keys())}")
 
                 processed_count += 1
 
