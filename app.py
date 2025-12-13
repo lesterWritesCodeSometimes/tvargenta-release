@@ -1351,23 +1351,34 @@ def upload():
             metadata[video_id] = metadata.get(video_id, {})
             metadata[video_id]["duracion"] = duracion
             if width == 800 and height == 480:
-                shutil.copy(temp_path, final_path)
+                # Atomic cutover: move temp file to final path
+                shutil.move(temp_path, final_path)
+                temp_path = None  # Mark as already moved
                 escribir_estado("âœ… Video ya estaba en 800x480. Copiado directo")
                 print(f"âœ… Video ya estaba en 800x480. Copiado directo: {final_path}")
             else:
                 escribir_estado("âœ‚ï¸ Redimensionando video...")
+                # Atomic cutover: transcode to temp file, then rename
+                transcode_temp_path = final_path + ".transcoding"
                 subprocess.run([
                     "ffmpeg", "-i", temp_path,
                     "-vf", "scale=800:480:force_original_aspect_ratio=decrease,pad=800:480:(ow-iw)/2:(oh-ih)/2",
                     "-c:a", "copy",
-                    "-y", final_path
+                    "-y", transcode_temp_path
                 ], check=True)
+                os.replace(transcode_temp_path, final_path)
                 print(f"ðŸŽ› Video procesado con resize y crop: {final_path}")
         except Exception as e:
             escribir_estado(f"âš ï¸ Error al procesar {filename}")
             print(f"âš ï¸ Error al procesar {filename}: {e}")
         finally:
-            os.remove(temp_path)
+            # Only remove temp_path if it still exists (wasn't moved atomically)
+            if temp_path and os.path.exists(temp_path):
+                os.remove(temp_path)
+            # Clean up transcode temp file if left behind
+            transcode_temp_path = final_path + ".transcoding"
+            if os.path.exists(transcode_temp_path):
+                os.remove(transcode_temp_path)
 
         escribir_estado("ðŸ–¼ Generando thumbnail...")
         sanity_check_thumbnails(video_id)
@@ -3810,13 +3821,14 @@ def api_vcr_record_upload():
 
         logger.info(f"[VCR] Receiving upload: tape={tape_uid} video={video_id}")
 
-        # Save the file (Flask has already buffered it)
-        file.save(final_path)
+        # Atomic cutover: save to temp file first, then rename
+        temp_path = final_path + ".uploading"
+        file.save(temp_path)
 
-        # Verify file size
-        file_size = os.path.getsize(final_path)
+        # Verify file size on temp file before committing
+        file_size = os.path.getsize(temp_path)
         if file_size > VCR_MAX_UPLOAD_SIZE:
-            os.unlink(final_path)
+            os.unlink(temp_path)
             _vcr_recording_state_write({
                 "recording": False,
                 "status": "failed",
@@ -3824,6 +3836,9 @@ def api_vcr_record_upload():
             })
             vcr_manager.trigger_vcr_update()
             return jsonify({"ok": False, "error": "file_too_large", "message": "Max file size is 3GB"}), 400
+
+        # Atomic cutover: move temp file to final location
+        os.replace(temp_path, final_path)
 
         # Get video duration using ffprobe
         try:
@@ -3867,6 +3882,12 @@ def api_vcr_record_upload():
 
     except Exception as e:
         logger.error(f"[VCR] Recording failed: {e}")
+        # Clean up temp file if it exists (best effort)
+        try:
+            if 'temp_path' in locals() and temp_path and os.path.exists(temp_path):
+                os.remove(temp_path)
+        except Exception:
+            pass
         _vcr_recording_state_write({
             "recording": False,
             "status": "failed",
