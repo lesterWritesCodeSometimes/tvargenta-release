@@ -98,6 +98,11 @@
             <button type="button" onclick="deleteChannel('{{ key }}', '{{ canal.nombre }}')" class="text-red-400 hover:text-red-300 text-sm">
               {{ tr("canales.card.delete") }}
             </button>
+            {% if canal.series_filter %}
+            <button type="button" onclick="rebuildSchedule('{{ key }}', '{{ canal.nombre }}')" class="text-yellow-400 hover:text-yellow-300 text-sm" id="rebuild-btn-{{ key }}">
+              {{ tr("canales.card.rebuild_schedule") }}
+            </button>
+            {% endif %}
           </div>
         </div>
       </div>
@@ -278,5 +283,47 @@
       document.body.appendChild(form);
       form.submit();
     }
+  }
+
+  function rebuildSchedule(channelId, channelName) {
+    const btn = document.getElementById(`rebuild-btn-${channelId}`);
+    const originalText = btn.textContent;
+
+    // Disable button and show loading state
+    btn.disabled = true;
+    btn.textContent = 'Rebuilding...';
+    btn.classList.add('opacity-50', 'cursor-not-allowed');
+
+    fetch(`/api/rebuild_schedule/${channelId}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    })
+    .then(response => response.json())
+    .then(data => {
+      if (data.ok) {
+        btn.textContent = 'Done!';
+        btn.classList.remove('text-yellow-400', 'hover:text-yellow-300');
+        btn.classList.add('text-green-400');
+        setTimeout(() => {
+          btn.textContent = originalText;
+          btn.classList.remove('text-green-400', 'opacity-50', 'cursor-not-allowed');
+          btn.classList.add('text-yellow-400', 'hover:text-yellow-300');
+          btn.disabled = false;
+        }, 2000);
+      } else {
+        alert(`Error rebuilding schedule: ${data.error || 'Unknown error'}`);
+        btn.textContent = originalText;
+        btn.classList.remove('opacity-50', 'cursor-not-allowed');
+        btn.disabled = false;
+      }
+    })
+    .catch(error => {
+      alert(`Error rebuilding schedule: ${error.message}`);
+      btn.textContent = originalText;
+      btn.classList.remove('opacity-50', 'cursor-not-allowed');
+      btn.disabled = false;
+    });
   }
 {% endblock %}

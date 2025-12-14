@@ -5,6 +5,7 @@
   "canales.card.tags_title": "🎯 Priority tags:",
   "canales.card.edit": "✏️ Edit channel",
   "canales.card.delete": "🗑️ Delete channel",
+  "canales.card.rebuild_schedule": "🔄 Rebuild Schedule",
 
   "canales.form.title_edit": "✏️ Edit channel",
   "canales.form.title_new": "➕ Create a new channel",

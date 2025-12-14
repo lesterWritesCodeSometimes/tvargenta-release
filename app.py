@@ -2692,7 +2692,34 @@ def api_canales():
         "canales": canales_list,
         "canal_activo_nombre": nombre_activo
     })
-    
+
+@app.route("/api/rebuild_schedule/<canal_id>", methods=["POST"])
+def api_rebuild_schedule(canal_id):
+    """Rebuild both weekly and daily schedules for a specific channel."""
+    logger.info(f"[API] Rebuild schedule requested for channel: {canal_id}")
+
+    canales = load_canales()
+    if canal_id not in canales:
+        return jsonify({"ok": False, "error": "Channel not found"}), 404
+
+    canal = canales[canal_id]
+    if not canal.get("series_filter"):
+        return jsonify({"ok": False, "error": "Channel has no series filter (not a broadcast channel)"}), 400
+
+    try:
+        # Rebuild weekly schedule for this channel only
+        scheduler.generate_weekly_schedule(channel_id=canal_id)
+        logger.info(f"[API] Weekly schedule rebuilt for channel: {canal_id}")
+
+        # Rebuild daily schedule for this channel only
+        scheduler.generate_daily_schedule(channel_id=canal_id)
+        logger.info(f"[API] Daily schedule rebuilt for channel: {canal_id}")
+
+        return jsonify({"ok": True, "message": f"Schedule rebuilt successfully for {canal['nombre']}"})
+    except Exception as e:
+        logger.error(f"[API] Error rebuilding schedule for {canal_id}: {e}")
+        return jsonify({"ok": False, "error": str(e)}), 500
+
 @app.route("/tv")
 def tv():
     logger.info(_hdr("HIT /tv (render player)"))

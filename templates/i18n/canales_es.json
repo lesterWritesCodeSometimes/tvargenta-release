@@ -5,6 +5,7 @@
   "canales.card.tags_title": "🎯 Tags prioridad:",
   "canales.card.edit": "✏️ Editar canal",
   "canales.card.delete": "🗑️ Eliminar canal",
+  "canales.card.rebuild_schedule": "🔄 Reconstruir Grilla",
 
   "canales.form.title_edit": "✏️ Editar canal",
   "canales.form.title_new": "➕ Crear un nuevo canal",

@@ -5,6 +5,7 @@
   "canales.card.tags_title": "🎯 Prioritäts-Tags:",
   "canales.card.edit": "✏️ Kanal bearbeiten",
   "canales.card.delete": "🗑️ Kanal löschen",
+  "canales.card.rebuild_schedule": "🔄 Zeitplan neu erstellen",
 
   "canales.form.title_edit": "✏️ Kanal bearbeiten",
   "canales.form.title_new": "➕ Neuen Kanal erstellen",
