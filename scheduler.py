@@ -562,12 +562,19 @@ def get_eligible_series_for_time(time_of_day: str, channel_series: List[str],
     return eligible
 
 
-def generate_weekly_schedule() -> dict:
+def generate_weekly_schedule(channel_id: str = None) -> dict:
     """
     Generate a new weekly schedule.
     Assigns series to time-of-day slots for each channel with series_filter.
+
+    Args:
+        channel_id: Optional. If provided, only regenerates for this specific channel,
+                   preserving the existing schedule for other channels.
     """
-    logger.info("[SCHEDULER] Generating weekly schedule...")
+    if channel_id:
+        logger.info(f"[SCHEDULER] Generating weekly schedule for channel: {channel_id}")
+    else:
+        logger.info("[SCHEDULER] Generating weekly schedule for all channels...")
 
     canales = load_canales()
     series_data = load_series()
@@ -579,13 +586,28 @@ def generate_weekly_schedule() -> dict:
         days_since_sunday = 0
     week_start = (now - timedelta(days=days_since_sunday)).date()
 
-    schedule = {
-        "generated_at": now.isoformat(),
-        "week_start": str(week_start),
-        "channels": {}
-    }
+    # If regenerating for a single channel, load existing schedule first
+    if channel_id:
+        schedule = load_weekly_schedule()
+        if not schedule:
+            schedule = {
+                "generated_at": now.isoformat(),
+                "week_start": str(week_start),
+                "channels": {}
+            }
+        # Update timestamp
+        schedule["generated_at"] = now.isoformat()
+        schedule["week_start"] = str(week_start)
+        channels_to_process = {channel_id: canales.get(channel_id, {})}
+    else:
+        schedule = {
+            "generated_at": now.isoformat(),
+            "week_start": str(week_start),
+            "channels": {}
+        }
+        channels_to_process = canales
 
-    for channel_id, config in canales.items():
+    for cid, config in channels_to_process.items():
         series_filter = config.get("series_filter", [])
         if not series_filter:
             continue  # Skip non-series channels
@@ -598,7 +620,7 @@ def generate_weekly_schedule() -> dict:
             if not eligible:
                 # No eligible series for this time - will show test pattern
                 channel_schedule["time_slots"][time_of_day] = ["__test_pattern__"] * slot_count
-                logger.warning(f"[SCHEDULER] No eligible series for {channel_id} during {time_of_day}")
+                logger.warning(f"[SCHEDULER] No eligible series for {cid} during {time_of_day}")
                 continue
 
             # Fill slots with series using back-to-back probability
@@ -613,10 +635,14 @@ def generate_weekly_schedule() -> dict:
 
             channel_schedule["time_slots"][time_of_day] = slots[:slot_count]
 
-        schedule["channels"][channel_id] = channel_schedule
+        schedule["channels"][cid] = channel_schedule
 
     save_weekly_schedule(schedule)
-    logger.info(f"[SCHEDULER] Weekly schedule generated for {len(schedule['channels'])} channels")
+
+    if channel_id:
+        logger.info(f"[SCHEDULER] Weekly schedule regenerated for channel: {channel_id}")
+    else:
+        logger.info(f"[SCHEDULER] Weekly schedule generated for {len(schedule['channels'])} channels")
 
     return schedule
 
@@ -868,13 +894,20 @@ def generate_block_schedule(block_start_second: int,
     return entries
 
 
-def generate_daily_schedule() -> dict:
+def generate_daily_schedule(channel_id: str = None) -> dict:
     """
     Generate a new daily schedule.
     Creates second-by-second (actually range-based) mapping for each channel.
     Schedule runs from 4am today to 3am tomorrow, with test pattern 3am-4am.
+
+    Args:
+        channel_id: Optional. If provided, only regenerates for this specific channel,
+                   preserving the existing schedule for other channels.
     """
-    logger.info("[SCHEDULER] Generating daily schedule...")
+    if channel_id:
+        logger.info(f"[SCHEDULER] Generating daily schedule for channel: {channel_id}")
+    else:
+        logger.info("[SCHEDULER] Generating daily schedule for all channels...")
 
     ensure_system_videos_exist()
 
@@ -894,22 +927,41 @@ def generate_daily_schedule() -> dict:
     valid_until = datetime.combine(schedule_date + timedelta(days=1),
                                    datetime.min.time().replace(hour=3))
 
-    schedule = {
-        "generated_at": now.isoformat(),
-        "schedule_date": str(schedule_date),
-        "valid_from": valid_from.isoformat(),
-        "valid_until": valid_until.isoformat(),
-        "channels": {}
-    }
+    # If regenerating for a single channel, load existing schedule first
+    if channel_id:
+        schedule = load_daily_schedule()
+        if not schedule:
+            schedule = {
+                "generated_at": now.isoformat(),
+                "schedule_date": str(schedule_date),
+                "valid_from": valid_from.isoformat(),
+                "valid_until": valid_until.isoformat(),
+                "channels": {}
+            }
+        # Update timestamps
+        schedule["generated_at"] = now.isoformat()
+        schedule["schedule_date"] = str(schedule_date)
+        schedule["valid_from"] = valid_from.isoformat()
+        schedule["valid_until"] = valid_until.isoformat()
+        channels_to_process = {channel_id: canales.get(channel_id, {})}
+    else:
+        schedule = {
+            "generated_at": now.isoformat(),
+            "schedule_date": str(schedule_date),
+            "valid_from": valid_from.isoformat(),
+            "valid_until": valid_until.isoformat(),
+            "channels": {}
+        }
+        channels_to_process = canales
 
-    for channel_id, config in canales.items():
+    for cid, config in channels_to_process.items():
         series_filter = config.get("series_filter", [])
         if not series_filter:
             continue
 
-        channel_weekly = weekly_schedule.get("channels", {}).get(channel_id, {})
+        channel_weekly = weekly_schedule.get("channels", {}).get(cid, {})
         if not channel_weekly:
-            logger.warning(f"[SCHEDULER] No weekly schedule for channel {channel_id}")
+            logger.warning(f"[SCHEDULER] No weekly schedule for channel {cid}")
             continue
 
         time_slots = channel_weekly.get("time_slots", {})
@@ -961,7 +1013,7 @@ def generate_daily_schedule() -> dict:
 
             # Get episodes for this block
             # First, peek at next episode to determine block structure
-            next_ep = peek_next_episode_for_channel(channel_id, series_name, 0, cursors, metadata)
+            next_ep = peek_next_episode_for_channel(cid, series_name, 0, cursors, metadata)
 
             if not next_ep:
                 # No episodes - show test pattern
@@ -981,7 +1033,7 @@ def generate_daily_schedule() -> dict:
             episodes_needed = block_structure.get("episodes_per_block", 1)
 
             for i in range(episodes_needed):
-                ep = get_next_episode_for_channel(channel_id, series_name, cursors, metadata)
+                ep = get_next_episode_for_channel(cid, series_name, cursors, metadata)
                 if ep:
                     block_episodes.append(ep)
 
@@ -1045,13 +1097,16 @@ def generate_daily_schedule() -> dict:
                 )
                 channel_entries.extend(block_entries)
 
-        schedule["channels"][channel_id] = channel_entries
+        schedule["channels"][cid] = channel_entries
 
     # Save cursors (they were modified during generation)
     save_episode_cursors(cursors)
     save_daily_schedule(schedule)
 
-    logger.info(f"[SCHEDULER] Daily schedule generated for {len(schedule['channels'])} channels")
+    if channel_id:
+        logger.info(f"[SCHEDULER] Daily schedule regenerated for channel: {channel_id}")
+    else:
+        logger.info(f"[SCHEDULER] Daily schedule generated for {len(schedule['channels'])} channels")
     return schedule
 
 
