@@ -2,21 +2,26 @@
 """
 Metadata Population Daemon for TVArgenta
 
-Background service that populates missing metadata for videos:
+Background service that populates missing metadata for videos using a two-phase approach:
+
+Phase 1 (Fast Metadata):
 - duracion: Video duration in seconds
-- loudness_lufs: Audio loudness in LUFS for volume normalization
 - thumbnails: Preview images for the UI
 
-Runs with low resource priority to avoid impacting system performance.
+Phase 2 (Loudness Analysis):
+- loudness_lufs: Audio loudness in LUFS for volume normalization
+
+Runs with low resource priority (nice/ionice) but processes videos continuously
+without throttling between them.
 
 Usage:
     python3 metadata_daemon.py
 
 The daemon will:
-1. Periodically scan for videos missing metadata
-2. Process one video at a time with throttling
-3. Use nice/ionice for low CPU/IO priority
-4. Sleep between videos to avoid resource contention
+1. Phase 1: Process ALL videos for duration and thumbnails (fast)
+2. Phase 2: Process ALL videos for loudness analysis (slow)
+3. Sleep only when all metadata is complete
+4. Use nice/ionice for low CPU/IO priority
 5. Log all activity to content/logs/metadata_daemon.log
 """
 
@@ -33,9 +38,7 @@ from datetime import datetime
 from pathlib import Path
 
 # Configuration
-CHECK_INTERVAL = 300          # Seconds between scans when idle (5 minutes)
-SLEEP_BETWEEN_VIDEOS = 60     # Seconds to sleep between processing videos
-BATCH_SIZE = 10               # Process up to N videos before re-checking queue
+CHECK_INTERVAL = 300          # Seconds between scans when all metadata is complete (5 minutes)
 NICE_LEVEL = 19               # Lowest CPU priority (19 = nicest)
 IONICE_CLASS = 2              # Best-effort I/O class
 IONICE_PRIORITY = 7           # Lowest priority within best-effort (0-7)
@@ -297,9 +300,10 @@ def generate_thumbnail(video_path, thumb_path):
     return success
 
 
-def find_videos_needing_work(metadata):
+def find_videos_needing_fast_metadata(metadata):
     """
-    Find videos that are missing metadata or thumbnails.
+    Phase 1: Find videos missing duration or thumbnails.
+    These are fast operations that should complete quickly.
     Returns list of (video_id, info, missing_fields) tuples.
     """
     needs_work = []
@@ -311,10 +315,6 @@ def find_videos_needing_work(metadata):
         if info.get("duracion") is None:
             missing.append("duracion")
 
-        # Check for missing loudness
-        if info.get("loudness_lufs") is None:
-            missing.append("loudness_lufs")
-
         # Check for missing thumbnail
         thumb_path = THUMB_DIR / f"{video_id}.jpg"
         if not thumb_path.exists():
@@ -322,6 +322,22 @@ def find_videos_needing_work(metadata):
 
         if missing:
             needs_work.append((video_id, info, missing))
+
+    return needs_work
+
+
+def find_videos_needing_loudness(metadata):
+    """
+    Phase 2: Find videos missing loudness analysis.
+    This is a slower operation that requires full audio processing.
+    Returns list of (video_id, info, missing_fields) tuples.
+    """
+    needs_work = []
+
+    for video_id, info in metadata.items():
+        # Check for missing loudness
+        if info.get("loudness_lufs") is None:
+            needs_work.append((video_id, info, ["loudness_lufs"]))
 
     return needs_work
 
@@ -379,18 +395,62 @@ def process_one_video(video_id, info, missing_fields):
     return updates
 
 
+def run_phase(phase_name, find_func):
+    """
+    Run a single phase of metadata processing.
+    Processes all videos without throttling between them.
+
+    Args:
+        phase_name: Name of the phase for logging
+        find_func: Function to find videos needing work for this phase
+
+    Returns:
+        Number of videos processed
+    """
+    global running
+
+    metadata = load_metadata()
+    if not metadata:
+        return 0
+
+    needs_work = find_func(metadata)
+    if not needs_work:
+        return 0
+
+    total = len(needs_work)
+    logger.info(f"[{phase_name}] Found {total} videos to process")
+
+    processed = 0
+    for video_id, info, missing_fields in needs_work:
+        if not running:
+            break
+
+        logger.info(f"[{phase_name}] Processing {processed + 1}/{total}: {video_id}")
+        updates = process_one_video(video_id, info, missing_fields)
+
+        if updates:
+            save_metadata_fields(video_id, updates)
+            logger.info(f"[{phase_name}] Saved: {list(updates.keys())}")
+
+        processed += 1
+
+    logger.info(f"[{phase_name}] Complete - processed {processed} videos")
+    return processed
+
+
 def run_daemon():
-    """Main daemon loop."""
+    """Main daemon loop with two-phase processing."""
     global running
 
     logger.info("TVArgenta Metadata Daemon starting...")
     logger.info(f"Configuration:")
     logger.info(f"  Check interval (idle): {CHECK_INTERVAL}s")
-    logger.info(f"  Sleep between videos: {SLEEP_BETWEEN_VIDEOS}s")
-    logger.info(f"  Batch size: {BATCH_SIZE}")
     logger.info(f"  Nice level: {NICE_LEVEL}")
     logger.info(f"  I/O class: {IONICE_CLASS} (best-effort), priority: {IONICE_PRIORITY}")
     logger.info(f"  Log file: {LOG_FILE}")
+    logger.info(f"Two-phase operation:")
+    logger.info(f"  Phase 1: Duration + Thumbnails (fast)")
+    logger.info(f"  Phase 2: Loudness Analysis (slow)")
 
     while running:
         try:
@@ -402,46 +462,34 @@ def run_daemon():
                 time.sleep(CHECK_INTERVAL)
                 continue
 
-            # Find videos needing work
-            needs_work = find_videos_needing_work(metadata)
+            # Check if any work is needed
+            fast_work = find_videos_needing_fast_metadata(metadata)
+            loudness_work = find_videos_needing_loudness(metadata)
 
-            if not needs_work:
+            if not fast_work and not loudness_work:
                 logger.info(f"All videos have complete metadata, sleeping {CHECK_INTERVAL}s...")
                 time.sleep(CHECK_INTERVAL)
                 continue
 
-            total_pending = len(needs_work)
-            logger.info(f"Found {total_pending} videos needing metadata")
+            # Phase 1: Fast metadata (duration + thumbnails)
+            if fast_work and running:
+                logger.info("=" * 50)
+                logger.info("PHASE 1: Fast Metadata (duration + thumbnails)")
+                logger.info("=" * 50)
+                run_phase("Phase 1", find_videos_needing_fast_metadata)
 
-            # Process up to BATCH_SIZE videos
-            batch = needs_work[:BATCH_SIZE]
-            processed_count = 0
+            # Phase 2: Loudness analysis
+            if running:
+                # Reload metadata to get fresh state after phase 1
+                loudness_work = find_videos_needing_loudness(load_metadata())
+                if loudness_work:
+                    logger.info("=" * 50)
+                    logger.info("PHASE 2: Loudness Analysis")
+                    logger.info("=" * 50)
+                    run_phase("Phase 2", find_videos_needing_loudness)
 
-            for i, (video_id, info, missing_fields) in enumerate(batch):
-                if not running:
-                    break
-
-                updates = process_one_video(video_id, info, missing_fields)
-
-                if updates:
-                    save_metadata_fields(video_id, updates)
-                    logger.info(f"Saved metadata for {video_id}: {list(updates.keys())}")
-
-                processed_count += 1
-
-                # Sleep between videos (but not after the last one in batch)
-                if running and i < len(batch) - 1:
-                    logger.info(f"Processed {processed_count}/{len(batch)} in batch, sleeping {SLEEP_BETWEEN_VIDEOS}s...")
-                    time.sleep(SLEEP_BETWEEN_VIDEOS)
-
-            # After batch: check if more work remains
-            remaining = total_pending - processed_count
-            if remaining > 0:
-                logger.info(f"Batch complete ({processed_count} processed), {remaining} remaining - checking immediately...")
-                # Don't sleep - loop back to check for more work
-            else:
-                logger.info(f"All caught up ({processed_count} processed), sleeping {CHECK_INTERVAL}s...")
-                time.sleep(CHECK_INTERVAL)
+            # After both phases complete, loop back to check for new videos
+            logger.info("Both phases complete, checking for new videos...")
 
         except KeyboardInterrupt:
             logger.info("Interrupted by keyboard")
