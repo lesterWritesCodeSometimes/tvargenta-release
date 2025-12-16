@@ -1044,8 +1044,7 @@
 	  }
 	  currentFetchController = new AbortController();
 
-	  // Stop current video immediately for faster perceived response
-	  video.pause();
+	  // Note: video.pause() moved to after fetch to allow fade-out for same-channel transitions
 
 	  // Stop VCR polling immediately to prevent race condition where VCR poll
 	  // restarts playback during async fetch (will be restarted if staying on ch 03)
@@ -1108,25 +1107,68 @@
 		  // Solo cambiamos el src si verdaderamente cambia el video o es forzado
 		  if (cambioDeVideo ) {
 			currentVideo = data.video_id;
-			video.src = data.video_url || `/videos/${data.video_id}.mp4`;
-			video.load();
 
-			// For broadcast channels, seek to the scheduled timestamp after loading
-			if (isBroadcast && seekTo > 0) {
-			  video.addEventListener('loadedmetadata', function seekHandler() {
-				video.currentTime = seekTo;
-				video.removeEventListener('loadedmetadata', seekHandler);
-				console.log(`[TV] Broadcast seek to ${seekTo}s`);
-			  }, { once: true });
+			// Calculate target volume (with loudness adjustment for broadcast)
+			let targetVolume = 1.0;
+			if (isBroadcast && data.loudness_lufs !== null && data.loudness_lufs !== undefined) {
+			  const TARGET_LUFS = -16;
+			  const dbOffset = TARGET_LUFS - data.loudness_lufs;
+			  const volumeScale = Math.pow(10, dbOffset / 20);
+			  targetVolume = Math.max(0.05, Math.min(1, baseVolume * volumeScale));
 			}
 
-			video.play().catch(e => console.warn("[TV] play() rechazado:", e));
+			// Helper to load and start the new video
+			const loadAndPlayNewVideo = () => {
+			  video.src = data.video_url || `/videos/${data.video_id}.mp4`;
+			  video.load();
+
+			  // For broadcast channels, seek to the scheduled timestamp after loading
+			  if (isBroadcast && seekTo > 0) {
+				video.addEventListener('loadedmetadata', function seekHandler() {
+				  video.currentTime = seekTo;
+				  video.removeEventListener('loadedmetadata', seekHandler);
+				  console.log(`[TV] Broadcast seek to ${seekTo}s`);
+				}, { once: true });
+			  }
+
+			  // Fade audio in for same-channel transitions (avoid pop)
+			  if (!cambioDeCanal) {
+				video.volume = 0;
+				video.play().catch(e => console.warn("[TV] play() rechazado:", e));
+				const fadeIn = setInterval(() => {
+				  if (video.volume < targetVolume - 0.1) {
+					video.volume = Math.min(targetVolume, video.volume + 0.15);
+				  } else {
+					video.volume = targetVolume;
+					clearInterval(fadeIn);
+				  }
+				}, 20);
+			  } else {
+				// Channel change: play immediately (keep the pop), then apply loudness
+				video.play().catch(e => console.warn("[TV] play() rechazado:", e));
+				video.volume = targetVolume;
+			  }
+			};
+
+			// Same-channel video change: fade out audio first
+			if (!cambioDeCanal && !video.paused && video.volume > 0) {
+			  const fadeOut = setInterval(() => {
+				if (video.volume > 0.1) {
+				  video.volume = Math.max(0, video.volume - 0.15);
+				} else {
+				  video.volume = 0;
+				  clearInterval(fadeOut);
+				  video.pause();
+				  loadAndPlayNewVideo();
+				}
+			  }, 20);
+			} else {
+			  // Channel change or video was paused: immediate transition (pop for channel changes)
+			  video.pause();
+			  loadAndPlayNewVideo();
+			}
 			// Channel badge removed for immersion
-
-			// Apply loudness-based volume normalization for broadcast content
-			if (isBroadcast) {
-			  applyLoudnessVolumeAdjustment(data.loudness_lufs);
-			}
+			// Note: loudness normalization now handled inline with fade logic above
 
 			// --- armado del umbral de "play real" ---
 			// Skip play reporting for broadcast system videos (test pattern, commercials)
