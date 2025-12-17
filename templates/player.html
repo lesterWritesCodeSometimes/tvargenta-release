@@ -942,29 +942,35 @@
 
 
 	
-	 // Persistent audio context to keep DAC alive and prevent pops between videos
+	 // Persistent audio context - routes video audio through Web Audio API to prevent DAC pops
 	let persistentAudioCtx = null;
+	let videoSourceNode = null;
+	let silentOscillator = null;
 
 	async function warmupAudio() {
 		try {
-		  // Create a persistent AudioContext that stays open forever
+		  // Create a persistent AudioContext
 		  persistentAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
 
-		  // Create a low-frequency tone to keep DAC active
-		  const oscillator = persistentAudioCtx.createOscillator();
+		  // Route video element's audio through this AudioContext
+		  // This makes video audio and Web Audio use the same ALSA stream
+		  videoSourceNode = persistentAudioCtx.createMediaElementSource(video);
+		  videoSourceNode.connect(persistentAudioCtx.destination);
+
+		  // Create a silent oscillator to keep the stream alive between videos
+		  silentOscillator = persistentAudioCtx.createOscillator();
 		  const gainNode = persistentAudioCtx.createGain();
 
-		  oscillator.frequency.value = 440;  // A4 note - very obvious
-		  gainNode.gain.value = 0.3;        // LOUD - for testing only
+		  silentOscillator.frequency.value = 1;    // Inaudible
+		  gainNode.gain.value = 0.001;             // Essentially silent
 
-		  oscillator.connect(gainNode);
+		  silentOscillator.connect(gainNode);
 		  gainNode.connect(persistentAudioCtx.destination);
-		  oscillator.start();
-		  // Never stop - keeps ALSA buffer fed to prevent DAC pop
+		  silentOscillator.start();
 
 		  // Small delay to let audio hardware stabilize
 		  await new Promise(r => setTimeout(r, 120));
-		  console.log('[PLAYER] Audio bridge started (persistent)');
+		  console.log('[PLAYER] Video audio routed through Web Audio API (persistent)');
 		} catch (e) {
 		  console.warn('[PLAYER] Audio warm-up failed:', e);
 		}
