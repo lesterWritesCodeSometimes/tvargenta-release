@@ -951,11 +951,27 @@
 		try {
 		  // Create a persistent AudioContext
 		  persistentAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+		  console.log('[PLAYER] AudioContext created, state:', persistentAudioCtx.state);
+
+		  // Try to resume if suspended (may fail without user interaction)
+		  if (persistentAudioCtx.state === 'suspended') {
+			try {
+			  await persistentAudioCtx.resume();
+			  console.log('[PLAYER] AudioContext resumed, state:', persistentAudioCtx.state);
+			} catch (e) {
+			  console.log('[PLAYER] AudioContext resume deferred until user interaction');
+			}
+		  }
 
 		  // Route video element's audio through this AudioContext
 		  // This makes video audio and Web Audio use the same ALSA stream
+		  if (!video) {
+			console.error('[PLAYER] Video element not found!');
+			return;
+		  }
 		  videoSourceNode = persistentAudioCtx.createMediaElementSource(video);
 		  videoSourceNode.connect(persistentAudioCtx.destination);
+		  console.log('[PLAYER] Video element connected to AudioContext');
 
 		  // Create a silent oscillator to keep the stream alive between videos
 		  silentOscillator = persistentAudioCtx.createOscillator();
@@ -970,7 +986,7 @@
 
 		  // Small delay to let audio hardware stabilize
 		  await new Promise(r => setTimeout(r, 120));
-		  console.log('[PLAYER] Video audio routed through Web Audio API (persistent)');
+		  console.log('[PLAYER] Audio bridge ready, AudioContext state:', persistentAudioCtx.state);
 		} catch (e) {
 		  console.warn('[PLAYER] Audio warm-up failed:', e);
 		}
@@ -1002,6 +1018,10 @@
 	document.addEventListener('click', () => {
 	  video.muted = false;
 	  updateMuteIndicatorFromVol();
+	  // Resume AudioContext if suspended (required after user interaction)
+	  if (persistentAudioCtx && persistentAudioCtx.state === 'suspended') {
+		persistentAudioCtx.resume();
+	  }
 	  video.play();
 	}, { once: true });
 
