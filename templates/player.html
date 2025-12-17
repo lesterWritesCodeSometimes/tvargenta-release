@@ -950,12 +950,12 @@
 		  // Create a persistent AudioContext that stays open forever
 		  persistentAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
 
-		  // Create a silent oscillator at sub-audible frequency
+		  // Create a low-frequency tone to keep DAC active
 		  const oscillator = persistentAudioCtx.createOscillator();
 		  const gainNode = persistentAudioCtx.createGain();
 
-		  oscillator.frequency.value = 1; // 1 Hz - completely inaudible
-		  gainNode.gain.value = 0.001;    // Nearly silent, but keeps stream active
+		  oscillator.frequency.value = 60;  // Low hum (mains frequency - blends naturally)
+		  gainNode.gain.value = 0.02;       // Quiet but audible enough to keep DAC alive
 
 		  oscillator.connect(gainNode);
 		  gainNode.connect(persistentAudioCtx.destination);
