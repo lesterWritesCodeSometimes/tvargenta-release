@@ -1146,7 +1146,21 @@
 			  }, { once: true });
 			}
 
-			video.play().catch(e => console.warn("[TV] play() rechazado:", e));
+			// Wait for video to be ready before playing to avoid frozen state on rapid switching
+			const playWhenReady = () => {
+			  // Double-check this is still the current request before playing
+			  if (thisRequest !== requestSequence) {
+				console.debug("[TV] Skipping play - stale request");
+				return;
+			  }
+			  video.play().catch(e => console.warn("[TV] play() rechazado:", e));
+			};
+
+			if (video.readyState >= 3) { // HAVE_FUTURE_DATA or higher
+			  playWhenReady();
+			} else {
+			  video.addEventListener('canplay', playWhenReady, { once: true });
+			}
 			// Channel badge removed for immersion
 
 			// Apply loudness-based volume normalization for broadcast content
@@ -1383,7 +1397,16 @@
 			  }, { once: true });
 			}
 
-			video.play().catch(e => console.warn("[TV] play() rechazado:", e));
+			// Wait for video to be ready before playing
+			const playBroadcast = () => {
+			  if (seqBeforeFetch !== requestSequence) return; // Stale
+			  video.play().catch(e => console.warn("[TV] play() rechazado:", e));
+			};
+			if (video.readyState >= 3) {
+			  playBroadcast();
+			} else {
+			  video.addEventListener('canplay', playBroadcast, { once: true });
+			}
 
 			// Apply loudness-based volume normalization
 			applyLoudnessVolumeAdjustment(data.loudness_lufs);
