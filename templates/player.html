@@ -762,9 +762,9 @@
 	
 	video.addEventListener('volumechange', () => {
 	  if (video.volume === 0 || video.muted) {
-		mostrarIconoMute(true);
+		setMuteVisible(true);
 	  } else {
-		mostrarIconoMute(false);
+		setMuteVisible(false);
 	  }
 	});
 	
@@ -800,6 +800,12 @@
 	 * @param {number|null} contentLufs - LUFS of current content
 	 */
 	function applyLoudnessVolumeAdjustment(contentLufs) {
+	  // Respect user's mute setting (baseVolume = 0)
+	  if (baseVolume <= 0.001) {
+		video.volume = 0;
+		return;
+	  }
+
 	  if (contentLufs === null || contentLufs === undefined) {
 		// No loudness data - use base volume
 		video.volume = baseVolume;
@@ -815,7 +821,7 @@
 	  // Convert dB to linear scale
 	  const volumeScale = Math.pow(10, dbOffset / 20);
 
-	  // Apply to base volume, clamping to valid range
+	  // Apply to base volume, clamping to valid range (min 5% when not muted)
 	  const adjustedVolume = Math.max(0.05, Math.min(1, baseVolume * volumeScale));
 
 	  video.volume = adjustedVolume;
