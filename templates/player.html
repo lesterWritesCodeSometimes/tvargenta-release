@@ -2816,6 +2816,9 @@ function ejecutarSeleccion() {
   let vcrState = null;
   let vcrPollInterval = null;
   let vcrNoiseInterval = null;
+  let vcrNoiseImageData = null;  // Reusable ImageData to avoid allocations
+  let vcrNoiseLastWidth = 0;
+  let vcrNoiseLastHeight = 0;
   let currentChannelId = null;
   let lastVcrTriggerMtime = 0;
   let vcrStaticTransitionActive = false;  // True while showing static transition
@@ -2982,18 +2985,28 @@ function ejecutarSeleccion() {
   function renderWhiteNoise() {
     if (!vcrNoiseCanvas) return;
     const ctx = vcrNoiseCanvas.getContext('2d');
-    vcrNoiseCanvas.width = window.innerWidth;
-    vcrNoiseCanvas.height = window.innerHeight;
+    const w = window.innerWidth;
+    const h = window.innerHeight;
 
-    const imageData = ctx.createImageData(vcrNoiseCanvas.width, vcrNoiseCanvas.height);
-    for (let i = 0; i < imageData.data.length; i += 4) {
-      const v = Math.random() * 255;
-      imageData.data[i] = v;     // R
-      imageData.data[i+1] = v;   // G
-      imageData.data[i+2] = v;   // B
-      imageData.data[i+3] = 255; // A
+    // Only resize canvas and recreate ImageData when dimensions change
+    if (w !== vcrNoiseLastWidth || h !== vcrNoiseLastHeight) {
+      vcrNoiseCanvas.width = w;
+      vcrNoiseCanvas.height = h;
+      vcrNoiseImageData = ctx.createImageData(w, h);
+      vcrNoiseLastWidth = w;
+      vcrNoiseLastHeight = h;
     }
-    ctx.putImageData(imageData, 0, 0);
+
+    // Reuse the cached ImageData object
+    const data = vcrNoiseImageData.data;
+    for (let i = 0; i < data.length; i += 4) {
+      const v = Math.random() * 255;
+      data[i] = v;       // R
+      data[i+1] = v;     // G
+      data[i+2] = v;     // B
+      data[i+3] = 255;   // A
+    }
+    ctx.putImageData(vcrNoiseImageData, 0, 0);
   }
 
   function startWhiteNoise() {
@@ -3006,6 +3019,10 @@ function ejecutarSeleccion() {
       clearInterval(vcrNoiseInterval);
       vcrNoiseInterval = null;
     }
+    // Free cached ImageData to release memory
+    vcrNoiseImageData = null;
+    vcrNoiseLastWidth = 0;
+    vcrNoiseLastHeight = 0;
   }
 
   function hideAllVcrScreens() {
