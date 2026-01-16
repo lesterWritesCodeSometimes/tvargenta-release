@@ -1,5 +1,5 @@
 // TVArgenta - encoder + LED de estado en GPIO25
-// Compila con libgpiod 1.6.3: gcc -O2 -o encoder_reader encoder_reader.c -lgpiod
+// Compila con libgpiod 2.x: gcc -O2 -o encoder_reader encoder_reader.c -lgpiod
 // LED ON mientras el proceso está vivo; OFF al salir (CTRL+C o shutdown).
 // Wiring: LED -> GPIO25, otra pata -> GND.
 
@@ -11,34 +11,41 @@
 #include <string.h>
 #include <signal.h>
 
-#define CHIP "/dev/gpiochip0"
-#define NEXT 3 
-#define CLK  23
-#define DT   17
-#define SW   27
-#define LED  25
+#define CHIP_PATH "/dev/gpiochip0"
 
-static struct gpiod_line *next_btn = NULL;
+// GPIO pin definitions
+#define PIN_NEXT 3
+#define PIN_CLK  23
+#define PIN_DT   17
+#define PIN_SW   27
+#define PIN_LED  25
+
+// Line indices within our requests
+#define IDX_CLK  0
+#define IDX_DT   1
+#define IDX_SW   2
+#define IDX_NEXT 3
+
 static struct gpiod_chip *chip = NULL;
-static struct gpiod_line *clk  = NULL;
-static struct gpiod_line *dt   = NULL;
-static struct gpiod_line *sw   = NULL;
-static struct gpiod_line *led  = NULL;
+static struct gpiod_line_request *input_request = NULL;
+static struct gpiod_line_request *led_request = NULL;
 static volatile sig_atomic_t running = 1;
 
 static void cleanup(void) {
-    // Apagar LED y soltar líneas al salir
-    if (led) {
-        // Ignorar errores si ya no está disponible
-        gpiod_line_set_value(led, 0);
-        gpiod_line_release(led);
-        led = NULL;
+    // Turn off LED and release resources
+    if (led_request) {
+        gpiod_line_request_set_value(led_request, PIN_LED, GPIOD_LINE_VALUE_INACTIVE);
+        gpiod_line_request_release(led_request);
+        led_request = NULL;
     }
-    if (clk)  { gpiod_line_release(clk);  clk  = NULL; }
-    if (dt)   { gpiod_line_release(dt);   dt   = NULL; }
-    if (sw)   { gpiod_line_release(sw);   sw   = NULL; }
-    if (chip) { gpiod_chip_close(chip);   chip = NULL; }
-	if (next_btn) { gpiod_line_release(next_btn); next_btn = NULL; }
+    if (input_request) {
+        gpiod_line_request_release(input_request);
+        input_request = NULL;
+    }
+    if (chip) {
+        gpiod_chip_close(chip);
+        chip = NULL;
+    }
 }
 
 static void on_signal(int sig) {
@@ -47,96 +54,177 @@ static void on_signal(int sig) {
 }
 
 int main(void) {
-    // Señales para finalizar prolijo (apaga LED)
+    // Signal handlers for clean shutdown (turns off LED)
     struct sigaction sa;
     memset(&sa, 0, sizeof(sa));
     sa.sa_handler = on_signal;
-    sigaction(SIGINT,  &sa, NULL);
+    sigaction(SIGINT, &sa, NULL);
     sigaction(SIGTERM, &sa, NULL);
 
-    chip = gpiod_chip_open(CHIP);
+    // Open GPIO chip
+    chip = gpiod_chip_open(CHIP_PATH);
     if (!chip) {
         perror("gpiod_chip_open");
         return 1;
     }
 
-    clk = gpiod_chip_get_line(chip, CLK);
-    dt  = gpiod_chip_get_line(chip, DT);
-    sw  = gpiod_chip_get_line(chip, SW);
-    led = gpiod_chip_get_line(chip, LED);
-	next_btn = gpiod_chip_get_line(chip, NEXT);
+    // === Setup INPUT lines (CLK, DT, SW, NEXT) ===
 
-	if (!next_btn) {
-		perror("gpiod_chip_get_line (NEXT)");
-		cleanup();
-		return 1;
-	}
+    // Create settings for inputs without pull-up (CLK, DT)
+    struct gpiod_line_settings *input_settings = gpiod_line_settings_new();
+    if (!input_settings) {
+        perror("gpiod_line_settings_new (input)");
+        cleanup();
+        return 1;
+    }
+    gpiod_line_settings_set_direction(input_settings, GPIOD_LINE_DIRECTION_INPUT);
 
-    if (!clk || !dt || !sw || !led) {
-        perror("gpiod_chip_get_line");
+    // Create settings for inputs with pull-up (SW, NEXT)
+    struct gpiod_line_settings *pullup_settings = gpiod_line_settings_new();
+    if (!pullup_settings) {
+        perror("gpiod_line_settings_new (pullup)");
+        gpiod_line_settings_free(input_settings);
+        cleanup();
+        return 1;
+    }
+    gpiod_line_settings_set_direction(pullup_settings, GPIOD_LINE_DIRECTION_INPUT);
+    gpiod_line_settings_set_bias(pullup_settings, GPIOD_LINE_BIAS_PULL_UP);
+
+    // Create line config
+    struct gpiod_line_config *input_line_config = gpiod_line_config_new();
+    if (!input_line_config) {
+        perror("gpiod_line_config_new (input)");
+        gpiod_line_settings_free(input_settings);
+        gpiod_line_settings_free(pullup_settings);
         cleanup();
         return 1;
     }
 
-    // Inputs: CLK/DT sin bias explícito, SW con pull-up
-    struct gpiod_line_request_config in_cfg = {
-        .consumer = "encoder",
-        .request_type = GPIOD_LINE_REQUEST_DIRECTION_INPUT,
-        .flags = 0
-    };
-    if (gpiod_line_request(clk, &in_cfg, 0) < 0 ||
-        gpiod_line_request(dt,  &in_cfg, 0) < 0) {
-        perror("line_request_input (clk/dt)");
+    // Add CLK and DT without pull-up
+    unsigned int no_pullup_offsets[] = {PIN_CLK, PIN_DT};
+    if (gpiod_line_config_add_line_settings(input_line_config, no_pullup_offsets, 2, input_settings) < 0) {
+        perror("gpiod_line_config_add_line_settings (clk/dt)");
+        gpiod_line_config_free(input_line_config);
+        gpiod_line_settings_free(input_settings);
+        gpiod_line_settings_free(pullup_settings);
         cleanup();
         return 1;
     }
 
-    in_cfg.flags = GPIOD_LINE_REQUEST_FLAG_BIAS_PULL_UP;
-    if (gpiod_line_request(sw, &in_cfg, 0) < 0) {
-        perror("line_request_input (sw pull-up)");
+    // Add SW and NEXT with pull-up
+    unsigned int pullup_offsets[] = {PIN_SW, PIN_NEXT};
+    if (gpiod_line_config_add_line_settings(input_line_config, pullup_offsets, 2, pullup_settings) < 0) {
+        perror("gpiod_line_config_add_line_settings (sw/next)");
+        gpiod_line_config_free(input_line_config);
+        gpiod_line_settings_free(input_settings);
+        gpiod_line_settings_free(pullup_settings);
         cleanup();
         return 1;
     }
-	
-	in_cfg.flags = GPIOD_LINE_REQUEST_FLAG_BIAS_PULL_UP;
-	if (gpiod_line_request(next_btn, &in_cfg, 0) < 0) {
-		perror("line_request_input (next_btn pull-up)");
-		cleanup();
-		return 1;
-	}
 
-    // Output: LED en alto (encendido) mientras corra el proceso
-    struct gpiod_line_request_config out_cfg = {
-        .consumer = "tvargenta-led",
-        .request_type = GPIOD_LINE_REQUEST_DIRECTION_OUTPUT,
-        .flags = 0
-    };
-    if (gpiod_line_request(led, &out_cfg, 1) < 0) {  // default_val = 1 (ON)
-        perror("line_request_output (led)");
+    // Create request config
+    struct gpiod_request_config *input_req_config = gpiod_request_config_new();
+    if (!input_req_config) {
+        perror("gpiod_request_config_new (input)");
+        gpiod_line_config_free(input_line_config);
+        gpiod_line_settings_free(input_settings);
+        gpiod_line_settings_free(pullup_settings);
         cleanup();
         return 1;
     }
-    // Redundante pero explícito:
-    gpiod_line_set_value(led, 1);
+    gpiod_request_config_set_consumer(input_req_config, "encoder");
 
-    int last_clk = gpiod_line_get_value(clk);
-    int last_sw  = gpiod_line_get_value(sw);
+    // Request input lines
+    input_request = gpiod_chip_request_lines(chip, input_req_config, input_line_config);
+
+    // Clean up config objects (no longer needed after request)
+    gpiod_request_config_free(input_req_config);
+    gpiod_line_config_free(input_line_config);
+    gpiod_line_settings_free(input_settings);
+    gpiod_line_settings_free(pullup_settings);
+
+    if (!input_request) {
+        perror("gpiod_chip_request_lines (input)");
+        cleanup();
+        return 1;
+    }
+
+    // === Setup OUTPUT line (LED) ===
+
+    struct gpiod_line_settings *led_settings = gpiod_line_settings_new();
+    if (!led_settings) {
+        perror("gpiod_line_settings_new (led)");
+        cleanup();
+        return 1;
+    }
+    gpiod_line_settings_set_direction(led_settings, GPIOD_LINE_DIRECTION_OUTPUT);
+    gpiod_line_settings_set_output_value(led_settings, GPIOD_LINE_VALUE_ACTIVE);  // LED ON at start
+
+    struct gpiod_line_config *led_line_config = gpiod_line_config_new();
+    if (!led_line_config) {
+        perror("gpiod_line_config_new (led)");
+        gpiod_line_settings_free(led_settings);
+        cleanup();
+        return 1;
+    }
+
+    unsigned int led_offset = PIN_LED;
+    if (gpiod_line_config_add_line_settings(led_line_config, &led_offset, 1, led_settings) < 0) {
+        perror("gpiod_line_config_add_line_settings (led)");
+        gpiod_line_config_free(led_line_config);
+        gpiod_line_settings_free(led_settings);
+        cleanup();
+        return 1;
+    }
+
+    struct gpiod_request_config *led_req_config = gpiod_request_config_new();
+    if (!led_req_config) {
+        perror("gpiod_request_config_new (led)");
+        gpiod_line_config_free(led_line_config);
+        gpiod_line_settings_free(led_settings);
+        cleanup();
+        return 1;
+    }
+    gpiod_request_config_set_consumer(led_req_config, "tvargenta-led");
+
+    // Request LED line
+    led_request = gpiod_chip_request_lines(chip, led_req_config, led_line_config);
+
+    // Clean up config objects
+    gpiod_request_config_free(led_req_config);
+    gpiod_line_config_free(led_line_config);
+    gpiod_line_settings_free(led_settings);
+
+    if (!led_request) {
+        perror("gpiod_chip_request_lines (led)");
+        cleanup();
+        return 1;
+    }
+
+    // Read initial values
+    int last_clk = (gpiod_line_request_get_value(input_request, PIN_CLK) == GPIOD_LINE_VALUE_ACTIVE) ? 1 : 0;
+    int last_sw = (gpiod_line_request_get_value(input_request, PIN_SW) == GPIOD_LINE_VALUE_ACTIVE) ? 1 : 0;
+    int last_next = (gpiod_line_request_get_value(input_request, PIN_NEXT) == GPIOD_LINE_VALUE_ACTIVE) ? 1 : 0;
+
     int sw_pressed = 0;
     int sw_released = 0;
-	int last_next = gpiod_line_get_value(next_btn);
-	struct timespec ts_now;
-	double last_next_fire = 0.0;         // último disparo BTN_NEXT (segundos)
-	const double NEXT_DEBOUNCE = 1.0;    // 1 segundo de antibounce
+    struct timespec ts_now;
+    double last_next_fire = 0.0;
+    const double NEXT_DEBOUNCE = 1.0;  // 1 second debounce
 
-    // Loop principal: emite ROTARY y BTN_* por stdout (como ya usás)
+    // Main loop: emit ROTARY and BTN_* events to stdout
     while (running) {
-        int clk_val = gpiod_line_get_value(clk);
-        int dt_val  = gpiod_line_get_value(dt);
-        int sw_val  = gpiod_line_get_value(sw);
+        enum gpiod_line_value clk_raw = gpiod_line_request_get_value(input_request, PIN_CLK);
+        enum gpiod_line_value dt_raw = gpiod_line_request_get_value(input_request, PIN_DT);
+        enum gpiod_line_value sw_raw = gpiod_line_request_get_value(input_request, PIN_SW);
 
-        // ROTARY
+        int clk_val = (clk_raw == GPIOD_LINE_VALUE_ACTIVE) ? 1 : 0;
+        int dt_val = (dt_raw == GPIOD_LINE_VALUE_ACTIVE) ? 1 : 0;
+        int sw_val = (sw_raw == GPIOD_LINE_VALUE_ACTIVE) ? 1 : 0;
+
+        // ROTARY encoder
         if (clk_val != last_clk) {
-            if (clk_val == 0) { // flanco descendente
+            if (clk_val == 0) {  // Falling edge
                 if (dt_val != clk_val)
                     printf("ROTARY_CW\n");
                 else
@@ -146,7 +234,7 @@ int main(void) {
             last_clk = clk_val;
         }
 
-        // BOTÓN
+        // BUTTON (encoder push)
         if (sw_val != last_sw) {
             if (sw_val == 0 && !sw_pressed) {
                 printf("BTN_PRESS\n");
@@ -161,30 +249,30 @@ int main(void) {
             }
             last_sw = sw_val;
         }
-		
-		// --- BOTÓN NEXT en GPIO3 (activo en 0, pull-up) con antirrebote de 1s ---
-		int next_val = gpiod_line_get_value(next_btn);
-		if (next_val != last_next) {
-			// Flanco de bajada = PRESIONADO (activo-bajo)
-			if (next_val == 0) {
-				// Tiempo actual en segundos
-				clock_gettime(CLOCK_MONOTONIC, &ts_now);
-				double now_s = ts_now.tv_sec + ts_now.tv_nsec / 1e9;
 
-				if ((now_s - last_next_fire) >= NEXT_DEBOUNCE) {
-					printf("BTN_NEXT\n");
-					fflush(stdout);
-					last_next_fire = now_s;
-				}
-			}
-			last_next = next_val;
-		}
-	
+        // NEXT button on GPIO3 (active low with pull-up) with 1s debounce
+        enum gpiod_line_value next_raw = gpiod_line_request_get_value(input_request, PIN_NEXT);
+        int next_val = (next_raw == GPIOD_LINE_VALUE_ACTIVE) ? 1 : 0;
 
-        usleep(3000);  // 3 ms
+        if (next_val != last_next) {
+            // Falling edge = PRESSED (active-low)
+            if (next_val == 0) {
+                clock_gettime(CLOCK_MONOTONIC, &ts_now);
+                double now_s = ts_now.tv_sec + ts_now.tv_nsec / 1e9;
+
+                if ((now_s - last_next_fire) >= NEXT_DEBOUNCE) {
+                    printf("BTN_NEXT\n");
+                    fflush(stdout);
+                    last_next_fire = now_s;
+                }
+            }
+            last_next = next_val;
+        }
+
+        usleep(3000);  // 3 ms polling interval
     }
 
-    // Al salir por señal o fin: apagar LED
+    // On exit: turn off LED and release resources
     cleanup();
     return 0;
 }
