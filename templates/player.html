@@ -781,6 +781,7 @@
 	let playedReportedFor = null;   // video_id para el que ya se reportó play
 	let playedTimer = null;         // timeout a 10s
 	let playedArmed = false;        // evita múltiples enganches
+	let _prevTimeUpdateHandler = null; // ref to previous timeupdate listener (avoid leak)
 
 	// Broadcast TV state tracking
 	let isBroadcastChannel = false;        // true if current channel uses broadcast scheduling
@@ -1192,6 +1193,10 @@
 			}, 10000);
 
 			// B) 30% de duración (cuando se conozca el metadata)
+			// Remove previous listener by stored ref to prevent accumulation
+			if (_prevTimeUpdateHandler) {
+			  video.removeEventListener("timeupdate", _prevTimeUpdateHandler);
+			}
 			const onTimeUpdate = () => {
 			  const dur = video.duration || 0;
 			  if (!playedArmed && dur > 0) {
@@ -1204,11 +1209,11 @@
 				  clearTimeout(playedTimer);
 				  reportPlayed(currentVideo);
 				  video.removeEventListener("timeupdate", onTimeUpdate);
+				  _prevTimeUpdateHandler = null;
 				}
 			  }
 			};
-
-			video.removeEventListener("timeupdate", onTimeUpdate);
+			_prevTimeUpdateHandler = onTimeUpdate;
 			video.addEventListener("timeupdate", onTimeUpdate);
 
 		  }
