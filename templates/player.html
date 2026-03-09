@@ -782,6 +782,20 @@
 	let playedTimer = null;         // timeout a 10s
 	let playedArmed = false;        // evita múltiples enganches
 	let _prevTimeUpdateHandler = null; // ref to previous timeupdate listener (avoid leak)
+	let _prevCanplayHandler = null;    // ref to previous canplay listener (avoid leak)
+
+	// Release old media resources before loading a new source.
+	// Without this, Chromium's media pipeline accumulates internal state
+	// (~18KB per transition) that causes OOM after hours of playback.
+	function releaseVideoSource() {
+	  video.pause();
+	  if (_prevCanplayHandler) {
+		video.removeEventListener('canplay', _prevCanplayHandler);
+		_prevCanplayHandler = null;
+	  }
+	  video.removeAttribute('src');
+	  video.load();
+	}
 
 	// Broadcast TV state tracking
 	let isBroadcastChannel = false;        // true if current channel uses broadcast scheduling
@@ -1141,6 +1155,7 @@
 		  // Solo cambiamos el src si verdaderamente cambia el video o es forzado
 		  if (cambioDeVideo ) {
 			currentVideo = data.video_id;
+			releaseVideoSource();
 			video.src = data.video_url || `/videos/${data.video_id}.mp4`;
 			video.load();
 
@@ -1166,6 +1181,8 @@
 			if (video.readyState >= 3) { // HAVE_FUTURE_DATA or higher
 			  playWhenReady();
 			} else {
+			  if (_prevCanplayHandler) video.removeEventListener('canplay', _prevCanplayHandler);
+			  _prevCanplayHandler = playWhenReady;
 			  video.addEventListener('canplay', playWhenReady, { once: true });
 			}
 			// Channel badge removed for immersion
@@ -1398,6 +1415,7 @@
 			lastBroadcastSeekTo = targetPos;
 
 			currentVideo = data.video_id;
+			releaseVideoSource();
 			video.src = data.video_url || `/videos/${data.video_id}.mp4`;
 			video.load();
 
@@ -1416,6 +1434,8 @@
 			if (video.readyState >= 3) {
 			  playBroadcast();
 			} else {
+			  if (_prevCanplayHandler) video.removeEventListener('canplay', _prevCanplayHandler);
+			  _prevCanplayHandler = playBroadcast;
 			  video.addEventListener('canplay', playBroadcast, { once: true });
 			}
 
@@ -3357,6 +3377,7 @@ function ejecutarSeleccion() {
     // If video source doesn't match, load it
     const expectedSrc = `/videos/${videoId}.mp4`;
     if (video.src !== window.location.origin + expectedSrc) {
+      releaseVideoSource();
       video.src = expectedSrc;
       video.load();
     }
