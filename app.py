@@ -648,8 +648,10 @@ def restart_kiosk(url="http://localhost:5000/tv"):
             "--disable-features=VaapiVideoDecoder",
             f"--user-data-dir={user_data_dir}",
             f"--disk-cache-dir={cache_dir}",
+            "--disk-cache-size=10485760",
+            "--disable-background-networking",
             # logging de Chromium para primer boot:
-            "--enable-logging=stderr", 
+            "--enable-logging=stderr",
             "--no-first-run",
             "--no-default-browser-check",
             "--log-level=2",

@@ -875,7 +875,7 @@
 	
 	async function i18nInit(){
 	  try {
-		const r = await fetch("/api/lang");
+		const r = await fetch("/api/lang", { cache: "no-store" });
 		if (r.ok){
 		  const d = await r.json();
 		  if (d && d.lang) I18N.lang = d.lang;
@@ -893,7 +893,7 @@
 	
 	async function pollLanguageFromBackend() {
 	  try {
-		const r = await fetch("/api/lang");
+		const r = await fetch("/api/lang", { cache: "no-store" });
 		if (!r.ok) return;
 
 		const data = await r.json();
@@ -1096,7 +1096,7 @@
 
 	  ultimaCarga = Date.now();
 
-	  fetch('/api/next_video', { signal: currentFetchController.signal })
+	  fetch('/api/next_video', { signal: currentFetchController.signal, cache: 'no-store' })
 		.then(res => res.json())
 		.then(data => {
 		  // Stale response check - ignore if user changed channel while waiting
@@ -1347,7 +1347,7 @@
 	
 	setInterval(async () => {
 	  try {
-		const res = await fetch("/api/should_reload");
+		const res = await fetch("/api/should_reload", { cache: "no-store" });
 		const data = await res.json();
 		if (data.should_reload) {
 		  const ahora = Date.now();
@@ -1378,7 +1378,7 @@
 		const seqBeforeFetch = requestSequence;
 
 		try {
-		  const res = await fetch("/api/next_video");
+		  const res = await fetch("/api/next_video", { cache: "no-store" });
 		  const data = await res.json();
 
 		  // If user changed channel while we were fetching, ignore this response
@@ -1497,10 +1497,10 @@
 
 
 	setInterval(async () => {
-	  const res = await fetch("/api/volumen_ping");
+	  const res = await fetch("/api/volumen_ping", { cache: "no-store" });
 	  const data = await res.json();
 	  if (data.ping) {
-		const resVol = await fetch("/api/volumen");
+		const resVol = await fetch("/api/volumen", { cache: "no-store" });
 		const volData = await resVol.json();
 		mostrarVolumen(volData.valor);
 	  }
@@ -1664,7 +1664,7 @@
 
 	async function wifiFetchStatus() {
 	  try {
-		const r = await fetch("/api/wifi/status");
+		const r = await fetch("/api/wifi/status", { cache: "no-store" });
 		const d = await r.json();
 		return d;
 	  } catch (e) {
@@ -2645,7 +2645,7 @@ function ejecutarSeleccion() {
 	// 3) Sino, toggle del menú como siempre
 	setInterval(async () => {
 	  try {
-		const res = await fetch("/api/menu_ping");
+		const res = await fetch("/api/menu_ping", { cache: "no-store" });
 		const data = await res.json();
 		if (!data.ping || !data.ts || data.ts === lastMenuPingTs) return;
 
@@ -2687,7 +2687,7 @@ function ejecutarSeleccion() {
 	setInterval(async () => {
 	  if (!menuVisible) return;
 	  try {
-		const r = await fetch("/api/menu_nav");
+		const r = await fetch("/api/menu_nav", { cache: "no-store" });
 		const d = await r.json();
 		if (d.ping && typeof d.delta === "number") {
 		  moverCursor(d.delta);
@@ -2704,7 +2704,7 @@ function ejecutarSeleccion() {
 	// - Sino, si menú visible    -> ejecutarSeleccion() como siempre
 	setInterval(async () => {
 	  try {
-		const r = await fetch("/api/menu_select");
+		const r = await fetch("/api/menu_select", { cache: "no-store" });
 		const d = await r.json();
 		if (!d.ping) return;
 
@@ -3460,7 +3460,7 @@ function ejecutarSeleccion() {
     const seqBeforeFetch = requestSequence;
 
     try {
-      const res = await fetch("/api/vcr/state");
+      const res = await fetch("/api/vcr/state", { cache: "no-store" });
       const data = await res.json();
 
       // If user changed channel while we were fetching, ignore this response
@@ -3490,7 +3490,7 @@ function ejecutarSeleccion() {
 
   async function checkVcrTrigger() {
     try {
-      const res = await fetch("/api/vcr/trigger");
+      const res = await fetch("/api/vcr/trigger", { cache: "no-store" });
       const data = await res.json();
       if (data.ok && data.mtime > lastVcrTriggerMtime) {
         lastVcrTriggerMtime = data.mtime;
@@ -3523,7 +3523,7 @@ function ejecutarSeleccion() {
   // Poll for VCR countdown trigger (from encoder)
   async function checkVcrCountdown() {
     try {
-      const res = await fetch("/api/vcr/countdown_trigger");
+      const res = await fetch("/api/vcr/countdown_trigger", { cache: "no-store" });
       const data = await res.json();
       if (data.ok && data.countdown !== null && data.countdown !== undefined) {
         vcrCountdown?.classList.remove("hidden");
@@ -3540,7 +3540,7 @@ function ejecutarSeleccion() {
   // Monitor pause trigger from encoder
   async function checkVcrPauseTrigger() {
     try {
-      const res = await fetch("/api/vcr/check_pause_trigger");
+      const res = await fetch("/api/vcr/check_pause_trigger", { cache: "no-store" });
       const data = await res.json();
       if (data.ok && data.triggered) {
         console.log("[VCR] Pause triggered, is_paused:", data.is_paused);
@@ -3554,7 +3554,7 @@ function ejecutarSeleccion() {
   // Monitor rewind trigger from encoder
   async function checkVcrRewindTrigger() {
     try {
-      const res = await fetch("/api/vcr/check_rewind_trigger");
+      const res = await fetch("/api/vcr/check_rewind_trigger", { cache: "no-store" });
       const data = await res.json();
       if (data.ok && data.triggered) {
         console.log("[VCR] Rewind triggered");
