@@ -672,13 +672,10 @@ def restart_kiosk(url="http://localhost:5000/tv"):
 def launch_kiosk_once():
     try:
         if not os.path.exists(LAUNCH_FLAG):
-            # Flask is already confirmed ready by restart_kiosk()'s probe loop,
-            # so launch directly via HTTP to avoid a ghost file:// renderer process
-            # that wastes ~41MB and is never closed.
-            if os.path.exists(INTRO_FLAG):
-                url = "http://localhost:5000/splash"
-            else:
-                url = "http://localhost:5000/"
+            # Always launch directly at /tv to avoid ghost renderer processes.
+            # Any intermediate page (boot, splash) that navigates to /tv causes
+            # Chromium to keep the old renderer alive (~80MB wasted).
+            url = "http://localhost:5000/tv"
             restart_kiosk(url=url)
             with open(LAUNCH_FLAG, "w") as f:
                 f.write("1")
