@@ -649,6 +649,7 @@ def restart_kiosk(url="http://localhost:5000/tv"):
             f"--disk-cache-dir={cache_dir}",
             "--disk-cache-size=10485760",
             "--disable-background-networking",
+            "--disable-extensions",
             "--js-flags=--max-old-space-size=128",
             # logging de Chromium para primer boot:
             "--enable-logging=stderr",
