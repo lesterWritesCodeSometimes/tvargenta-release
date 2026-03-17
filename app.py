@@ -624,7 +624,10 @@ def restart_kiosk(url="http://localhost:5000/tv"):
             except Exception as e:
                 logger.warning(f"[KIOSK] No pude preparar {d}: {e}")
 
-        chromium_bin = "/usr/bin/chromium-browser" if os.path.exists("/usr/bin/chromium-browser") else "/usr/bin/chromium"
+        # Use the actual binary, not the Debian wrapper script, to avoid
+        # injected flags (--force-renderer-accessibility, --load-extension,
+        # --enable-remote-extensions) that spawn extra renderer processes.
+        chromium_bin = "/usr/lib/chromium/chromium"
         
         # Limpieza de locks del perfil (cuando hay apagados bruscos quedan "Singleton*" y bloquea primer boot)
         try:
@@ -645,13 +648,14 @@ def restart_kiosk(url="http://localhost:5000/tv"):
             "--autoplay-policy=no-user-gesture-required",
             "--ozone-platform=x11",
             "--use-gl=angle", "--use-angle=gl",
+            "--enable-gpu-rasterization",
+            "--disable-dev-shm-usage",
             f"--user-data-dir={user_data_dir}",
             f"--disk-cache-dir={cache_dir}",
             "--disk-cache-size=10485760",
             "--disable-background-networking",
             "--disable-extensions",
             "--js-flags=--max-old-space-size=128",
-            # logging de Chromium para primer boot:
             "--enable-logging=stderr",
             "--no-first-run",
             "--no-default-browser-check",
