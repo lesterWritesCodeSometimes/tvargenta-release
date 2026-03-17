@@ -655,6 +655,7 @@ def restart_kiosk(url="http://localhost:5000/tv"):
             "--disk-cache-size=10485760",
             "--disable-background-networking",
             "--disable-extensions",
+            "--renderer-process-limit=1",
             "--js-flags=--max-old-space-size=128",
             "--enable-logging=stderr",
             "--no-first-run",
