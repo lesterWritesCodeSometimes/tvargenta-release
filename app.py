@@ -641,15 +641,15 @@ def restart_kiosk(url="http://localhost:5000/tv"):
             "--noerrdialogs",
             "--disable-infobars",
             "--disable-translate",
-            "--disable-features=Translate",
+            "--disable-features=Translate,VaapiVideoDecoder",
             "--autoplay-policy=no-user-gesture-required",
             "--ozone-platform=x11",
             "--use-gl=angle", "--use-angle=gl",
-            "--disable-features=VaapiVideoDecoder",
             f"--user-data-dir={user_data_dir}",
             f"--disk-cache-dir={cache_dir}",
             "--disk-cache-size=10485760",
             "--disable-background-networking",
+            "--js-flags=--max-old-space-size=128",
             # logging de Chromium para primer boot:
             "--enable-logging=stderr",
             "--no-first-run",
@@ -671,9 +671,11 @@ def restart_kiosk(url="http://localhost:5000/tv"):
 def launch_kiosk_once():
     try:
         if not os.path.exists(LAUNCH_FLAG):
-            # si existe intro flag, arrancamos mostrando la imagen de espera (pre-loader local)
+            # Flask is already confirmed ready by restart_kiosk()'s probe loop,
+            # so launch directly via HTTP to avoid a ghost file:// renderer process
+            # that wastes ~41MB and is never closed.
             if os.path.exists(INTRO_FLAG):
-                url = Path(APP_DIR, "templates", "kiosk_boot.html").as_uri()
+                url = "http://localhost:5000/splash"
             else:
                 url = "http://localhost:5000/"
             restart_kiosk(url=url)
