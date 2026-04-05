@@ -265,6 +265,9 @@ _last_frontend_ping = 0.0  # epoch de Ãºltimo ping recibido
 _last_frontend_stage = "boot"
 PING_GRACE = 25.0  # segundos de gracia despuÃ©s de lanzar Chromium
 _watchdog_already_retry = False # evita relanzar Chromium mÃ¡s de 1 vez
+_last_video_time = -1.0         # último currentTime reportado por el player
+_last_video_paused = True
+_last_video_ready = 0           # readyState (0-4)
 
 if os.path.exists(TRIGGER_PATH):
     try:
@@ -661,7 +664,8 @@ def restart_kiosk(url="http://localhost:5000/tv"):
             "--no-first-run",
             "--no-default-browser-check",
             "--log-level=2",
-            
+            "--remote-debugging-port=9222",
+
         ]
         logger.info(f"[KIOSK] Lanzando: {' '.join(cmd)} DISPLAY={env.get('DISPLAY')} X0={'ok' if os.path.exists('/tmp/.X11-unix/X0') else 'NO'} bin={chromium_bin}")
 
@@ -1124,12 +1128,19 @@ def _advance_splash_rotation():
     _save_splash_state({"index": idx})
     logger.info(f"[SPLASH] advanced -> idx={idx}")
 
-def _touch_frontend_ping(stage: str = None):
+def _touch_frontend_ping(stage: str = None, video_time=None, video_paused=None, video_ready=None):
     """Marca ultimo ping del frontend y, opcionalmente, la etapa."""
     global _last_frontend_ping, _last_frontend_stage
+    global _last_video_time, _last_video_paused, _last_video_ready
     _last_frontend_ping = time.monotonic()
     if stage:
         _last_frontend_stage = stage
+    if video_time is not None:
+        _last_video_time = float(video_time)
+    if video_paused is not None:
+        _last_video_paused = bool(video_paused)
+    if video_ready is not None:
+        _last_video_ready = int(video_ready)
 
 
 # --- GestiÃ³n: /gestion -------------------------------------------------
@@ -3012,8 +3023,17 @@ def api_kiosk_ping():
 def api_ping():
     # Heartbeat periÃ³dico desde splash/player
     stage = request.args.get("stage") or "unknown"
-    _touch_frontend_ping(stage)
-    # DevolvÃ© algo ultra liviano para logs de Chromium si querÃ©s
+    vt = vp = vr = None
+    try:
+        body = request.get_json(silent=True) or {}
+        vt = body.get("ct")
+        vp = body.get("paused")
+        vr = body.get("rs")
+        if stage == "unknown" and vt is not None and vt >= 0:
+            stage = "playing"
+    except Exception:
+        pass
+    _touch_frontend_ping(stage, video_time=vt, video_paused=vp, video_ready=vr)
     return jsonify(ok=True, stage=stage)
     
 
@@ -4169,41 +4189,186 @@ if __name__ == "__main__":
     # Lanzar Chromium una sola vez en background
     threading.Thread(target=launch_kiosk_once, daemon=True).start()
     
-    def _read_ping():
-        try:
-            with open(PING_FILE, "r") as f:
-                s = f.read().strip()
-            parts = s.split("|", 1)
-            return float(parts[0]), (parts[1] if len(parts) > 1 else "?")
-        except Exception:
-            return 0.0, "?"
+    # ------------------------------------------------------------------
+    # Persistent watchdog — monitors Chromium health continuously
+    # Layer 1: JS heartbeat (ping timeout + currentTime stall)
+    # Layer 2: renderer process alive + window title check
+    # Layer 3: screenshot pixel diff between cycles (freeze/black)
+    # ------------------------------------------------------------------
+    WD_BOOT_TIMEOUT   = 65   # seconds to wait for first ping after boot
+    WD_PING_TIMEOUT   = 20   # seconds without ping → unhealthy
+    WD_STALL_TIMEOUT  = 30   # seconds of currentTime not advancing → stalled
+    WD_CYCLE          = 10   # seconds between watchdog cycles
+    WD_SS_EVERY       = 6    # screenshot every N cycles (= 60s at 10s cycle)
+    WD_BLACK_MEAN     = 5    # brightness mean threshold for black screen
+    WD_BLACK_STD      = 3    # brightness std threshold for black screen
+    WD_FREEZE_PCT     = 1.0  # % changed-pixels below which screen is frozen
+    WD_COOLDOWN       = 90   # seconds after restart before monitoring resumes
+    WD_SS_PATH_CURR   = "/tmp/tvargenta_wd_ss_curr.png"
+    WD_SS_PATH_PREV   = "/tmp/tvargenta_wd_ss_prev.png"
 
-    def kiosk_watchdog(timeout_first=65, retry_url="http://localhost:5000/"):
-        global _last_frontend_ping, _last_frontend_stage, _watchdog_already_retry
-        start = time.monotonic()
-
-        # Espera ping real del frontend
-        while (time.monotonic() - start) < timeout_first:
-            if _last_frontend_ping and (time.monotonic() - _last_frontend_ping) < timeout_first:
-                logger.info(f"[WD] Frontend OK (stage={_last_frontend_stage}) en {(time.monotonic()-start):.1f}s")
-                return
-            time.sleep(0.5)
-
-        if _watchdog_already_retry:
-            logger.warning("[WD] Sin ping y ya se reintentÃ³ antes. No relanzo mÃ¡s.")
-            return
-
-        logger.warning("[WD] No hubo ping de splash/player a tiempo. Reintentando Chromium una vez...")
+    def _wd_restart(reason):
+        logger.warning(f"[WD] RESTARTING Chromium — {reason}")
         try:
             subprocess.run(["pkill", "-f", "chromium"], check=False)
-            time.sleep(0.7)
+            time.sleep(1)
         except Exception:
             pass
+        restart_kiosk(url="http://localhost:5000/")
 
-        _watchdog_already_retry = True
-        restart_kiosk(url=retry_url)
-      
-    
+    def _wd_check_renderer():
+        """Layer 2: check renderer process exists and window title is healthy."""
+        try:
+            result = subprocess.run(
+                ["pgrep", "-f", "chromium.*--type=renderer"],
+                capture_output=True, text=True, timeout=5
+            )
+            if result.returncode != 0:
+                return False, "renderer process not found"
+        except Exception as e:
+            return False, f"pgrep error: {e}"
+
+        # Check window title via xprop (crash pages change the title)
+        try:
+            result = subprocess.run(
+                ["xprop", "-root", "_NET_ACTIVE_WINDOW"],
+                capture_output=True, text=True, timeout=5,
+                env={**os.environ, "DISPLAY": ":0"}
+            )
+            if result.returncode == 0 and "0x" in result.stdout:
+                wid = result.stdout.strip().split()[-1]
+                title_result = subprocess.run(
+                    ["xprop", "-id", wid, "WM_NAME"],
+                    capture_output=True, text=True, timeout=5,
+                    env={**os.environ, "DISPLAY": ":0"}
+                )
+                if title_result.returncode == 0:
+                    title = title_result.stdout.lower()
+                    for bad in ["aw, snap", "oh no", "crashed", "not responding", "dead"]:
+                        if bad in title:
+                            return False, f"crash page detected: {title.strip()}"
+        except Exception:
+            pass  # xprop failure is non-fatal
+        return True, "ok"
+
+    def _wd_check_screenshot(cycle_num):
+        """Layer 3: take screenshot, compare to previous cycle's screenshot."""
+        try:
+            result = subprocess.run(
+                ["scrot", "-z", WD_SS_PATH_CURR],
+                capture_output=True, timeout=10,
+                env={**os.environ, "DISPLAY": ":0"}
+            )
+            if result.returncode != 0:
+                return True, "scrot failed (non-fatal)"
+
+            from PIL import Image
+            import statistics as _stats
+
+            img = Image.open(WD_SS_PATH_CURR).convert("L")
+            pixels = list(img.getdata())
+            mean_b = _stats.mean(pixels)
+            std_b = _stats.stdev(pixels) if len(pixels) > 1 else 0
+
+            # Black screen detection
+            if mean_b < WD_BLACK_MEAN and std_b < WD_BLACK_STD:
+                return False, f"black screen (mean={mean_b:.1f}, std={std_b:.1f})"
+
+            # Freeze detection: compare to previous screenshot
+            if os.path.exists(WD_SS_PATH_PREV):
+                prev = Image.open(WD_SS_PATH_PREV).convert("L")
+                if prev.size == img.size:
+                    prev_px = list(prev.getdata())
+                    changed = sum(1 for a, b in zip(pixels, prev_px) if abs(a - b) > 5)
+                    pct = 100 * changed / len(pixels)
+                    if pct < WD_FREEZE_PCT:
+                        return False, f"frozen screen ({pct:.1f}% changed between cycles)"
+
+            # Rotate: current becomes previous for next cycle
+            os.replace(WD_SS_PATH_CURR, WD_SS_PATH_PREV)
+            return True, "ok"
+
+        except Exception as e:
+            return True, f"screenshot error (non-fatal): {e}"
+
+    def kiosk_watchdog():
+        global _last_frontend_ping, _last_frontend_stage, _watchdog_already_retry
+        global _last_video_time
+
+        # --- Phase 1: boot wait (same as before) ---
+        start = time.monotonic()
+        while (time.monotonic() - start) < WD_BOOT_TIMEOUT:
+            if _last_frontend_ping and (time.monotonic() - _last_frontend_ping) < WD_BOOT_TIMEOUT:
+                logger.info(f"[WD] Frontend OK (stage={_last_frontend_stage}) en {(time.monotonic()-start):.1f}s")
+                break
+            time.sleep(0.5)
+        else:
+            # No ping during boot — restart once
+            logger.warning("[WD] No ping during boot. Restarting Chromium...")
+            _wd_restart("no ping during boot")
+            time.sleep(WD_COOLDOWN)
+
+        # --- Phase 2: persistent monitoring loop ---
+        logger.info("[WD] Entering persistent monitoring loop")
+        cycle = 0
+        last_known_ct = -1.0
+        ct_stall_since = 0.0
+        # Clean up any leftover screenshot from previous run
+        for p in (WD_SS_PATH_CURR, WD_SS_PATH_PREV):
+            try: os.remove(p)
+            except FileNotFoundError: pass
+
+        while True:
+            time.sleep(WD_CYCLE)
+            cycle += 1
+            now = time.monotonic()
+
+            # Layer 1a: ping timeout
+            if _last_frontend_ping and (now - _last_frontend_ping) > WD_PING_TIMEOUT:
+                _wd_restart(f"no ping for {now - _last_frontend_ping:.0f}s")
+                ct_stall_since = 0.0
+                last_known_ct = -1.0
+                time.sleep(WD_COOLDOWN)
+                continue
+
+            # Layer 1b: currentTime stall (only when playing, not paused)
+            if not _last_video_paused and _last_video_time >= 0:
+                if _last_video_time == last_known_ct:
+                    if ct_stall_since == 0:
+                        ct_stall_since = now
+                    elif (now - ct_stall_since) > WD_STALL_TIMEOUT:
+                        _wd_restart(f"currentTime stalled at {_last_video_time:.1f}s for {now - ct_stall_since:.0f}s")
+                        ct_stall_since = 0.0
+                        last_known_ct = -1.0
+                        time.sleep(WD_COOLDOWN)
+                        continue
+                else:
+                    ct_stall_since = 0.0
+                last_known_ct = _last_video_time
+
+            # Layer 2: renderer process + window title
+            alive, detail = _wd_check_renderer()
+            if not alive:
+                _wd_restart(detail)
+                ct_stall_since = 0.0
+                last_known_ct = -1.0
+                time.sleep(WD_COOLDOWN)
+                continue
+
+            # Layer 3: screenshot analysis (every WD_SS_EVERY cycles)
+            if cycle % WD_SS_EVERY == 0:
+                ok, detail = _wd_check_screenshot(cycle)
+                if not ok:
+                    _wd_restart(detail)
+                    ct_stall_since = 0.0
+                    last_known_ct = -1.0
+                    # Remove prev screenshot so we don't false-positive after restart
+                    for p in (WD_SS_PATH_CURR, WD_SS_PATH_PREV):
+                        try: os.remove(p)
+                        except FileNotFoundError: pass
+                    time.sleep(WD_COOLDOWN)
+                    continue
+
     threading.Thread(target=kiosk_watchdog, daemon=True).start()
 
     app.run(debug=False, host="0.0.0.0")

@@ -2814,17 +2814,40 @@ function ejecutarSeleccion() {
   // --- PING watchdog ---
   function wdPing() {
     try {
+      const payload = {
+        at: Date.now(),
+        ct: video ? video.currentTime : -1,
+        paused: video ? video.paused : true,
+        rs: video ? video.readyState : 0,
+      };
       if (navigator.sendBeacon) {
-        const blob = new Blob([JSON.stringify({at: Date.now()})], {type: 'application/json'});
+        const blob = new Blob([JSON.stringify(payload)], {type: 'application/json'});
         navigator.sendBeacon("{{ url_for('api_ping') }}", blob);
       } else {
-        fetch("{{ url_for('api_ping') }}", {method: "POST", headers:{'Content-Type':'application/json'}, body: JSON.stringify({at: Date.now()}), keepalive: true});
+        fetch("{{ url_for('api_ping') }}", {method: "POST", headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload), keepalive: true});
       }
     } catch(e) {}
   }
   wdPing();                 // ping inmediato al cargar player
   const wdTimer = setInterval(wdPing, 5000);
   window.addEventListener('beforeunload', () => clearInterval(wdTimer));
+
+  // --- Video error/stall self-recovery ---
+  let _stallCount = 0;
+  video.addEventListener('error', () => {
+    console.warn("[WD] video error — skipping to next");
+    cargarSiguienteVideo(true);
+  });
+  video.addEventListener('stalled', () => {
+    _stallCount++;
+    console.warn("[WD] video stalled (" + _stallCount + ")");
+    if (_stallCount >= 3) {
+      _stallCount = 0;
+      console.warn("[WD] too many stalls — skipping to next");
+      cargarSiguienteVideo(true);
+    }
+  });
+  video.addEventListener('playing', () => { _stallCount = 0; });
 
 	
   (function bootProbe(){
