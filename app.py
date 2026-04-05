@@ -4356,8 +4356,12 @@ if __name__ == "__main__":
                 continue
 
             # Layer 3: screenshot analysis (every WD_SS_EVERY cycles)
-            # Skip during boot/splash — dark screen is expected before player loads
-            if cycle % WD_SS_EVERY == 0 and _last_frontend_stage == "playing":
+            # Only run when a video is actively playing (readyState>=2, not paused)
+            # Skips boot/splash, AV-input channels, and between-video transitions
+            if (cycle % WD_SS_EVERY == 0
+                    and _last_frontend_stage == "playing"
+                    and _last_video_ready >= 2
+                    and not _last_video_paused):
                 ok, detail = _wd_check_screenshot(cycle)
                 if not ok:
                     _wd_restart(detail)
