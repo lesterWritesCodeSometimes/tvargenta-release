@@ -92,6 +92,10 @@ BLOCK_DURATION_SEC = 30 * 60  # 30 minutes in seconds
 # Commercial breaks per block
 COMMERCIAL_BREAKS_PER_BLOCK = 3
 
+# Per-channel block grid offset (0–3 minutes), regenerated weekly.
+# Staggers commercial breaks across channels so they don't all align.
+BLOCK_OFFSET_MAX_SEC = 3 * 60  # 180 seconds
+
 # Schedule timing
 WEEKLY_SCHEDULE_HOUR = 2
 WEEKLY_SCHEDULE_MINUTE = 30
@@ -612,7 +616,10 @@ def generate_weekly_schedule(channel_id: str = None) -> dict:
         if not series_filter:
             continue  # Skip non-series channels
 
-        channel_schedule = {"time_slots": {}}
+        channel_schedule = {
+            "time_slots": {},
+            "block_offset_sec": random.randint(0, BLOCK_OFFSET_MAX_SEC),
+        }
 
         for time_of_day, slot_count in TIME_OF_DAY_SLOTS.items():
             eligible = get_eligible_series_for_time(time_of_day, series_filter, series_data)
@@ -636,6 +643,7 @@ def generate_weekly_schedule(channel_id: str = None) -> dict:
             channel_schedule["time_slots"][time_of_day] = slots[:slot_count]
 
         schedule["channels"][cid] = channel_schedule
+        logger.info(f"[SCHEDULER] Channel {cid} block offset: {channel_schedule['block_offset_sec']}s ({channel_schedule['block_offset_sec']/60:.1f}min)")
 
     save_weekly_schedule(schedule)
 
@@ -965,27 +973,25 @@ def generate_daily_schedule(channel_id: str = None) -> dict:
             continue
 
         time_slots = channel_weekly.get("time_slots", {})
+        block_offset = channel_weekly.get("block_offset_sec", 0)
         channel_entries = []
 
-        # Test pattern: 3am-4am (seconds 0-3599 of the day)
-        # But actually our day starts at 3am, so:
-        # Second 0 = 3:00:00am
-        # Second 3600 = 4:00:00am (start of programming)
+        # Test pattern: 3am until programming starts (4am + offset)
         channel_entries.append({
             "start": 0,
-            "end": 3600,
+            "end": 3600 + block_offset,
             "type": "test_pattern",
             "video_id": "__test_pattern__",
         })
 
-        # Process each 30-minute block from 4am to 3am
-        # That's 46 blocks (4am to 2:30am = 22.5 hours = 45 blocks, plus we end at 3am)
-        # Actually: 4am to 3am next day = 23 hours = 46 blocks
+        # Process each 30-minute block from (4am + offset) to (3am + offset)
+        # 46 blocks of 30 minutes each, shifted by the channel's weekly offset
+        # so commercial breaks don't align across channels.
 
-        current_second = 3600  # Start at 4am (3600 seconds into day starting at 3am)
+        current_second = 3600 + block_offset
 
-        for block_num in range(46):  # 46 half-hour blocks from 4am to 3am
-            block_start_second = 3600 + (block_num * BLOCK_DURATION_SEC)
+        for block_num in range(46):  # 46 half-hour blocks
+            block_start_second = 3600 + block_offset + (block_num * BLOCK_DURATION_SEC)
 
             # Calculate what time this block represents
             total_seconds_from_midnight = (3 * 3600) + block_start_second  # 3am base
