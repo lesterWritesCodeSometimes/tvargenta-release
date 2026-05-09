@@ -4204,8 +4204,20 @@ if __name__ == "__main__":
     WD_BLACK_STD      = 3    # brightness std threshold for black screen
     WD_FREEZE_PCT     = 1.0  # % changed-pixels below which screen is frozen
     WD_COOLDOWN       = 90   # seconds after restart before monitoring resumes
+    WD_REBOOT_AFTER   = 600  # seconds of unhealthy state before triggering full reboot
     WD_SS_PATH_CURR   = "/tmp/tvargenta_wd_ss_curr.png"
     WD_SS_PATH_PREV   = "/tmp/tvargenta_wd_ss_prev.png"
+
+    def _wd_reboot_system(reason):
+        logger.critical(f"[WD] REBOOTING SYSTEM — {reason}")
+        try:
+            subprocess.run(["sudo", "systemctl", "reboot"], check=False, timeout=10)
+        except Exception as e:
+            logger.error(f"[WD] systemctl reboot failed: {e}. Trying /sbin/reboot")
+            try:
+                subprocess.run(["sudo", "/sbin/reboot"], check=False, timeout=10)
+            except Exception as e2:
+                logger.error(f"[WD] /sbin/reboot also failed: {e2}")
 
     def _wd_restart(reason):
         logger.warning(f"[WD] RESTARTING Chromium — {reason}")
@@ -4313,6 +4325,7 @@ if __name__ == "__main__":
         cycle = 0
         last_known_ct = -1.0
         ct_stall_since = 0.0
+        last_healthy = time.monotonic()  # tracks last time we saw a recent ping
         # Clean up any leftover screenshot from previous run
         for p in (WD_SS_PATH_CURR, WD_SS_PATH_PREV):
             try: os.remove(p)
@@ -4322,6 +4335,20 @@ if __name__ == "__main__":
             time.sleep(WD_CYCLE)
             cycle += 1
             now = time.monotonic()
+
+            # Track health: a recent ping means the user-space stack is responsive.
+            if _last_frontend_ping and (now - _last_frontend_ping) < WD_PING_TIMEOUT:
+                last_healthy = now
+
+            # Escalation: if no healthy state for WD_REBOOT_AFTER, the system itself
+            # is likely unrecoverable (kernel pressure, V4L2 leak, etc). Reboot.
+            if (now - last_healthy) > WD_REBOOT_AFTER:
+                _wd_reboot_system(f"no healthy ping for {now - last_healthy:.0f}s after multiple Chromium restarts")
+                # Give systemd time to bring us down. If we're still alive after,
+                # reset the timer so we don't spam reboots.
+                time.sleep(120)
+                last_healthy = time.monotonic()
+                continue
 
             # Layer 1a: ping timeout
             if _last_frontend_ping and (now - _last_frontend_ping) > WD_PING_TIMEOUT:
