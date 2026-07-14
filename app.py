@@ -3056,6 +3056,56 @@ def admin():
     
     
 # --- Power control (soft standby estilo CRT, no apaga el equipo) ---
+# Backlight del display DSI: escribible por el grupo video, sin sudo
+BACKLIGHT_PATH = "/sys/class/backlight/rpi_backlight/brightness"
+_backlight_off_timer = None
+_backlight_prev = 255
+
+
+def _leer_backlight():
+    try:
+        with open(BACKLIGHT_PATH, "r") as f:
+            return int(f.read().strip())
+    except (OSError, ValueError):
+        return None
+
+
+def _escribir_backlight(valor):
+    try:
+        with open(BACKLIGHT_PATH, "w") as f:
+            f.write(str(valor))
+    except OSError as e:
+        logger.warning(f"[POWER] No pude escribir el backlight: {e}")
+
+
+def _backlight_off_tras_animacion():
+    """Apaga el backlight ~2s después del off, cuando ya terminó la animación CRT."""
+    global _backlight_off_timer
+
+    def _apagar():
+        global _backlight_prev
+        if _leer_power_state():
+            return  # volvieron a encender antes de que venciera el timer
+        actual = _leer_backlight()
+        if actual:
+            _backlight_prev = actual
+        _escribir_backlight(0)
+
+    if _backlight_off_timer:
+        _backlight_off_timer.cancel()
+    _backlight_off_timer = threading.Timer(2.0, _apagar)
+    _backlight_off_timer.daemon = True
+    _backlight_off_timer.start()
+
+
+def _backlight_on():
+    global _backlight_off_timer
+    if _backlight_off_timer:
+        _backlight_off_timer.cancel()
+        _backlight_off_timer = None
+    _escribir_backlight(_backlight_prev or 255)
+
+
 def _leer_power_state():
     try:
         with open(POWER_STATE_PATH, "r") as f:
@@ -3079,13 +3129,19 @@ def api_power():
     # "halt" queda como alias legacy: ya no apaga el equipo, solo standby
     if action in ("off", "halt"):
         _escribir_power_state(False)
+        _backlight_off_tras_animacion()
         return jsonify({"ok": True, "action": "off", "on": False})
     if action == "on":
         _escribir_power_state(True)
+        _backlight_on()
         return jsonify({"ok": True, "action": "on", "on": True})
     if action == "toggle":
         nuevo = not _leer_power_state()
         _escribir_power_state(nuevo)
+        if nuevo:
+            _backlight_on()
+        else:
+            _backlight_off_tras_animacion()
         return jsonify({"ok": True, "action": "toggle", "on": nuevo})
     return jsonify({"ok": False, "error": "unsupported action"}), 400
 
@@ -4207,6 +4263,7 @@ if __name__ == "__main__":
     
     init_volumen_por_defecto()
     _escribir_power_state(True)  # la TV siempre arranca encendida
+    _backlight_on()              # recupera el backlight si quedó apagado
 
     # Lanzar Chromium una sola vez en background
     threading.Thread(target=launch_kiosk_once, daemon=True).start()
