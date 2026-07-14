@@ -85,6 +85,7 @@ MENU_TRIGGER_PATH = str(TMP_DIR / "trigger_menu.json")
 MENU_STATE_PATH  = str(TMP_DIR / "menu_state.json")
 MENU_NAV_PATH    = str(TMP_DIR / "trigger_menu_nav.json")
 MENU_SELECT_PATH = str(TMP_DIR / "trigger_menu_select.json")
+POWER_STATE_PATH = str(TMP_DIR / "tvargenta_power.json")
 
 INTRO_FLAG  = "/tmp/tvargenta_show_intro"
 LAUNCH_FLAG      = str(TMP_DIR / "tvargenta_kiosk_launched")
@@ -3054,20 +3055,38 @@ def admin():
     return redirect(url_for("gestion"))
     
     
-# --- Power control (halt) ---
-@app.route("/api/power", methods=["POST"])
+# --- Power control (soft standby estilo CRT, no apaga el equipo) ---
+def _leer_power_state():
+    try:
+        with open(POWER_STATE_PATH, "r") as f:
+            return bool(json.load(f).get("on", True))
+    except (FileNotFoundError, json.JSONDecodeError, ValueError):
+        return True
+
+
+def _escribir_power_state(on):
+    with open(POWER_STATE_PATH, "w") as f:
+        json.dump({"on": bool(on)}, f)
+
+
+@app.route("/api/power", methods=["GET", "POST"])
 def api_power():
+    if request.method == "GET":
+        return jsonify({"on": _leer_power_state()})
+
     data = request.get_json(force=True) or {}
     action = (data.get("action") or "").lower()
-    if action == "halt":
-        try:
-            # Opcional: log visible
-            print("[API] Halt solicitado desde UIâ€¦")
-            # Lanza el halt (no bloquea)
-            subprocess.Popen(["sudo", "/sbin/shutdown", "-h", "now"])
-            return jsonify({"ok": True, "action": "halt"})
-        except Exception as e:
-            return jsonify({"ok": False, "error": str(e)}), 500
+    # "halt" queda como alias legacy: ya no apaga el equipo, solo standby
+    if action in ("off", "halt"):
+        _escribir_power_state(False)
+        return jsonify({"ok": True, "action": "off", "on": False})
+    if action == "on":
+        _escribir_power_state(True)
+        return jsonify({"ok": True, "action": "on", "on": True})
+    if action == "toggle":
+        nuevo = not _leer_power_state()
+        _escribir_power_state(nuevo)
+        return jsonify({"ok": True, "action": "toggle", "on": nuevo})
     return jsonify({"ok": False, "error": "unsupported action"}), 400
 
  
@@ -4187,6 +4206,7 @@ if __name__ == "__main__":
     os.makedirs(THUMB_DIR, exist_ok=True)
     
     init_volumen_por_defecto()
+    _escribir_power_state(True)  # la TV siempre arranca encendida
 
     # Lanzar Chromium una sola vez en background
     threading.Thread(target=launch_kiosk_once, daemon=True).start()

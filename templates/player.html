@@ -113,6 +113,61 @@
 	  display: none;
 	}
 
+	/* --- Standby estilo CRT --- */
+	#power-overlay {
+	  position: fixed;
+	  inset: 0;
+	  background: #000;
+	  z-index: 2147483647; /* arriba de todo, incluso del channel-indicator */
+	  display: none;
+	  pointer-events: none;
+	}
+
+	#power-overlay.visible {
+	  display: block;
+	}
+
+	#power-overlay.fade-out {
+	  opacity: 0;
+	  transition: opacity 0.18s ease-out;
+	}
+
+	#power-line {
+	  position: absolute;
+	  top: 50%;
+	  left: 50%;
+	  width: 100%;
+	  height: 100%;
+	  background: #fff;
+	  box-shadow: 0 0 60px 20px rgba(255,255,255,0.55);
+	  transform: translate(-50%, -50%) scale(0.001, 0.001);
+	  opacity: 0;
+	}
+
+	#power-line.anim-off {
+	  animation: crt-off 0.7s ease-in forwards;
+	}
+
+	#power-line.anim-on {
+	  animation: crt-on 0.9s ease-out forwards;
+	}
+
+	@keyframes crt-off {
+	  0%   { opacity: 1; transform: translate(-50%, -50%) scale(1, 1); }
+	  35%  { opacity: 1; transform: translate(-50%, -50%) scale(1, 0.004); }
+	  60%  { opacity: 1; transform: translate(-50%, -50%) scale(1, 0.004); }
+	  90%  { opacity: 1; transform: translate(-50%, -50%) scale(0.02, 0.004); }
+	  100% { opacity: 0; transform: translate(-50%, -50%) scale(0.001, 0.001); }
+	}
+
+	@keyframes crt-on {
+	  0%   { opacity: 0; transform: translate(-50%, -50%) scale(0.001, 0.001); }
+	  10%  { opacity: 1; transform: translate(-50%, -50%) scale(0.02, 0.004); }
+	  40%  { opacity: 1; transform: translate(-50%, -50%) scale(1, 0.004); }
+	  70%  { opacity: 1; transform: translate(-50%, -50%) scale(1, 0.004); }
+	  100% { opacity: 1; transform: translate(-50%, -50%) scale(1, 1); }
+	}
+
 
 	body::before {
 	  content: "";
@@ -614,6 +669,7 @@
   <video id="tvVideo" autoplay playsinline disableRemotePlayback></video>
   <img id="no-signal" src="/static/no_signal.png" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; object-fit:cover; z-index:10;">
   <div id="channel-indicator" class="hidden" style="position:fixed !important; z-index:2147483647 !important;"></div>
+  <div id="power-overlay"><div id="power-line"></div></div>
   <div id="overlay">{{ tr("overlay.loading_channel") }}</div>
   <div id="barra-volumen" class="oculto">
     <span class="label-volumen">{{ tr("vol.label") }}</span>
@@ -1056,6 +1112,13 @@
 		  } catch (e) {
 			console.warn("[PLAYER] no pude leer volumen:", e);
 		  }
+
+		  // 5b) estado de power (por si la página recargó estando en standby)
+		  try {
+			const rp = await fetch("/api/power");
+			const dp = await rp.json();
+			if (dp.on === false) crtPowerOff(false);
+		  } catch (e) {}
 
 		  // 6) preferencias UI (badge de canal, etc.)
 		  await cargarUiPrefs();
@@ -1502,9 +1565,78 @@
 	  if (data.ping) {
 		const resVol = await fetch("/api/volumen", { cache: "no-store" });
 		const volData = await resVol.json();
-		mostrarVolumen(volData.valor);
+		if (tvPowerOn) {
+		  mostrarVolumen(volData.valor);
+		} else {
+		  // TV en standby: aplicamos el volumen sin mostrar la barra
+		  baseVolume = volData.valor / 100;
+		  video.volume = baseVolume;
+		}
 	  }
 	}, 300);
+
+	// --- Power (standby suave con animación CRT) ---
+	let tvPowerOn = true;
+	let powerAnimating = false;
+	const powerOverlay = document.getElementById("power-overlay");
+	const powerLine = document.getElementById("power-line");
+
+	// Backstop: nada puede arrancar el video mientras la TV está "apagada"
+	// (broadcast sync, cambio de canal, etc. siguen corriendo por debajo)
+	video.addEventListener("play", () => {
+	  if (!tvPowerOn) video.pause();
+	});
+
+	function crtPowerOff(animar = true) {
+	  tvPowerOn = false;
+	  if (menuVisible) ocultarMenu();
+	  powerOverlay.classList.remove("fade-out");
+	  powerOverlay.classList.add("visible");
+	  if (!animar) {
+		video.pause();
+		return;
+	  }
+	  powerAnimating = true;
+	  powerLine.classList.remove("anim-on");
+	  void powerLine.offsetWidth; // reinicia la animación
+	  powerLine.classList.add("anim-off");
+	  powerLine.addEventListener("animationend", () => {
+		powerLine.classList.remove("anim-off");
+		video.pause();
+		powerAnimating = false;
+	  }, { once: true });
+	  setTimeout(() => { powerAnimating = false; }, 1600); // failsafe
+	}
+
+	function crtPowerOn() {
+	  tvPowerOn = true;
+	  powerAnimating = true;
+	  video.play().catch(() => {});
+	  powerOverlay.classList.remove("fade-out");
+	  powerOverlay.classList.add("visible");
+	  powerLine.classList.remove("anim-off");
+	  void powerLine.offsetWidth;
+	  powerLine.classList.add("anim-on");
+	  powerLine.addEventListener("animationend", () => {
+		powerOverlay.classList.add("fade-out");
+		setTimeout(() => {
+		  powerOverlay.classList.remove("visible", "fade-out");
+		  powerLine.classList.remove("anim-on");
+		  powerAnimating = false;
+		}, 200);
+	  }, { once: true });
+	  setTimeout(() => { powerAnimating = false; }, 1600); // failsafe
+	}
+
+	setInterval(async () => {
+	  if (powerAnimating) return;
+	  try {
+		const r = await fetch("/api/power", { cache: "no-store" });
+		const d = await r.json();
+		if (typeof d.on !== "boolean" || d.on === tvPowerOn) return;
+		if (d.on) crtPowerOn(); else crtPowerOff();
+	  } catch (e) {}
+	}, 500);
 	
 	// --- Estado del menú ---
 	let menuVisible = false;
@@ -2497,16 +2629,13 @@ function ejecutarSeleccion() {
     if (isBack(label)) return goBackFrom("power_confirm");
 
     if (label === tr("power.confirm")) {
-      mostrarOverlay(tr("overlay.shutting_down") || "…");
       ocultarMenu();
-      if (!window.__haltDispatched) {
-        window.__haltDispatched = true;
-        fetch("/api/power", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ action: "halt" })
-        }).catch(() => {});
-      }
+      // Standby suave: el poll de /api/power dispara la animación CRT
+      fetch("/api/power", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "off" })
+      }).catch(() => {});
       return;
     }
     return;
@@ -2651,6 +2780,16 @@ function ejecutarSeleccion() {
 
 		lastMenuPingTs = data.ts;
 
+		// 0) TV "apagada": cualquier toque del encoder la enciende
+		if (!tvPowerOn) {
+		  fetch("/api/power", {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ action: "on" })
+		  }).catch(() => {});
+		  return;
+		}
+
 		// 1) Cerrar QR de AP si está visible
 		if (wifiApModalVisible) {
 		  console.log("[WIFI][QR] Cerrar modal AP por menu_ping");
@@ -2707,6 +2846,16 @@ function ejecutarSeleccion() {
 		const r = await fetch("/api/menu_select", { cache: "no-store" });
 		const d = await r.json();
 		if (!d.ping) return;
+
+		// 0) TV "apagada": el select también la enciende
+		if (!tvPowerOn) {
+		  fetch("/api/power", {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ action: "on" })
+		  }).catch(() => {});
+		  return;
+		}
 
 		// 1) Prioridad: cerrar QR de AP
 		if (wifiApModalVisible) {
