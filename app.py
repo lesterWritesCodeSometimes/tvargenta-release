@@ -2802,6 +2802,8 @@ def api_volumen():
         with open(VOLUMEN_PATH, "w") as f:
             json.dump({"valor": nuevo_valor}, f)
         _write_json_atomic(VOLUMEN_PERSIST_PATH, {"valor": nuevo_valor})
+        with open("/tmp/trigger_volumen.json", "w") as f:
+            json.dump({"timestamp": time.time()}, f)
         return jsonify({"ok": True, "valor": nuevo_valor})
 
     # mÃ©todo GET
