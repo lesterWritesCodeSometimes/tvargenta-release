@@ -1131,6 +1131,13 @@
 
 	
 	function cargarSiguienteVideo(force = false) {
+	  // TV en standby: no cargamos nada — cada load/play abre y cierra el
+	  // dispositivo de audio y hace "pop" en el DAC. Reintentamos al encender.
+	  if (!tvPowerOn) {
+		pendingLoadWhileOff = true;
+		return;
+	  }
+
 	  const ahora = Date.now();
 
 	  // Minimal debounce to prevent double-triggers
@@ -1431,11 +1438,12 @@
 
 	// Broadcast channel sync polling
 	// For broadcast channels, periodically check if scheduled content has changed
-	function startBroadcastSync() {
-	  if (broadcastSyncInterval) return; // Already running
-
-	  broadcastSyncInterval = setInterval(async () => {
+	async function broadcastSyncTick() {
 		if (!isBroadcastChannel) return;
+
+		// TV en standby: no tocamos el video (evita pops del DAC);
+		// al encender, crtPowerOn llama a este tick para re-sincronizar
+		if (!tvPowerOn) return;
 
 		// Capture sequence before fetch to detect channel changes during request
 		const seqBeforeFetch = requestSequence;
@@ -1513,8 +1521,11 @@
 		} catch (e) {
 		  console.warn("[TV] Broadcast sync error:", e);
 		}
-	  }, BROADCAST_SYNC_INTERVAL_MS);
+	}
 
+	function startBroadcastSync() {
+	  if (broadcastSyncInterval) return; // Already running
+	  broadcastSyncInterval = setInterval(broadcastSyncTick, BROADCAST_SYNC_INTERVAL_MS);
 	  console.log("[TV] Broadcast sync started");
 	}
 
@@ -1578,6 +1589,7 @@
 	// --- Power (standby suave con animación CRT) ---
 	let tvPowerOn = true;
 	let powerAnimating = false;
+	let pendingLoadWhileOff = false; // hubo cambio de canal durante el standby
 	const powerOverlay = document.getElementById("power-overlay");
 	const powerLine = document.getElementById("power-line");
 
@@ -1611,7 +1623,13 @@
 	function crtPowerOn() {
 	  tvPowerOn = true;
 	  powerAnimating = true;
-	  video.play().catch(() => {});
+	  if (pendingLoadWhileOff) {
+		pendingLoadWhileOff = false;
+		cargarSiguienteVideo(false);
+	  } else {
+		video.play().catch(() => {});
+		if (isBroadcastChannel) broadcastSyncTick(); // ponerse al día con la grilla
+	  }
 	  powerOverlay.classList.remove("fade-out");
 	  powerOverlay.classList.add("visible");
 	  powerLine.classList.remove("anim-off");
