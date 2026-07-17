@@ -339,10 +339,16 @@ def get_commercials(metadata: dict = None) -> List[dict]:
     commercials = []
     for video_id, data in metadata.items():
         if data.get("category") == "commercial":
+            # A human-set "channels" key (even []) overrides auto-detection;
+            # otherwise fall back to daemon-detected channels. Empty = all.
+            if "channels" in data:
+                channels = data.get("channels") or []
+            else:
+                channels = data.get("detected_channels") or []
             commercials.append({
                 "video_id": video_id,
                 "duration": data.get("duracion") or 30,  # default 30s if unknown
-                "channels": data.get("channels") or [],  # empty = all channels
+                "channels": channels,  # empty = all channels
             })
 
     return commercials

@@ -1158,6 +1158,88 @@ def test_28_commercial_channel_filtering():
     return True
 
 
+def test_29_manual_channels_override_detected():
+    """Test 29: Human-set channels short-circuit auto-detected channels."""
+    print("\n=== Test 29: Manual channels override detected ===")
+
+    metadata = {
+        "c_untouched": {"category": "commercial", "duracion": 30},
+        "c_detected": {"category": "commercial", "duracion": 30,
+                       "detected_channels": ["channel_1"]},
+        "c_manual": {"category": "commercial", "duracion": 30,
+                     "channels": ["channel_2"],
+                     "detected_channels": ["channel_1"]},
+        "c_manual_all": {"category": "commercial", "duracion": 30,
+                         "channels": [],
+                         "detected_channels": ["channel_1"]},
+    }
+
+    result = {c["video_id"]: c["channels"] for c in scheduler.get_commercials(metadata)}
+
+    assert result["c_untouched"] == [], "No manual, no detection -> all channels"
+    print("  Untouched commercial -> all channels ✓")
+
+    assert result["c_detected"] == ["channel_1"], "Detection applies when no manual set"
+    print("  Detected channels used when human hasn't chosen ✓")
+
+    assert result["c_manual"] == ["channel_2"], "Manual list must beat detection"
+    print("  Manual selection overrides detection ✓")
+
+    assert result["c_manual_all"] == [], "Manual empty list (key present) must beat detection"
+    print("  Manual 'all channels' ([]) overrides detection ✓")
+
+    print("  Test 29 PASSED")
+    return True
+
+
+def test_30_channel_detection_matching():
+    """Test 30: Alias phrase matching for channel detection."""
+    print("\n=== Test 30: Channel detection matching ===")
+
+    import channel_detection
+
+    canales = {
+        "1": {"nombre": "Nickelodeon", "series_filter": ["A"],
+              "aliases": ["nick", "nick jr", "snick"]},
+        "2": {"nombre": "Cartoon Network", "series_filter": ["B"]},
+        "3": {"nombre": "Kids WB", "series_filter": ["C"]},
+        "9": {"nombre": "Regular Channel", "tags_prioridad": []},  # not broadcast
+    }
+    phrases = channel_detection.get_channel_phrases(canales)
+
+    assert "9" not in phrases, "Non-broadcast channels must not participate"
+    assert "snick" in phrases["1"] and "nickelodeon" in phrases["1"]
+    print("  Phrases built from nombre + aliases, broadcast channels only ✓")
+
+    # Synonym matches; punctuation and case are normalized away
+    hits = channel_detection.match_channels("Saturday night, only on SNICK!", phrases)
+    assert list(hits.keys()) == ["1"] and hits["1"] == ["snick"], hits
+    print("  Synonym 'snick' matches Nickelodeon ✓")
+
+    # Multi-word alias matches as a phrase
+    hits = channel_detection.match_channels("tonight on cartoon network", phrases)
+    assert "2" in hits, hits
+    print("  'cartoon network' phrase matches ✓")
+
+    # Component words alone must NOT match multi-word names
+    hits = channel_detection.match_channels("fun for kids on every network", phrases)
+    assert hits == {}, f"'kids'/'network' alone must not match, got {hits}"
+    print("  Bare 'kids' / 'network' do not match ✓")
+
+    # Word boundaries: 'nick' must not match inside 'nickel'
+    hits = channel_detection.match_channels("a shiny nickel for your thoughts", phrases)
+    assert hits == {}, f"'nickel' must not match 'nick', got {hits}"
+    print("  'nickel' does not match alias 'nick' ✓")
+
+    # Full detection result shape via match evidence
+    hits = channel_detection.match_channels("New episodes of Rugrats, only on Nickelodeon. Nick Jr in the morning.", phrases)
+    assert hits["1"] == ["nick", "nick jr", "nickelodeon"], hits
+    print("  Multiple alias hits collected as evidence ✓")
+
+    print("  Test 30 PASSED")
+    return True
+
+
 def run_all_tests():
     """Run all tests."""
     print("=" * 60)
@@ -1195,6 +1277,8 @@ def run_all_tests():
         test_26_empty_series_handling,
         test_27_independent_channel_cursors,
         test_28_commercial_channel_filtering,
+        test_29_manual_channels_override_detected,
+        test_30_channel_detection_matching,
     ]
 
     passed = 0

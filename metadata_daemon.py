@@ -16,6 +16,12 @@ Phase 1 (Fast Metadata):
 Phase 2 (Loudness Analysis):
 - loudness_lufs: Audio loudness in LUFS for volume normalization
 
+Phase 3 (Channel Detection, commercials only):
+- detected_channels: Channels whose name/aliases appear in the commercial's
+  speech (whisper.cpp) or on-screen text (tesseract). A human-set "channels"
+  field always wins over this at read time. Skipped when neither tool is
+  installed.
+
 Runs with low resource priority (nice/ionice) but processes videos continuously
 without throttling between them.
 
@@ -26,9 +32,10 @@ The daemon will:
 1. Phase 0: Scan directories for new videos (series + commercials)
 2. Phase 1: Process ALL videos for duration and thumbnails (fast)
 3. Phase 2: Process ALL videos for loudness analysis (slow)
-4. Sleep only when all metadata is complete
-5. Use nice/ionice for low CPU/IO priority
-6. Log all activity to content/logs/metadata_daemon.log
+4. Phase 3: Process commercials for channel detection (slow)
+5. Sleep only when all metadata is complete
+6. Use nice/ionice for low CPU/IO priority
+7. Log all activity to content/logs/metadata_daemon.log
 """
 
 import json
@@ -43,6 +50,8 @@ import fcntl
 from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
+
+import channel_detection
 
 # Configuration
 CHECK_INTERVAL = 300          # Seconds between scans when all metadata is complete (5 minutes)
@@ -60,6 +69,7 @@ COMMERCIALS_DIR = VIDEO_DIR / "commercials"
 METADATA_FILE = CONTENT_DIR / "metadata.json"
 METADATA_LOCK_FILE = CONTENT_DIR / ".metadata.lock"
 SERIES_FILE = CONTENT_DIR / "series.json"
+CANALES_FILE = CONTENT_DIR / "canales.json"
 THUMB_DIR = CONTENT_DIR / "thumbnails"
 LOG_DIR = CONTENT_DIR / "logs"
 LOG_FILE = LOG_DIR / "metadata_daemon.log"
@@ -537,6 +547,95 @@ def find_videos_needing_loudness(metadata):
     return needs_work
 
 
+def load_canales():
+    """Load channel configurations from canales.json."""
+    if CANALES_FILE.exists():
+        with open(CANALES_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    return {}
+
+
+def find_commercials_needing_channel_detection(metadata):
+    """
+    Phase 3: Find commercials that haven't been through channel detection.
+    Returns an empty list when the detection tools aren't installed or no
+    broadcast channels exist, so the daemon can still go idle.
+    Returns list of (video_id, info, missing_fields) tuples.
+    """
+    if not channel_detection.detection_available():
+        return []
+    if not channel_detection.get_channel_phrases(load_canales()):
+        return []
+
+    needs_work = []
+    for video_id, info in metadata.items():
+        if info.get("category") != "commercial":
+            continue
+        if "detected_channels" not in info:
+            needs_work.append((video_id, info, ["detected_channels"]))
+
+    return needs_work
+
+
+def run_channel_detection_phase():
+    """
+    Phase 3: Run channel detection on commercials missing it.
+    Always writes detected_channels (empty list on no match) so each
+    commercial is analyzed exactly once. Returns number processed.
+    """
+    global running
+
+    metadata = load_metadata()
+    needs_work = find_commercials_needing_channel_detection(metadata)
+    if not needs_work:
+        return 0
+
+    canales = load_canales()
+    total = len(needs_work)
+    logger.info(f"[Phase 3] Found {total} commercials to analyze")
+    logger.info(f"[Phase 3] STT: {'yes' if channel_detection.stt_available() else 'no'}, "
+                f"OCR: {'yes' if channel_detection.ocr_available() else 'no'}")
+
+    processed = 0
+    for video_id, info, _ in needs_work:
+        if not running:
+            break
+
+        filepath = get_video_path(video_id, info)
+        if not filepath.exists():
+            logger.warning(f"[Phase 3] File not found: {filepath}")
+            processed += 1
+            continue
+
+        logger.info(f"[Phase 3] Processing {processed + 1}/{total}: {video_id}")
+        try:
+            channels, evidence = channel_detection.detect_channels(
+                filepath, canales,
+                duration=info.get("duracion"),
+                run_cmd=run_throttled
+            )
+        except Exception as e:
+            logger.error(f"[Phase 3] Detection failed for {video_id}: {e}")
+            processed += 1
+            continue
+
+        save_metadata_fields(video_id, {
+            "detected_channels": channels,
+            "detected_channels_evidence": evidence,
+        })
+
+        if channels:
+            names = {cid: canales.get(cid, {}).get("nombre", cid) for cid in channels}
+            logger.info(f"[Phase 3] {video_id} -> {names} (evidence: {evidence})")
+        else:
+            logger.info(f"[Phase 3] {video_id} -> no channel mentions (all channels)")
+
+        processed += 1
+
+    logger.info(f"[Phase 3] Complete - processed {processed} commercials")
+    return processed
+
+
 def process_one_video(video_id, info, missing_fields):
     """
     Process a single video to populate missing metadata.
@@ -643,10 +742,14 @@ def run_daemon():
     logger.info(f"  Nice level: {NICE_LEVEL}")
     logger.info(f"  I/O class: {IONICE_CLASS} (best-effort), priority: {IONICE_PRIORITY}")
     logger.info(f"  Log file: {LOG_FILE}")
-    logger.info(f"Three-phase operation:")
+    logger.info(f"Four-phase operation:")
     logger.info(f"  Phase 0: Directory Scan (discover new videos)")
     logger.info(f"  Phase 1: Duration + Thumbnails (fast)")
     logger.info(f"  Phase 2: Loudness Analysis (slow)")
+    logger.info(f"  Phase 3: Channel Detection (commercials, slow)")
+    if not channel_detection.detection_available():
+        logger.warning("Phase 3 disabled: neither whisper-cli nor tesseract found "
+                       "(install them to enable commercial channel detection)")
 
     while running:
         try:
@@ -667,8 +770,9 @@ def run_daemon():
             # Check if any work is needed
             fast_work = find_videos_needing_fast_metadata(metadata)
             loudness_work = find_videos_needing_loudness(metadata)
+            detection_work = find_commercials_needing_channel_detection(metadata)
 
-            if not fast_work and not loudness_work:
+            if not fast_work and not loudness_work and not detection_work:
                 logger.info(f"All videos have complete metadata, sleeping {CHECK_INTERVAL}s...")
                 time.sleep(CHECK_INTERVAL)
                 continue
@@ -689,6 +793,15 @@ def run_daemon():
                     logger.info("PHASE 2: Loudness Analysis")
                     logger.info("=" * 50)
                     run_phase("Phase 2", find_videos_needing_loudness)
+
+            # Phase 3: Channel detection for commercials
+            if running:
+                detection_work = find_commercials_needing_channel_detection(load_metadata())
+                if detection_work:
+                    logger.info("=" * 50)
+                    logger.info("PHASE 3: Channel Detection")
+                    logger.info("=" * 50)
+                    run_channel_detection_phase()
 
             # After all phases complete, loop back to check for new videos
             logger.info("All phases complete, checking for new videos...")

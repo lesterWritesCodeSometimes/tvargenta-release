@@ -1241,7 +1241,8 @@ def edit_video(video_id):
 
         # Preserve existing fields not exposed in the edit form
         if video_id in metadata:
-            for key in ["duracion", "loudness_lufs", "commercials_path", "channels"]:
+            for key in ["duracion", "loudness_lufs", "commercials_path", "channels",
+                        "detected_channels", "detected_channels_evidence"]:
                 if key in metadata[video_id]:
                     video_data[key] = metadata[video_id][key]
 
@@ -2290,11 +2291,21 @@ def get_commercials_list():
                 "duration": data.get("duracion", 0),
                 "tags": data.get("tags", []),
                 "fecha": data.get("fecha", ""),
-                "channels": data.get("channels", []),
+                "channels": commercial_effective_channels(data),
+                "channels_manual": "channels" in data,
+                "detected_channels": data.get("detected_channels") or [],
             })
     # Sort by title
     commercials.sort(key=lambda x: x["title"].lower())
     return commercials
+
+
+def commercial_effective_channels(data):
+    """Effective channel list: human-set "channels" (key present, even [])
+    overrides daemon-detected channels. Empty = all channels."""
+    if "channels" in data:
+        return data.get("channels") or []
+    return data.get("detected_channels") or []
 
 
 @app.route("/upload/commercials", methods=["GET"])
@@ -2478,9 +2489,12 @@ def delete_commercial(video_id):
         return jsonify({"ok": False, "error": str(e)}), 500
 
 
-@app.route("/api/commercials/<video_id>/channels", methods=["PUT"])
+@app.route("/api/commercials/<video_id>/channels", methods=["PUT", "DELETE"])
 def set_commercial_channels(video_id):
-    """Set which channels a commercial is eligible for (empty list = all channels)."""
+    """
+    PUT: set which channels a commercial airs on (empty list = all channels).
+    DELETE: remove the human-set list, deferring to auto-detection again.
+    """
     global metadata
     metadata = load_metadata()
 
@@ -2488,6 +2502,13 @@ def set_commercial_channels(video_id):
         return jsonify({"ok": False, "error": "Commercial not found"}), 404
     if metadata[video_id].get("category") != "commercial":
         return jsonify({"ok": False, "error": "Video is not a commercial"}), 400
+
+    if request.method == "DELETE":
+        metadata[video_id].pop("channels", None)
+        save_metadata(metadata)
+        detected = metadata[video_id].get("detected_channels") or []
+        logger.info(f"[COMMERCIALS] Reset channels for {video_id} to auto ({detected or 'all'})")
+        return jsonify({"ok": True, "channels": detected, "channels_manual": False})
 
     body = request.get_json(silent=True) or {}
     channels = body.get("channels", [])
@@ -2503,7 +2524,7 @@ def set_commercial_channels(video_id):
     save_metadata(metadata)
 
     logger.info(f"[COMMERCIALS] Set channels for {video_id}: {metadata[video_id]['channels'] or 'all'}")
-    return jsonify({"ok": True, "channels": metadata[video_id]["channels"]})
+    return jsonify({"ok": True, "channels": metadata[video_id]["channels"], "channels_manual": True})
 
 
 @app.route("/api/commercials")
@@ -2520,7 +2541,9 @@ def api_commercials():
                 "title": data.get("title", video_id),
                 "duration": data.get("duracion", 0),
                 "tags": data.get("tags", []),
-                "channels": data.get("channels", [])
+                "channels": commercial_effective_channels(data),
+                "channels_manual": "channels" in data,
+                "detected_channels": data.get("detected_channels") or []
             })
 
     # Sort by title

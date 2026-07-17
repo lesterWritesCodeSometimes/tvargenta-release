@@ -97,6 +97,12 @@
       background: rgba(34, 197, 94, 0.2);
       color: #4ade80;
     }
+    /* Auto-detected (no human selection yet): amber instead of green */
+    .channel-chips.auto .channel-chip.active {
+      border-color: #f59e0b;
+      background: rgba(245, 158, 11, 0.15);
+      color: #fbbf24;
+    }
     .channel-chip.saving {
       opacity: 0.5;
       pointer-events: none;
@@ -156,6 +162,8 @@
       </div>
       <p class="text-xs text-gray-500 mb-4">
         Pick which channels each commercial can air on — no selection means it airs on all channels.
+        Amber chips are auto-detected from the commercial's audio and on-screen text; touching the
+        chips makes your selection permanent, and "↺ auto" returns to detection.
         Changes take effect when a channel's schedule is next rebuilt.
       </p>
 
@@ -190,14 +198,24 @@
             </div>
           </div>
           <!-- Channel assignment -->
+          {% set is_auto = (not comm.channels_manual) and comm.channels %}
           <div class="mt-3 pt-3 border-t border-gray-700">
             <div class="flex items-center justify-between mb-1.5">
               <span class="text-[10px] uppercase tracking-wider text-gray-500">Channels</span>
-              <span class="channels-hint text-[10px] {{ 'text-gray-400' if not comm.channels else 'text-green-400' }}">
-                {{ 'All channels' if not comm.channels else 'Selected only' }}
+              <span class="flex items-center gap-2">
+                <button type="button"
+                        onclick="resetChannels('{{ comm.video_id }}')"
+                        title="Discard manual selection and use auto-detection"
+                        class="reset-auto text-[10px] text-gray-500 hover:text-amber-400 underline {{ '' if comm.channels_manual else 'hidden' }}">
+                  ↺ auto
+                </button>
+                <span class="channels-hint text-[10px] {{ 'text-amber-400' if is_auto else ('text-green-400' if comm.channels else 'text-gray-400') }}">
+                  {{ 'Auto-detected' if is_auto else ('Selected only' if comm.channels else 'All channels') }}
+                </span>
               </span>
             </div>
-            <div class="flex flex-wrap gap-1 channel-chips" data-video-id="{{ comm.video_id }}">
+            <div class="flex flex-wrap gap-1 channel-chips {{ 'auto' if is_auto else '' }}"
+                 data-video-id="{{ comm.video_id }}">
               {% for ch in channel_options %}
               <button type="button"
                       onclick="toggleChannel('{{ comm.video_id }}', '{{ ch.id }}', this)"
@@ -475,44 +493,70 @@
       });
     }
 
+    // Reflect a commercial's channel state (list + manual/auto) in its card
+    function renderChannelState(videoId, channels, manual) {
+      const chips = document.querySelector(`.channel-chips[data-video-id="${videoId}"]`);
+      const card = chips.closest('.commercial-card');
+      const hint = card.querySelector('.channels-hint');
+      const resetBtn = card.querySelector('.reset-auto');
+      const isAuto = !manual && channels.length > 0;
+
+      chips.querySelectorAll('.channel-chip').forEach(b => {
+        b.classList.toggle('active', channels.includes(b.dataset.channelId));
+      });
+      chips.classList.toggle('auto', isAuto);
+      resetBtn.classList.toggle('hidden', !manual);
+
+      hint.classList.remove('text-gray-400', 'text-green-400', 'text-amber-400');
+      if (isAuto) {
+        hint.textContent = 'Auto-detected';
+        hint.classList.add('text-amber-400');
+      } else if (channels.length > 0) {
+        hint.textContent = 'Selected only';
+        hint.classList.add('text-green-400');
+      } else {
+        hint.textContent = 'All channels';
+        hint.classList.add('text-gray-400');
+      }
+    }
+
+    async function saveChannels(videoId, method, body) {
+      const chips = document.querySelector(`.channel-chips[data-video-id="${videoId}"]`);
+      chips.querySelectorAll('.channel-chip').forEach(b => b.classList.add('saving'));
+      try {
+        const response = await fetch(`/api/commercials/${videoId}/channels`, {
+          method: method,
+          headers: { 'Content-Type': 'application/json' },
+          body: body ? JSON.stringify(body) : undefined
+        });
+        const data = await response.json();
+        if (!data.ok) throw new Error(data.error || 'Save failed');
+        renderChannelState(videoId, data.channels, data.channels_manual);
+        return true;
+      } catch (err) {
+        alert(`Failed to save channels: ${err.message}`);
+        return false;
+      } finally {
+        chips.querySelectorAll('.channel-chip').forEach(b => b.classList.remove('saving'));
+      }
+    }
+
     async function toggleChannel(videoId, channelId, btn) {
       const chips = document.querySelector(`.channel-chips[data-video-id="${videoId}"]`);
       const wasActive = btn.classList.contains('active');
 
-      // Optimistic toggle, then collect the full selection for this commercial
+      // Optimistic toggle, then save the full selection as a manual choice
+      // (starting from whatever was displayed, including auto-detected chips)
       btn.classList.toggle('active');
       const selected = Array.from(chips.querySelectorAll('.channel-chip.active'))
         .map(b => b.dataset.channelId);
 
-      chips.querySelectorAll('.channel-chip').forEach(b => b.classList.add('saving'));
+      const ok = await saveChannels(videoId, 'PUT', { channels: selected });
+      if (!ok) btn.classList.toggle('active', wasActive);
+    }
 
-      try {
-        const response = await fetch(`/api/commercials/${videoId}/channels`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ channels: selected })
-        });
-        const data = await response.json();
-        if (!data.ok) throw new Error(data.error || 'Save failed');
-
-        // Update the "All channels / Selected only" hint
-        const hint = chips.closest('.commercial-card').querySelector('.channels-hint');
-        if (selected.length === 0) {
-          hint.textContent = 'All channels';
-          hint.classList.remove('text-green-400');
-          hint.classList.add('text-gray-400');
-        } else {
-          hint.textContent = 'Selected only';
-          hint.classList.remove('text-gray-400');
-          hint.classList.add('text-green-400');
-        }
-      } catch (err) {
-        // Revert on failure
-        btn.classList.toggle('active', wasActive);
-        alert(`Failed to save channels: ${err.message}`);
-      } finally {
-        chips.querySelectorAll('.channel-chip').forEach(b => b.classList.remove('saving'));
-      }
+    async function resetChannels(videoId) {
+      await saveChannels(videoId, 'DELETE', null);
     }
 
     async function deleteCommercial(videoId, title) {
