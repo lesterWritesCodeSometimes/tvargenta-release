@@ -14,6 +14,13 @@ which channels the commercial belongs to. Results go in the commercial's
 "detected_channels" metadata field; a human-set "channels" field (key present,
 even if empty) always takes precedence at read time.
 
+Extraction is expensive (~1 min per spot on a Pi 4) so its output is cached in
+content/channel_detection_cache.json — one entry per commercial with the raw
+transcript and deduped on-screen text. Matching is pure text-vs-text and can be
+re-run for free whenever alias phrases change; the cache stores a fingerprint
+of the phrases it was last matched against so any editor (UI or hand-edit of
+canales.json) makes the daemon rematch everything on its next cycle.
+
 Alias phrases live in canales.json per channel:
 
     "1": {"nombre": "Nickelodeon", "aliases": ["nick", "nick jr", "snick"], ...}
@@ -29,11 +36,14 @@ External tools (all optional — detection degrades to whichever are present):
 - tesseract: OCR on sampled frames
 """
 
+import hashlib
+import json
 import os
 import re
 import shutil
 import subprocess
 import tempfile
+from datetime import datetime
 from pathlib import Path
 
 # Speech-to-text: whisper.cpp binary and model, overridable via environment
@@ -148,12 +158,16 @@ def transcribe_audio(video_path, duration=None, run_cmd=_run):
 def ocr_video_frames(video_path, run_cmd=_run):
     """
     Sample frames from the video and OCR each one.
-    Returns the concatenated OCR text ("" on failure or no text).
+    Frames whose text duplicates an earlier frame are dropped (a held end card
+    yields one copy), but word ORDER within a frame is preserved — multi-word
+    aliases match as phrases, so this must stay ordered text, not a word set.
+    Returns the deduped OCR text ("" on failure or no text).
     """
     if not ocr_available():
         return ""
 
     texts = []
+    seen = set()
     with tempfile.TemporaryDirectory(prefix="tva_ocr_") as tmpdir:
         _, stderr, ok = run_cmd([
             "ffmpeg", "-y", "-i", str(video_path),
@@ -169,29 +183,80 @@ def ocr_video_frames(video_path, run_cmd=_run):
                 [TESSERACT_BIN, str(frame), "stdout"], timeout=60
             )
             if ok and stdout.strip():
-                texts.append(stdout)
+                key = normalize_text(stdout)
+                if key and key not in seen:
+                    seen.add(key)
+                    texts.append(stdout.strip())
 
     return "\n".join(texts)
 
 
-def detect_channels(video_path, canales, duration=None, run_cmd=_run):
+# ============================================================================
+# EXTRACTION CACHE
+# ============================================================================
+#
+# Cache file format (one per install, lives next to metadata.json):
+#   {
+#     "version": 1,
+#     "phrases_fingerprint": "<sha1 of the alias phrases last matched against>",
+#     "entries": {"<video_id>": {"transcript": "...", "screen_text": "...",
+#                                "extracted_at": "<iso>"}}
+#   }
+# Callers are responsible for locking around save_cache (the daemon and app
+# both serialize writes through the shared metadata lock).
+
+def load_cache(path):
+    """Load the extraction cache, returning an empty structure if absent/corrupt."""
+    p = Path(path)
+    if p.exists():
+        try:
+            with open(p, "r", encoding="utf-8") as f:
+                cache = json.load(f)
+            if isinstance(cache.get("entries"), dict):
+                return cache
+        except Exception:
+            pass
+    return {"version": 1, "phrases_fingerprint": None, "entries": {}}
+
+
+def save_cache(path, cache):
+    """Atomically write the extraction cache."""
+    p = Path(path)
+    tmp = p.with_suffix(".json.tmp")
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(cache, f, ensure_ascii=False)
+        f.flush()
+        os.fsync(f.fileno())
+    os.replace(tmp, p)
+
+
+def phrases_fingerprint(channel_phrases):
+    """Stable fingerprint of the alias phrase config, for staleness detection."""
+    canonical = json.dumps(channel_phrases, sort_keys=True)
+    return hashlib.sha1(canonical.encode("utf-8")).hexdigest()
+
+
+def extract_text(video_path, duration=None, run_cmd=_run):
     """
-    Full detection pass for one commercial.
+    The expensive half of detection: run STT and OCR once for a commercial.
+    Returns a cache entry dict {"transcript", "screen_text", "extracted_at"}.
+    """
+    return {
+        "transcript": transcribe_audio(video_path, duration=duration, run_cmd=run_cmd),
+        "screen_text": ocr_video_frames(video_path, run_cmd=run_cmd),
+        "extracted_at": datetime.now().isoformat(timespec="seconds"),
+    }
+
+
+def match_entry(entry, channel_phrases):
+    """
+    The free half of detection: match a cached extraction against phrases.
     Returns (channel_ids, evidence) where channel_ids is a sorted list and
     evidence maps channel_id -> {"audio": [phrases], "screen": [phrases]}.
     """
-    channel_phrases = get_channel_phrases(canales)
-    if not channel_phrases:
-        return [], {}
-
     evidence = {}
-
-    transcript = transcribe_audio(video_path, duration=duration, run_cmd=run_cmd)
-    for channel_id, matched in match_channels(transcript, channel_phrases).items():
+    for channel_id, matched in match_channels(entry.get("transcript", ""), channel_phrases).items():
         evidence.setdefault(channel_id, {})["audio"] = matched
-
-    screen_text = ocr_video_frames(video_path, run_cmd=run_cmd)
-    for channel_id, matched in match_channels(screen_text, channel_phrases).items():
+    for channel_id, matched in match_channels(entry.get("screen_text", ""), channel_phrases).items():
         evidence.setdefault(channel_id, {})["screen"] = matched
-
     return sorted(evidence.keys()), evidence

@@ -33,13 +33,14 @@ from settings import (
     SPLASH_DIR, SPLASH_STATE_FILE, INTRO_PATH, CHROME_PROFILE, CHROME_CACHE,
     PLAYS_FILE, USER, UPLOAD_STATUS, TMP_DIR, CONFIG_PATH, LOG_DIR, I18N_DIR,
     VCR_STATE_FILE, VCR_TRIGGER_FILE, TAPES_FILE, VCR_RECORDING_STATE_FILE,
-    SERIES_FILE, SERIES_VIDEO_DIR, COMMERCIALS_DIR,
+    SERIES_FILE, SERIES_VIDEO_DIR, COMMERCIALS_DIR, CHANNEL_DETECTION_CACHE_FILE,
 )
 import re
 import bluetooth_manager
 import wifi_manager
 import vcr_manager
 import scheduler
+import channel_detection
 
 
        
@@ -2687,6 +2688,45 @@ def canales():
 
     return render_template("canales.html", canales=canales_data, all_series=all_series, active_page='channels')
 
+def rematch_commercial_channels():
+    """
+    Re-run channel detection matching for all commercials with a cached
+    extraction, after channel names/aliases changed. Pure text matching from
+    the cache — no STT/OCR cost. Commercials not yet cached are picked up by
+    the metadata daemon. Returns number of commercials whose verdict changed.
+    """
+    global metadata
+    cache = channel_detection.load_cache(CHANNEL_DETECTION_CACHE_FILE)
+    entries = cache.get("entries", {})
+    canales = load_canales()
+    phrases = channel_detection.get_channel_phrases(canales)
+
+    metadata = load_metadata()
+    changed = 0
+    for video_id, entry in entries.items():
+        info = metadata.get(video_id)
+        if not info or info.get("category") != "commercial":
+            continue
+        channels, evidence = channel_detection.match_entry(entry, phrases)
+        if (info.get("detected_channels") != channels
+                or info.get("detected_channels_evidence") != evidence):
+            info["detected_channels"] = channels
+            info["detected_channels_evidence"] = evidence
+            changed += 1
+
+    if changed:
+        save_metadata(metadata)
+
+    # Record what we matched against so the daemon doesn't redo this
+    cache["phrases_fingerprint"] = channel_detection.phrases_fingerprint(phrases)
+    with metadata_lock():
+        channel_detection.save_cache(CHANNEL_DETECTION_CACHE_FILE, cache)
+
+    if entries:
+        logger.info(f"[CANALES] Rematched {len(entries)} cached commercials, {changed} verdicts changed")
+    return changed
+
+
 @app.route("/guardar_canal", methods=["POST"])
 def guardar_canal():
     canal_id = request.form.get("canal_id")
@@ -2696,6 +2736,12 @@ def guardar_canal():
     tags_prioridad = request.form.getlist("tags_prioridad")
     series_filter = request.form.getlist("series_filter")
     intro = request.form.get("intro_video_id", "").strip()
+    aliases_raw = request.form.get("aliases", "")
+    aliases = []
+    for alias in aliases_raw.split(","):
+        alias = alias.strip()
+        if alias and alias.lower() not in [a.lower() for a in aliases]:
+            aliases.append(alias)
 
     if not nombre:
         return redirect(url_for("canales"))
@@ -2707,19 +2753,28 @@ def guardar_canal():
         existing_ids = [int(k) for k in canales.keys() if k.isdigit()]
         canal_id = str(max(existing_ids, default=0) + 1)
 
-    nuevo_canal = {
+    # Start from the existing config so keys the form doesn't cover
+    # (e.g. min_gap_minutes) survive a save
+    nuevo_canal = dict(canales.get(canal_id, {}))
+    nuevo_canal.update({
         "nombre": nombre,
         "descripcion": descripcion,
         "icono": icono,
         "tags_prioridad": tags_prioridad,
-        "series_filter": series_filter
-    }
+        "series_filter": series_filter,
+        "aliases": aliases,
+    })
 
+    # The canales form has no intro_video_id field; only set it when some
+    # caller provides one, and otherwise leave any existing value untouched
     if intro:
         nuevo_canal["intro_video_id"] = intro
 
     canales[canal_id] = nuevo_canal
     save_canales(canales)
+
+    # Name/alias changes affect commercial channel detection
+    rematch_commercial_channels()
     return redirect(url_for("canales"))
 
 
@@ -2729,6 +2784,8 @@ def eliminar_canal(canal_id):
     if canal_id in canales:
         del canales[canal_id]
         save_canales(canales)
+        # Detections pointing at the deleted channel must be dropped
+        rematch_commercial_channels()
     return redirect(url_for("canales"))
 
 @app.route("/editar_canal/<canal_id>")

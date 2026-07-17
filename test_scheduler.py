@@ -1240,6 +1240,58 @@ def test_30_channel_detection_matching():
     return True
 
 
+def test_31_detection_cache_and_rematch():
+    """Test 31: Cached extractions rematch without re-extraction."""
+    print("\n=== Test 31: Detection cache and rematch ===")
+
+    import channel_detection
+
+    canales = {
+        "1": {"nombre": "Nickelodeon", "series_filter": ["A"], "aliases": ["nick"]},
+        "2": {"nombre": "Cartoon Network", "series_filter": ["B"]},
+    }
+    phrases = channel_detection.get_channel_phrases(canales)
+
+    # match_entry works purely from cached text, splitting evidence by source
+    entry = {"transcript": "Only on Nickelodeon!", "screen_text": "CARTOON\nNETWORK"}
+    channels, evidence = channel_detection.match_entry(entry, phrases)
+    assert channels == ["1", "2"], channels
+    assert evidence["1"] == {"audio": ["nickelodeon"]}, evidence
+    assert evidence["2"] == {"screen": ["cartoon network"]}, evidence
+    print("  match_entry matches cached transcript + screen text ✓")
+
+    # Fingerprint is stable for identical phrases, changes when aliases change
+    fp1 = channel_detection.phrases_fingerprint(phrases)
+    fp2 = channel_detection.phrases_fingerprint(
+        channel_detection.get_channel_phrases(dict(reversed(list(canales.items())))))
+    assert fp1 == fp2, "Fingerprint must not depend on dict order"
+    canales["2"]["aliases"] = ["toonami"]
+    fp3 = channel_detection.phrases_fingerprint(channel_detection.get_channel_phrases(canales))
+    assert fp3 != fp1, "Fingerprint must change when aliases change"
+    print("  Phrase fingerprint stable across ordering, changes on alias edit ✓")
+
+    # New alias applies to the cached entry with no re-extraction
+    entry2 = {"transcript": "coming up on toonami", "screen_text": ""}
+    channels, evidence = channel_detection.match_entry(
+        entry2, channel_detection.get_channel_phrases(canales))
+    assert channels == ["2"] and evidence["2"] == {"audio": ["toonami"]}
+    print("  Newly added alias matches cached text ✓")
+
+    # Cache round-trip
+    cache_path = TEST_CONTENT_DIR / "channel_detection_cache.json"
+    cache = channel_detection.load_cache(cache_path)
+    assert cache["entries"] == {} and cache["phrases_fingerprint"] is None
+    cache["entries"]["spot_1"] = entry
+    cache["phrases_fingerprint"] = fp3
+    channel_detection.save_cache(cache_path, cache)
+    reloaded = channel_detection.load_cache(cache_path)
+    assert reloaded == cache, "Cache must round-trip"
+    print("  Cache file round-trips ✓")
+
+    print("  Test 31 PASSED")
+    return True
+
+
 def run_all_tests():
     """Run all tests."""
     print("=" * 60)
@@ -1279,6 +1331,7 @@ def run_all_tests():
         test_28_commercial_channel_filtering,
         test_29_manual_channels_override_detected,
         test_30_channel_detection_matching,
+        test_31_detection_cache_and_rematch,
     ]
 
     passed = 0

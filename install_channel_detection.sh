@@ -39,8 +39,12 @@ else
   echo "== Whisper model already present, skipping download =="
 fi
 
-echo "== Restarting TVArgenta so the daemon picks up the tools =="
-systemctl restart tvargenta.service
+if systemctl is-active --quiet tvargenta.service; then
+  echo "== Restarting TVArgenta so the daemon picks up the tools =="
+  systemctl restart tvargenta.service
+else
+  echo "== TVArgenta service not running (fresh install?) - skipping restart =="
+fi
 
 echo "Done. Watch detection progress with:"
 echo "  tail -f /srv/tvargenta/content/logs/metadata_daemon.log"

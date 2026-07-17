@@ -136,6 +136,17 @@
                       class="w-full bg-gray-800 text-white px-3 py-2 rounded border border-gray-600 text-sm">{{ canal.descripcion or '' }}</textarea>
           </div>
 
+          <div>
+            <label class="block text-xs mb-1 text-amber-300">Detection aliases</label>
+            <input type="text" name="aliases" value="{{ (canal.aliases or []) | join(', ') }}"
+                   placeholder="e.g. nick, nick jr, snick"
+                   class="w-full bg-gray-800 text-white px-3 py-2 rounded border border-gray-600 focus:border-amber-500 text-sm">
+            <p class="text-[11px] text-gray-500 mt-1">
+              Comma-separated words/phrases that identify this channel in commercials
+              (the channel name always matches). Saving re-checks all analyzed commercials.
+            </p>
+          </div>
+
           {% if all_series %}
           <div>
             <label class="block text-xs mb-2 text-purple-300 font-semibold">Series Filter</label>
@@ -199,6 +210,16 @@
             <label class="block text-xs mb-1 text-gray-400">{{ tr("canales.form.label_desc") }}</label>
             <textarea name="descripcion" rows="2" placeholder="Brief description..."
                       class="w-full bg-gray-800 text-white px-3 py-2 rounded border border-gray-600 text-sm"></textarea>
+          </div>
+
+          <div>
+            <label class="block text-xs mb-1 text-amber-300">Detection aliases</label>
+            <input type="text" name="aliases" placeholder="e.g. nick, nick jr, snick"
+                   class="w-full bg-gray-800 text-white px-3 py-2 rounded border border-gray-600 focus:border-amber-500 text-sm">
+            <p class="text-[11px] text-gray-500 mt-1">
+              Comma-separated words/phrases that identify this channel in commercials
+              (the channel name always matches).
+            </p>
           </div>
 
           {% if all_series %}

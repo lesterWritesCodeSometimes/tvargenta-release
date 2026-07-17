@@ -691,6 +691,28 @@ build_encoder() {
 }
 
 # =============================================================================
+# CHANNEL DETECTION
+# Installs whisper.cpp + tesseract for commercial channel detection (Phase 3
+# of the metadata daemon)
+# =============================================================================
+setup_channel_detection() {
+    log_info "Setting up channel-detection dependencies..."
+
+    local INSTALL_DIR="/srv/tvargenta"
+    local SCRIPT="${INSTALL_DIR}/install_channel_detection.sh"
+
+    if [[ ! -f "$SCRIPT" ]]; then
+        log_error "install_channel_detection.sh not found at ${SCRIPT}"
+        log_error "Run install_app first."
+        exit 1
+    fi
+
+    sudo bash "$SCRIPT"
+
+    log_info "Channel detection setup complete!"
+}
+
+# =============================================================================
 # MAIN
 # =============================================================================
 main() {
@@ -731,6 +753,9 @@ main() {
         build_encoder)
             build_encoder
             ;;
+        setup_channel_detection)
+            setup_channel_detection
+            ;;
         legacy)
             legacy
             ;;
@@ -741,6 +766,7 @@ main() {
             install_app
             setup_venv
             build_encoder
+            setup_channel_detection
             install_services
             setup_audio
             setup_display
@@ -754,6 +780,7 @@ main() {
             echo "  install_app        - Clone TVArgenta repo to /srv/tvargenta"
             echo "  setup_venv         - Create Python venv and install packages"
             echo "  build_encoder      - Compile encoder_reader C binary"
+            echo "  setup_channel_detection - Install whisper.cpp + tesseract for commercial channel detection"
             echo "  install_services   - Install systemd services"
             echo "  setup_audio        - Configure ALSA for HiFiBerry DAC"
             echo "  setup_display      - Configure autologin with X11 session"

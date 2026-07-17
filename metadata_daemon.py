@@ -70,6 +70,7 @@ METADATA_FILE = CONTENT_DIR / "metadata.json"
 METADATA_LOCK_FILE = CONTENT_DIR / ".metadata.lock"
 SERIES_FILE = CONTENT_DIR / "series.json"
 CANALES_FILE = CONTENT_DIR / "canales.json"
+CHANNEL_CACHE_FILE = CONTENT_DIR / "channel_detection_cache.json"
 THUMB_DIR = CONTENT_DIR / "thumbnails"
 LOG_DIR = CONTENT_DIR / "logs"
 LOG_FILE = LOG_DIR / "metadata_daemon.log"
@@ -557,80 +558,135 @@ def load_canales():
 
 def find_commercials_needing_channel_detection(metadata):
     """
-    Phase 3: Find commercials that haven't been through channel detection.
-    Returns an empty list when the detection tools aren't installed or no
-    broadcast channels exist, so the daemon can still go idle.
-    Returns list of (video_id, info, missing_fields) tuples.
+    Phase 3: Find channel-detection work.
+    Work exists when a commercial has no cached extraction (needs the tools),
+    has a cached extraction but no detected_channels field (match is free),
+    or the alias phrases changed since the cache was last matched (rematch).
+    Returns a list of work descriptors; empty means the daemon can idle.
     """
-    if not channel_detection.detection_available():
+    phrases = channel_detection.get_channel_phrases(load_canales())
+    if not phrases:
         return []
-    if not channel_detection.get_channel_phrases(load_canales()):
-        return []
+
+    cache = channel_detection.load_cache(CHANNEL_CACHE_FILE)
+    entries = cache.get("entries", {})
 
     needs_work = []
     for video_id, info in metadata.items():
         if info.get("category") != "commercial":
             continue
-        if "detected_channels" not in info:
-            needs_work.append((video_id, info, ["detected_channels"]))
+        if video_id not in entries:
+            if channel_detection.detection_available():
+                needs_work.append((video_id, info, ["extract"]))
+        elif "detected_channels" not in info:
+            needs_work.append((video_id, info, ["match"]))
+
+    if entries and cache.get("phrases_fingerprint") != channel_detection.phrases_fingerprint(phrases):
+        needs_work.append(("__phrases_changed__", {}, ["rematch"]))
 
     return needs_work
 
 
+def save_channel_match(video_id, channels, evidence, canales):
+    """Persist one commercial's match result and log the verdict."""
+    save_metadata_fields(video_id, {
+        "detected_channels": channels,
+        "detected_channels_evidence": evidence,
+    })
+    if channels:
+        names = {cid: canales.get(cid, {}).get("nombre", cid) for cid in channels}
+        logger.info(f"[Phase 3] {video_id} -> {names} (evidence: {evidence})")
+    else:
+        logger.info(f"[Phase 3] {video_id} -> no channel mentions (all channels)")
+
+
 def run_channel_detection_phase():
     """
-    Phase 3: Run channel detection on commercials missing it.
-    Always writes detected_channels (empty list on no match) so each
-    commercial is analyzed exactly once. Returns number processed.
+    Phase 3: Channel detection for commercials.
+    Extraction (STT + OCR) runs once per commercial and is cached; matching
+    runs from the cache and is re-run for every commercial whenever the alias
+    phrases change. Returns number of commercials processed.
     """
     global running
 
     metadata = load_metadata()
-    needs_work = find_commercials_needing_channel_detection(metadata)
-    if not needs_work:
+    canales = load_canales()
+    phrases = channel_detection.get_channel_phrases(canales)
+    if not phrases:
         return 0
 
-    canales = load_canales()
-    total = len(needs_work)
-    logger.info(f"[Phase 3] Found {total} commercials to analyze")
-    logger.info(f"[Phase 3] STT: {'yes' if channel_detection.stt_available() else 'no'}, "
-                f"OCR: {'yes' if channel_detection.ocr_available() else 'no'}")
-
+    cache = channel_detection.load_cache(CHANNEL_CACHE_FILE)
+    entries = cache.get("entries", {})
+    fingerprint = channel_detection.phrases_fingerprint(phrases)
     processed = 0
-    for video_id, info, _ in needs_work:
+
+    commercials = {vid: info for vid, info in metadata.items()
+                   if info.get("category") == "commercial"}
+
+    # Drop cache entries for commercials that no longer exist
+    stale = [vid for vid in entries if vid not in commercials]
+    for vid in stale:
+        del entries[vid]
+    if stale:
+        logger.info(f"[Phase 3] Pruned {len(stale)} stale cache entries")
+
+    # Rematch everything cached when the alias phrases changed (covers both
+    # UI edits and hand edits of canales.json), or when a commercial has a
+    # cached extraction but no verdict yet. Text-vs-text: effectively free.
+    rematch_all = bool(entries) and cache.get("phrases_fingerprint") != fingerprint
+    if rematch_all:
+        logger.info(f"[Phase 3] Alias phrases changed - rematching {len(entries)} cached commercials")
+    for vid, entry in entries.items():
         if not running:
             break
-
-        filepath = get_video_path(video_id, info)
-        if not filepath.exists():
-            logger.warning(f"[Phase 3] File not found: {filepath}")
-            processed += 1
+        if not rematch_all and "detected_channels" in commercials[vid]:
             continue
-
-        logger.info(f"[Phase 3] Processing {processed + 1}/{total}: {video_id}")
-        try:
-            channels, evidence = channel_detection.detect_channels(
-                filepath, canales,
-                duration=info.get("duracion"),
-                run_cmd=run_throttled
-            )
-        except Exception as e:
-            logger.error(f"[Phase 3] Detection failed for {video_id}: {e}")
-            processed += 1
-            continue
-
-        save_metadata_fields(video_id, {
-            "detected_channels": channels,
-            "detected_channels_evidence": evidence,
-        })
-
-        if channels:
-            names = {cid: canales.get(cid, {}).get("nombre", cid) for cid in channels}
-            logger.info(f"[Phase 3] {video_id} -> {names} (evidence: {evidence})")
-        else:
-            logger.info(f"[Phase 3] {video_id} -> no channel mentions (all channels)")
-
+        channels, evidence = channel_detection.match_entry(entry, phrases)
+        info = commercials[vid]
+        if (info.get("detected_channels") != channels
+                or info.get("detected_channels_evidence") != evidence):
+            save_channel_match(vid, channels, evidence, canales)
         processed += 1
+
+    # Only mark the phrases as matched if the rematch wasn't interrupted;
+    # otherwise the next cycle picks up where this one left off.
+    if running:
+        cache["phrases_fingerprint"] = fingerprint
+    with metadata_lock():
+        channel_detection.save_cache(CHANNEL_CACHE_FILE, cache)
+
+    # Extract text for commercials not yet cached (the expensive part)
+    to_extract = [vid for vid in commercials if vid not in entries]
+    if to_extract and channel_detection.detection_available():
+        total = len(to_extract)
+        logger.info(f"[Phase 3] Found {total} commercials to analyze")
+        logger.info(f"[Phase 3] STT: {'yes' if channel_detection.stt_available() else 'no'}, "
+                    f"OCR: {'yes' if channel_detection.ocr_available() else 'no'}")
+
+        for i, vid in enumerate(to_extract):
+            if not running:
+                break
+            info = commercials[vid]
+            filepath = get_video_path(vid, info)
+            if not filepath.exists():
+                logger.warning(f"[Phase 3] File not found: {filepath}")
+                continue
+
+            logger.info(f"[Phase 3] Extracting {i + 1}/{total}: {vid}")
+            try:
+                entry = channel_detection.extract_text(
+                    filepath, duration=info.get("duracion"), run_cmd=run_throttled)
+            except Exception as e:
+                logger.error(f"[Phase 3] Extraction failed for {vid}: {e}")
+                continue
+
+            entries[vid] = entry
+            with metadata_lock():
+                channel_detection.save_cache(CHANNEL_CACHE_FILE, cache)
+
+            channels, evidence = channel_detection.match_entry(entry, phrases)
+            save_channel_match(vid, channels, evidence, canales)
+            processed += 1
 
     logger.info(f"[Phase 3] Complete - processed {processed} commercials")
     return processed
