@@ -82,6 +82,25 @@
     .commercial-card:hover {
       border-color: #22c55e;
     }
+    .channel-chip {
+      border-color: #4b5563;
+      color: #9ca3af;
+      background: transparent;
+      transition: all 0.15s ease;
+    }
+    .channel-chip:hover {
+      border-color: #22c55e;
+      color: #4ade80;
+    }
+    .channel-chip.active {
+      border-color: #22c55e;
+      background: rgba(34, 197, 94, 0.2);
+      color: #4ade80;
+    }
+    .channel-chip.saving {
+      opacity: 0.5;
+      pointer-events: none;
+    }
   </style>
 </head>
 <body class="bg-black text-white font-mono min-h-screen p-4">
@@ -131,10 +150,14 @@
 
     <!-- Existing Commercials Section -->
     <div class="mb-8">
-      <div class="flex items-center justify-between mb-4">
+      <div class="flex items-center justify-between mb-1">
         <h2 class="text-xl font-bold text-green-400">Existing Commercials</h2>
         <span class="text-sm text-gray-400">{{ commercials|length }} commercial(s)</span>
       </div>
+      <p class="text-xs text-gray-500 mb-4">
+        Pick which channels each commercial can air on — no selection means it airs on all channels.
+        Changes take effect when a channel's schedule is next rebuilt.
+      </p>
 
       {% if commercials %}
       <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4" id="commercials-grid">
@@ -164,6 +187,25 @@
                 {% endif %}
               </div>
               {% endif %}
+            </div>
+          </div>
+          <!-- Channel assignment -->
+          <div class="mt-3 pt-3 border-t border-gray-700">
+            <div class="flex items-center justify-between mb-1.5">
+              <span class="text-[10px] uppercase tracking-wider text-gray-500">Channels</span>
+              <span class="channels-hint text-[10px] {{ 'text-gray-400' if not comm.channels else 'text-green-400' }}">
+                {{ 'All channels' if not comm.channels else 'Selected only' }}
+              </span>
+            </div>
+            <div class="flex flex-wrap gap-1 channel-chips" data-video-id="{{ comm.video_id }}">
+              {% for ch in channel_options %}
+              <button type="button"
+                      onclick="toggleChannel('{{ comm.video_id }}', '{{ ch.id }}', this)"
+                      data-channel-id="{{ ch.id }}"
+                      class="channel-chip {{ 'active' if ch.id in comm.channels else '' }} text-[10px] px-2 py-0.5 rounded-full border">
+                {{ ch.nombre }}
+              </button>
+              {% endfor %}
             </div>
           </div>
           <!-- Actions -->
@@ -431,6 +473,46 @@
         xhr.open('POST', "{{ url_for('upload_commercials_post') }}");
         xhr.send(formData);
       });
+    }
+
+    async function toggleChannel(videoId, channelId, btn) {
+      const chips = document.querySelector(`.channel-chips[data-video-id="${videoId}"]`);
+      const wasActive = btn.classList.contains('active');
+
+      // Optimistic toggle, then collect the full selection for this commercial
+      btn.classList.toggle('active');
+      const selected = Array.from(chips.querySelectorAll('.channel-chip.active'))
+        .map(b => b.dataset.channelId);
+
+      chips.querySelectorAll('.channel-chip').forEach(b => b.classList.add('saving'));
+
+      try {
+        const response = await fetch(`/api/commercials/${videoId}/channels`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ channels: selected })
+        });
+        const data = await response.json();
+        if (!data.ok) throw new Error(data.error || 'Save failed');
+
+        // Update the "All channels / Selected only" hint
+        const hint = chips.closest('.commercial-card').querySelector('.channels-hint');
+        if (selected.length === 0) {
+          hint.textContent = 'All channels';
+          hint.classList.remove('text-green-400');
+          hint.classList.add('text-gray-400');
+        } else {
+          hint.textContent = 'Selected only';
+          hint.classList.remove('text-gray-400');
+          hint.classList.add('text-green-400');
+        }
+      } catch (err) {
+        // Revert on failure
+        btn.classList.toggle('active', wasActive);
+        alert(`Failed to save channels: ${err.message}`);
+      } finally {
+        chips.querySelectorAll('.channel-chip').forEach(b => b.classList.remove('saving'));
+      }
     }
 
     async function deleteCommercial(videoId, title) {

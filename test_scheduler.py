@@ -1121,6 +1121,43 @@ def test_27_independent_channel_cursors():
     return True
 
 
+def test_28_commercial_channel_filtering():
+    """Test 28: Commercials can be earmarked for specific channels."""
+    print("\n=== Test 28: Commercial channel filtering ===")
+
+    # Commercials with no channels key get an empty list (= all channels)
+    commercials = scheduler.get_commercials()
+    for comm in commercials:
+        assert comm["channels"] == [], f"Expected empty channels, got {comm['channels']}"
+    print(f"  Legacy commercials default to all channels ✓")
+
+    pool = [
+        {"video_id": "c_all", "duration": 30, "channels": []},
+        {"video_id": "c_nick", "duration": 30, "channels": ["channel_1"]},
+        {"video_id": "c_both", "duration": 30, "channels": ["channel_1", "channel_2"]},
+    ]
+
+    ch1 = scheduler.filter_commercials_for_channel(pool, "channel_1")
+    assert {c["video_id"] for c in ch1} == {"c_all", "c_nick", "c_both"}, f"channel_1 got {ch1}"
+    print(f"  channel_1 gets unrestricted + earmarked commercials ✓")
+
+    ch2 = scheduler.filter_commercials_for_channel(pool, "channel_2")
+    assert {c["video_id"] for c in ch2} == {"c_all", "c_both"}, f"channel_2 got {ch2}"
+    print(f"  channel_2 excludes channel_1-only commercial ✓")
+
+    ch3 = scheduler.filter_commercials_for_channel(pool, "channel_3")
+    assert {c["video_id"] for c in ch3} == {"c_all"}, f"channel_3 got {ch3}"
+    print(f"  channel_3 only gets unrestricted commercial ✓")
+
+    # A commercial missing the channels key entirely is treated as unrestricted
+    no_key = scheduler.filter_commercials_for_channel([{"video_id": "c_old", "duration": 30}], "channel_1")
+    assert len(no_key) == 1, "Commercial without channels key should be eligible everywhere"
+    print(f"  Missing channels key treated as all channels ✓")
+
+    print("  Test 28 PASSED")
+    return True
+
+
 def run_all_tests():
     """Run all tests."""
     print("=" * 60)
@@ -1157,6 +1194,7 @@ def run_all_tests():
         test_25_seek_to_calculation_accuracy,
         test_26_empty_series_handling,
         test_27_independent_channel_cursors,
+        test_28_commercial_channel_filtering,
     ]
 
     passed = 0

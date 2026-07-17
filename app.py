@@ -1239,9 +1239,9 @@ def edit_video(video_id):
             video_data["season"] = None
             video_data["episode"] = None
 
-        # Preserve existing fields like duracion
+        # Preserve existing fields not exposed in the edit form
         if video_id in metadata:
-            for key in ["duracion"]:
+            for key in ["duracion", "loudness_lufs", "commercials_path", "channels"]:
                 if key in metadata[video_id]:
                     video_data[key] = metadata[video_id][key]
 
@@ -2290,6 +2290,7 @@ def get_commercials_list():
                 "duration": data.get("duracion", 0),
                 "tags": data.get("tags", []),
                 "fecha": data.get("fecha", ""),
+                "channels": data.get("channels", []),
             })
     # Sort by title
     commercials.sort(key=lambda x: x["title"].lower())
@@ -2319,9 +2320,15 @@ def upload_commercials():
     metadata = load_metadata()
     existing_ids = list(metadata.keys())
 
+    # Channel list for per-commercial channel assignment
+    canales = load_canales()
+    channel_options = [{"id": cid, "nombre": info.get("nombre", cid)}
+                       for cid, info in canales.items()]
+
     return render_template("upload_commercials.html",
                            commercials=commercials,
                            existing_ids=existing_ids,
+                           channel_options=channel_options,
                            lang=lang,
                            tr=tr)
 
@@ -2471,6 +2478,34 @@ def delete_commercial(video_id):
         return jsonify({"ok": False, "error": str(e)}), 500
 
 
+@app.route("/api/commercials/<video_id>/channels", methods=["PUT"])
+def set_commercial_channels(video_id):
+    """Set which channels a commercial is eligible for (empty list = all channels)."""
+    global metadata
+    metadata = load_metadata()
+
+    if video_id not in metadata:
+        return jsonify({"ok": False, "error": "Commercial not found"}), 404
+    if metadata[video_id].get("category") != "commercial":
+        return jsonify({"ok": False, "error": "Video is not a commercial"}), 400
+
+    body = request.get_json(silent=True) or {}
+    channels = body.get("channels", [])
+    if not isinstance(channels, list) or not all(isinstance(c, str) for c in channels):
+        return jsonify({"ok": False, "error": "channels must be a list of channel ids"}), 400
+
+    canales = load_canales()
+    invalid = [c for c in channels if c not in canales]
+    if invalid:
+        return jsonify({"ok": False, "error": f"Unknown channel id(s): {', '.join(invalid)}"}), 400
+
+    metadata[video_id]["channels"] = sorted(set(channels))
+    save_metadata(metadata)
+
+    logger.info(f"[COMMERCIALS] Set channels for {video_id}: {metadata[video_id]['channels'] or 'all'}")
+    return jsonify({"ok": True, "channels": metadata[video_id]["channels"]})
+
+
 @app.route("/api/commercials")
 def api_commercials():
     """Return list of commercials for Content Manager."""
@@ -2484,7 +2519,8 @@ def api_commercials():
                 "video_id": video_id,
                 "title": data.get("title", video_id),
                 "duration": data.get("duracion", 0),
-                "tags": data.get("tags", [])
+                "tags": data.get("tags", []),
+                "channels": data.get("channels", [])
             })
 
     # Sort by title

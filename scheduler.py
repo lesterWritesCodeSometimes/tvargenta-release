@@ -342,9 +342,20 @@ def get_commercials(metadata: dict = None) -> List[dict]:
             commercials.append({
                 "video_id": video_id,
                 "duration": data.get("duracion") or 30,  # default 30s if unknown
+                "channels": data.get("channels") or [],  # empty = all channels
             })
 
     return commercials
+
+
+def filter_commercials_for_channel(commercials: List[dict], channel_id: str) -> List[dict]:
+    """
+    Filter commercials to those eligible for a channel.
+    A commercial with an empty/missing "channels" list plays on all channels;
+    otherwise it only plays on the listed channel ids.
+    """
+    return [c for c in commercials
+            if not c.get("channels") or str(channel_id) in c["channels"]]
 
 
 # ============================================================================
@@ -974,6 +985,7 @@ def generate_daily_schedule(channel_id: str = None) -> dict:
 
         time_slots = channel_weekly.get("time_slots", {})
         block_offset = channel_weekly.get("block_offset_sec", 0)
+        channel_commercials = filter_commercials_for_channel(commercials, cid)
         channel_entries = []
 
         # Test pattern: 3am until programming starts (4am + offset)
@@ -1077,7 +1089,7 @@ def generate_daily_schedule(channel_id: str = None) -> dict:
                           "series_path": ep.get("series_path"),
                           "duration": time_per_block,
                           "_base_offset": span_block * time_per_block}],
-                        commercials,
+                        channel_commercials,
                         BLOCK_DURATION_SEC
                     )
 
@@ -1098,7 +1110,7 @@ def generate_daily_schedule(channel_id: str = None) -> dict:
                 block_entries = generate_block_schedule(
                     block_start_second,
                     block_episodes,
-                    commercials,
+                    channel_commercials,
                     BLOCK_DURATION_SEC
                 )
                 channel_entries.extend(block_entries)
