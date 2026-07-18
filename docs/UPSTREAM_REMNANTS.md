@@ -6,8 +6,31 @@ featureset — replacing the generic upload / tags / configuración pages with i
 specialized flows, adding the scheduler, VCR/NFC, metadata daemon, and channel detection.
 That rework left behind a number of upstream remnants that are now unused or actively broken.
 
-This document catalogs all of them, with evidence. Nothing here has been deleted;
-this is an inventory to inform future cleanup.
+This document catalogs all of them, with evidence.
+
+## Resolution log (2026-07-17)
+
+The cleanup was executed piece by piece; the findings below are kept as the record of
+what existed and why it was removed. Commits:
+
+| Commit | Piece |
+|---|---|
+| `d96ec6f` | Dead pre-fork Python modules (encoder_test, encoder_menu, analyze_loudness) + dead app.py imports/function (§3.1, §3.2) |
+| `af910f3` | Broken /tags + /configuracion routes, POST endpoints, i18n bundles, editor links (§1.1, §1.2, §2.1, §2.2) |
+| `2a42fac` | Superseded generic /upload page + /upload_status + upload_* i18n (§2.3) |
+| `ca804d6` | kiosk_boot.html, unused Splash/static/assets files, redundant .rar (§2.5, §4) |
+| `8b98878` | Orphan routes: /api/videos, /delete_full, /static-intro.mp4, /editar_canal, /admin (§3.3) |
+| `c51fc6f` | Unimplemented OSD menu stubs "Predefined/My Channels" (§6.3) |
+| `6c6e4f7` | Legacy tag-based picker + plays/fairness tracking (§6.1, §6.2) |
+| `70908de` | Tag vocabulary/config layer, editor tag+modes UI, dead channel keys, upstream seed data (§6.4, §6.6) |
+| `ca1a631` | Stale upstream README.en.md (§5.1) |
+
+Deliberately kept: `/upload/commercials` GET page (hosts the channel-earmarking UI,
+reached by direct URL), `/vcr_admin` (functional hidden admin page), `/video/<id>`
+(linked from the commercials page), `/index` redirect alias (used by the nav),
+`docs/VCR_NFC_IMPLEMENTATION_PLAN.md` (historical design notes), the gaming-toggle
+scripts' stale `splash.png` reference (Pi-side `fbv` cosmetics, guarded by `[ -f ]`),
+and inert `"tags"`/`"modo"` fields in existing video metadata.
 
 Legend: **BROKEN** = live code path that fails at runtime · **DEAD** = unreachable/unreferenced ·
 **STALE** = docs/archives that no longer match reality.
