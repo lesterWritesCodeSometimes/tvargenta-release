@@ -144,6 +144,34 @@
             <p class="text-[11px] text-gray-500 mt-1">
               {{ tr("canales.form.aliases_hint") }} {{ tr("canales.form.aliases_hint_recheck") }}
             </p>
+
+            {% set strip = comms_by_channel.get(key, []) %}
+            <div class="mt-3">
+              <div class="flex items-center justify-between mb-1.5">
+                <span class="text-[10px] uppercase tracking-wider text-gray-500">{{ tr("canales.commercials.heading") }}</span>
+                <span class="text-[10px] text-gray-500">
+                  <span class="inline-block w-2 h-2 rounded-full bg-amber-400 align-middle"></span> {{ tr("canales.commercials.legend_auto") }}
+                  <span class="inline-block w-2 h-2 rounded-full bg-green-400 align-middle ml-2"></span> {{ tr("canales.commercials.legend_manual") }}
+                </span>
+              </div>
+              {% if strip %}
+              <div class="flex flex-wrap gap-1.5">
+                {% for comm in strip %}
+                <a href="{{ url_for('index') }}#commercial-{{ comm.video_id }}" title="{{ comm.title }}"
+                   class="block rounded border-2 {{ 'border-green-400' if comm.manual else 'border-amber-400' }} hover:opacity-80">
+                  <img src="{{ url_for('serve_thumbnail', filename=comm.video_id + '.jpg') }}"
+                       onerror="this.onerror=null;this.src='{{ url_for('serve_thumbnail', filename='default_thumbnail.png') }}';"
+                       class="w-12 h-12 object-cover rounded-sm" alt="{{ comm.title }}">
+                </a>
+                {% endfor %}
+              </div>
+              {% else %}
+              <p class="text-[11px] text-gray-600 italic">{{ tr("canales.commercials.empty") }}</p>
+              {% endif %}
+              {% if general_commercials %}
+              <p class="text-[11px] text-gray-500 mt-1.5">{{ tr("canales.commercials.general_count").replace("{n}", general_commercials|string) }}</p>
+              {% endif %}
+            </div>
           </div>
 
           {% if all_series %}

@@ -1,39 +1,37 @@
 {
   "canales.page_title": "📺 Canales de TVArgenta",
   "canales.header": "📡 Canales de TVArgenta",
-
   "canales.card.edit": "✏️ Editar canal",
   "canales.card.delete": "🗑️ Eliminar canal",
   "canales.card.rebuild_schedule": "🔄 Reconstruir Grilla",
   "canales.card.no_desc": "Sin descripción",
   "canales.card.no_filter": "Todo el contenido (sin filtro)",
-
   "canales.form.title_new": "➕ Crear un nuevo canal",
-
   "canales.form.label_name": "📺 Nombre del Canal",
   "canales.form.label_desc": "📝 Descripción",
   "canales.form.label_icon": "🌟 Elegí un ícono (opcional)",
   "canales.form.icon_none": "(Sin ícono)",
   "canales.form.label_aliases": "Alias de detección",
   "canales.form.label_series": "Filtro de series",
-
   "canales.form.name_placeholder": "ej.: Dibujitos Retro",
   "canales.form.desc_placeholder": "Breve descripción...",
   "canales.form.aliases_placeholder": "ej.: nick, nick jr, snick",
   "canales.form.aliases_hint": "Palabras o frases separadas por comas que identifican este canal en las publicidades (el nombre del canal siempre coincide).",
   "canales.form.aliases_hint_recheck": "Al guardar se vuelven a revisar todas las publicidades analizadas.",
   "canales.form.series_hint": "Seleccioná las series a incluir, o dejalo vacío para todo el contenido.",
-
   "canales.form.submit_update": "💾 Guardar cambios",
   "canales.form.submit_create": "💾 Guardar canal",
   "canales.form.cancel_edit": "❌ Cancelar",
-
   "canales.create.prompt": "Crear canal nuevo",
   "canales.empty_hint": "¡Hacé clic en la tarjeta de arriba para crear tu primer canal!",
-
   "canales.js.confirm_delete": "¿Eliminar el canal \"{name}\"?",
   "canales.js.rebuilding": "Reconstruyendo...",
   "canales.js.done": "¡Listo!",
   "canales.js.rebuild_error": "Error al reconstruir la grilla: {error}",
-  "canales.js.unknown_error": "Error desconocido"
+  "canales.js.unknown_error": "Error desconocido",
+  "canales.commercials.heading": "Publicidades en este canal",
+  "canales.commercials.legend_auto": "detectadas",
+  "canales.commercials.legend_manual": "manuales",
+  "canales.commercials.empty": "Todavía no hay publicidades asignadas — los alias de arriba alimentan la detección automática, o asigná manualmente desde la Biblioteca.",
+  "canales.commercials.general_count": "+{n} publicidad(es) generales también salen acá (sin restricción de canal)"
 }

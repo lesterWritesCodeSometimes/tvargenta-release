@@ -1625,15 +1625,9 @@ def upload_commercials():
     metadata = load_metadata()
     existing_ids = list(metadata.keys())
 
-    # Channel list for per-commercial channel assignment
-    canales = load_canales()
-    channel_options = [{"id": cid, "nombre": info.get("nombre", cid)}
-                       for cid, info in canales.items()]
-
     return render_template("upload_commercials.html",
                            commercials=commercials,
-                           existing_ids=existing_ids,
-                           channel_options=channel_options)
+                           existing_ids=existing_ids)
 
 
 @app.route("/upload/commercials", methods=["POST"])
@@ -1841,7 +1835,11 @@ def api_commercials():
     # Sort by title
     commercials.sort(key=lambda x: x["title"].lower())
 
-    return jsonify({"ok": True, "commercials": commercials})
+    canales = load_canales()
+    channel_options = [{"id": cid, "nombre": info.get("nombre", cid)}
+                       for cid, info in canales.items()]
+
+    return jsonify({"ok": True, "commercials": commercials, "channel_options": channel_options})
 
 
 # --- Movies API ---
@@ -1977,7 +1975,31 @@ def canales():
         for name in _get_all_series()
     ]
 
-    return render_template("canales.html", canales=canales_data, all_series=all_series, active_page='channels')
+    # Read-only commercial strips per channel: which commercials air here,
+    # split by how they got here (daemon detection vs manual earmark).
+    meta = load_metadata()
+    comms_by_channel = {cid: [] for cid in canales_data}
+    general_commercials = 0
+    for vid, data in sorted(meta.items(), key=lambda kv: kv[1].get("title", kv[0]).lower()):
+        if data.get("category") != "commercial":
+            continue
+        effective = commercial_effective_channels(data)
+        if not effective:
+            general_commercials += 1
+            continue
+        manual = "channels" in data
+        for cid in effective:
+            if cid in comms_by_channel:
+                comms_by_channel[cid].append({
+                    "video_id": vid,
+                    "title": data.get("title", vid),
+                    "manual": manual,
+                })
+
+    return render_template("canales.html", canales=canales_data, all_series=all_series,
+                           comms_by_channel=comms_by_channel,
+                           general_commercials=general_commercials,
+                           active_page='channels')
 
 def rematch_commercial_channels():
     """

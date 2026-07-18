@@ -1,7 +1,6 @@
 {
   "index.title": "📺 TVArgenta",
   "index.stats.total_time": "⏳ Total memory time:",
-
   "index.loading": "Loading...",
   "index.upload_button": "Upload",
   "index.uploading": "Uploading...",
@@ -16,7 +15,6 @@
   "index.delete": "Delete",
   "index.cancel": "Cancel",
   "index.close": "Close",
-
   "index.series.heading": "TV Series",
   "index.series.count_suffix": "series",
   "index.series.upload_heading": "Upload Episodes",
@@ -35,28 +33,24 @@
   "index.series.create_button": "Create Series",
   "index.series.confirm_delete_episode": "Delete this episode?",
   "index.series.confirm_delete_series": "Delete \"{name}\" and all episodes?",
-
   "index.time.any": "Any Time",
   "index.time.early_morning": "Early Morning",
   "index.time.late_morning": "Late Morning",
   "index.time.afternoon": "Afternoon",
   "index.time.evening": "Evening",
   "index.time.night": "Night",
-
   "index.movies.heading": "Movies",
   "index.movies.count_suffix": "movies",
   "index.movies.upload_heading": "Upload Movies",
   "index.movies.drop_hint": "Drop movie files here",
   "index.movies.empty": "No movies yet",
   "index.movies.confirm_delete": "Delete this movie?",
-
   "index.commercials.heading": "Commercials",
   "index.commercials.count_suffix": "commercials",
   "index.commercials.upload_heading": "Upload Commercials",
   "index.commercials.drop_hint": "Drop commercial files here",
   "index.commercials.empty": "No commercials yet",
   "index.commercials.confirm_delete": "Delete this commercial?",
-
   "index.vhs.heading": "VHS Tapes",
   "index.vhs.count_suffix": "tapes",
   "index.vhs.checking_reader": "Checking NFC Reader...",
@@ -77,7 +71,6 @@
   "index.vhs.alert_select_video": "Select a video",
   "index.vhs.error_prefix": "Error: {msg}",
   "index.vhs.unknown_error": "Unknown",
-
   "index.reader.error": "Error",
   "index.reader.not_connected": "NFC Reader Not Connected",
   "index.reader.connect_hint": "Connect USB NFC reader",
@@ -87,12 +80,19 @@
   "index.reader.register_below": "Register it below",
   "index.reader.ready": "Ready",
   "index.reader.place_tape": "Place tape on reader",
-
   "index.debug.issues": "Debug: {count} issue(s)",
   "index.debug.new_files": "New Files (no metadata)",
   "index.debug.add_metadata": "Add metadata",
   "index.debug.ghost_entries": "Ghost Entries (no file)",
   "index.debug.delete_all": "Delete All",
   "index.debug.confirm_delete_ghost": "Delete ghost entry '{id}'?",
-  "index.debug.confirm_delete_all": "Delete ALL ghost entries?"
+  "index.debug.confirm_delete_all": "Delete ALL ghost entries?",
+  "index.commercials.channels_label": "Channels",
+  "index.commercials.hint_auto": "auto-detected",
+  "index.commercials.hint_selected": "specific channels",
+  "index.commercials.hint_all": "airs on all channels",
+  "index.commercials.reset_auto": "↺ auto",
+  "index.commercials.reset_auto_title": "Clear manual selection and return to auto-detection",
+  "index.commercials.err_save_failed": "Save failed",
+  "index.commercials.alert_save_channels": "Error saving channels: {error}"
 }

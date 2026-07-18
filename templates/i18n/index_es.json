@@ -86,5 +86,13 @@
   "index.debug.ghost_entries": "Entradas fantasma (sin archivo)",
   "index.debug.delete_all": "Eliminar todo",
   "index.debug.confirm_delete_ghost": "¿Eliminar la entrada fantasma '{id}'?",
-  "index.debug.confirm_delete_all": "¿Eliminar TODAS las entradas fantasma?"
+  "index.debug.confirm_delete_all": "¿Eliminar TODAS las entradas fantasma?",
+  "index.commercials.channels_label": "Canales",
+  "index.commercials.hint_auto": "detección automática",
+  "index.commercials.hint_selected": "canales específicos",
+  "index.commercials.hint_all": "sale en todos los canales",
+  "index.commercials.reset_auto": "↺ auto",
+  "index.commercials.reset_auto_title": "Borrar la selección manual y volver a la detección automática",
+  "index.commercials.err_save_failed": "No se pudo guardar",
+  "index.commercials.alert_save_channels": "Error al guardar los canales: {error}"
 }

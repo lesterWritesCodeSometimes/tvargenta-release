@@ -62,6 +62,26 @@
     width: 0%;
     transition: width 0.2s ease;
   }
+  .channel-chip {
+    border-color: #4b5563;
+    color: #9ca3af;
+    background: transparent;
+    transition: all 0.15s ease;
+  }
+  .channel-chip:hover { border-color: #22c55e; color: #4ade80; }
+  .channel-chip.active {
+    border-color: #22c55e;
+    background: rgba(34, 197, 94, 0.2);
+    color: #4ade80;
+  }
+  /* Auto-detected (no human selection yet): amber instead of green */
+  .channel-chips.auto .channel-chip.active {
+    border-color: #f59e0b;
+    background: rgba(245, 158, 11, 0.15);
+    color: #fbbf24;
+  }
+  .channel-chip.saving { opacity: 0.4; pointer-events: none; }
+  .commercial-highlight { outline: 2px solid #fbbf24; outline-offset: 2px; }
   .content-card {
     background: rgba(17,24,39,0.8);
     border: 1px solid #374151;
@@ -1141,8 +1161,15 @@
       }
 
       document.getElementById('commercials-count').textContent = data.commercials.length;
-      container.innerHTML = data.commercials.map(c => `
-        <div class="content-card rounded-lg p-3">
+      channelOptions = data.channel_options || [];
+      container.innerHTML = data.commercials.map(c => {
+        const isAuto = !c.channels_manual && c.channels.length > 0;
+        const chips = channelOptions.map(ch => `
+              <button type="button" onclick="toggleChannel('${c.video_id}', '${ch.id}', this)"
+                      data-channel-id="${ch.id}"
+                      class="channel-chip ${c.channels.includes(ch.id) ? 'active' : ''} text-[10px] px-2 py-0.5 rounded-full border">${ch.nombre}</button>`).join('');
+        return `
+        <div class="content-card rounded-lg p-3" id="commercial-${c.video_id}">
           <div class="flex gap-2 mb-2">
             <img src="/thumbnails/${c.video_id}.jpg" onerror="this.src='/thumbnails/default_thumbnail.png'"
                  class="w-14 h-14 object-cover rounded border border-gray-600">
@@ -1151,12 +1178,26 @@
               <p class="text-xs text-gray-400">${formatDuration(c.duration)}</p>
             </div>
           </div>
+          <div class="mb-2 pt-2 border-t border-gray-700">
+            <div class="flex items-center justify-between mb-1">
+              <span class="text-[10px] uppercase tracking-wider text-gray-500">${tr("index.commercials.channels_label")}</span>
+              <span class="flex items-center gap-2">
+                <button type="button" onclick="resetChannels('${c.video_id}')"
+                        title="${tr("index.commercials.reset_auto_title")}"
+                        class="reset-auto text-[10px] text-gray-500 hover:text-amber-400 underline ${c.channels_manual ? '' : 'hidden'}">${tr("index.commercials.reset_auto")}</button>
+                <span class="channels-hint text-[10px] ${isAuto ? 'text-amber-400' : (c.channels.length ? 'text-green-400' : 'text-gray-400')}">${isAuto ? tr("index.commercials.hint_auto") : (c.channels.length ? tr("index.commercials.hint_selected") : tr("index.commercials.hint_all"))}</span>
+              </span>
+            </div>
+            <div class="flex flex-wrap gap-1 channel-chips ${isAuto ? 'auto' : ''}" data-video-id="${c.video_id}">${chips}
+            </div>
+          </div>
           <div class="flex gap-2">
             <a href="/edit/${c.video_id}" class="flex-1 text-center text-xs bg-gray-600 hover:bg-gray-700 text-white py-1 rounded">${tr("index.edit")}</a>
             <button onclick="deleteCommercial('${c.video_id}')" class="flex-1 text-center text-xs bg-red-600 hover:bg-red-700 text-white py-1 rounded">${tr("index.delete")}</button>
           </div>
         </div>
-      `).join('');
+      `; }).join('');
+      highlightCommercialFromHash();
     } catch (e) { console.error(e); }
   }
 
@@ -1164,6 +1205,91 @@
     if (!confirm(tr("index.commercials.confirm_delete"))) return;
     await fetch(`/api/commercials/${videoId}`, { method: 'DELETE' });
     loadCommercials();
+  }
+
+  // --- Channel earmarking (auto-detected vs manual override) ---
+  let channelOptions = [];
+
+  function renderChannelState(videoId, channels, manual) {
+    const chips = document.querySelector(`.channel-chips[data-video-id="${videoId}"]`);
+    if (!chips) return;
+    const card = chips.closest('.content-card');
+    const hint = card.querySelector('.channels-hint');
+    const resetBtn = card.querySelector('.reset-auto');
+    const isAuto = !manual && channels.length > 0;
+
+    chips.querySelectorAll('.channel-chip').forEach(b => {
+      b.classList.toggle('active', channels.includes(b.dataset.channelId));
+    });
+    chips.classList.toggle('auto', isAuto);
+    resetBtn.classList.toggle('hidden', !manual);
+
+    hint.classList.remove('text-gray-400', 'text-green-400', 'text-amber-400');
+    if (isAuto) {
+      hint.textContent = tr("index.commercials.hint_auto");
+      hint.classList.add('text-amber-400');
+    } else if (channels.length > 0) {
+      hint.textContent = tr("index.commercials.hint_selected");
+      hint.classList.add('text-green-400');
+    } else {
+      hint.textContent = tr("index.commercials.hint_all");
+      hint.classList.add('text-gray-400');
+    }
+  }
+
+  async function saveChannels(videoId, method, body) {
+    const chips = document.querySelector(`.channel-chips[data-video-id="${videoId}"]`);
+    chips.querySelectorAll('.channel-chip').forEach(b => b.classList.add('saving'));
+    try {
+      const response = await fetch(`/api/commercials/${videoId}/channels`, {
+        method: method,
+        headers: { 'Content-Type': 'application/json' },
+        body: body ? JSON.stringify(body) : undefined
+      });
+      const data = await response.json();
+      if (!data.ok) throw new Error(data.error || tr("index.commercials.err_save_failed"));
+      renderChannelState(videoId, data.channels, data.channels_manual);
+      return true;
+    } catch (err) {
+      alert(tr("index.commercials.alert_save_channels").replace("{error}", err.message));
+      return false;
+    } finally {
+      chips.querySelectorAll('.channel-chip').forEach(b => b.classList.remove('saving'));
+    }
+  }
+
+  async function toggleChannel(videoId, channelId, btn) {
+    const chips = document.querySelector(`.channel-chips[data-video-id="${videoId}"]`);
+    const wasActive = btn.classList.contains('active');
+
+    // Optimistic toggle, then save the full selection as a manual choice
+    // (starting from whatever was displayed, including auto-detected chips)
+    btn.classList.toggle('active');
+    const selected = Array.from(chips.querySelectorAll('.channel-chip.active'))
+      .map(b => b.dataset.channelId);
+
+    const ok = await saveChannels(videoId, 'PUT', { channels: selected });
+    if (!ok) btn.classList.toggle('active', wasActive);
+  }
+
+  async function resetChannels(videoId) {
+    await saveChannels(videoId, 'DELETE', null);
+  }
+
+  // Deep link from the Channels page: /gestion#commercial-<id>
+  function highlightCommercialFromHash() {
+    if (!location.hash.startsWith('#commercial-')) return;
+    const el = document.getElementById(location.hash.slice(1));
+    if (!el) return;
+    const content = document.getElementById('commercials-content');
+    const toggle = document.getElementById('commercials-toggle');
+    if (content && content.style.display === 'none') {
+      content.style.display = 'block';
+      if (toggle) toggle.textContent = '▼';
+    }
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    el.classList.add('commercial-highlight');
+    setTimeout(() => el.classList.remove('commercial-highlight'), 4000);
   }
 
   // ============================================

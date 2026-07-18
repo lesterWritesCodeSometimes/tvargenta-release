@@ -1,7 +1,6 @@
 {
   "index.title": "📺 TVArgenta",
   "index.stats.total_time": "⏳ Gesamte Erinnerungszeit:",
-
   "index.loading": "Wird geladen...",
   "index.upload_button": "Hochladen",
   "index.uploading": "Wird hochgeladen...",
@@ -16,7 +15,6 @@
   "index.delete": "Löschen",
   "index.cancel": "Abbrechen",
   "index.close": "Schließen",
-
   "index.series.heading": "TV-Serien",
   "index.series.count_suffix": "Serien",
   "index.series.upload_heading": "Episoden hochladen",
@@ -35,28 +33,24 @@
   "index.series.create_button": "Serie erstellen",
   "index.series.confirm_delete_episode": "Diese Episode löschen?",
   "index.series.confirm_delete_series": "\"{name}\" und alle Episoden löschen?",
-
   "index.time.any": "Jederzeit",
   "index.time.early_morning": "Früher Morgen",
   "index.time.late_morning": "Später Vormittag",
   "index.time.afternoon": "Nachmittag",
   "index.time.evening": "Abend",
   "index.time.night": "Nacht",
-
   "index.movies.heading": "Filme",
   "index.movies.count_suffix": "Filme",
   "index.movies.upload_heading": "Filme hochladen",
   "index.movies.drop_hint": "Filmdateien hier ablegen",
   "index.movies.empty": "Noch keine Filme",
   "index.movies.confirm_delete": "Diesen Film löschen?",
-
   "index.commercials.heading": "Werbespots",
   "index.commercials.count_suffix": "Werbespots",
   "index.commercials.upload_heading": "Werbespots hochladen",
   "index.commercials.drop_hint": "Werbespot-Dateien hier ablegen",
   "index.commercials.empty": "Noch keine Werbespots",
   "index.commercials.confirm_delete": "Diesen Werbespot löschen?",
-
   "index.vhs.heading": "VHS-Kassetten",
   "index.vhs.count_suffix": "Kassetten",
   "index.vhs.checking_reader": "NFC-Leser wird geprüft...",
@@ -77,7 +71,6 @@
   "index.vhs.alert_select_video": "Wähle ein Video aus",
   "index.vhs.error_prefix": "Fehler: {msg}",
   "index.vhs.unknown_error": "Unbekannt",
-
   "index.reader.error": "Fehler",
   "index.reader.not_connected": "NFC-Leser nicht verbunden",
   "index.reader.connect_hint": "USB-NFC-Leser anschließen",
@@ -87,12 +80,19 @@
   "index.reader.register_below": "Unten registrieren",
   "index.reader.ready": "Bereit",
   "index.reader.place_tape": "Kassette auf den Leser legen",
-
   "index.debug.issues": "Debug: {count} Problem(e)",
   "index.debug.new_files": "Neue Dateien (ohne Metadaten)",
   "index.debug.add_metadata": "Metadaten hinzufügen",
   "index.debug.ghost_entries": "Geistereinträge (keine Datei)",
   "index.debug.delete_all": "Alle löschen",
   "index.debug.confirm_delete_ghost": "Geistereintrag '{id}' löschen?",
-  "index.debug.confirm_delete_all": "ALLE Geistereinträge löschen?"
+  "index.debug.confirm_delete_all": "ALLE Geistereinträge löschen?",
+  "index.commercials.channels_label": "Kanäle",
+  "index.commercials.hint_auto": "automatisch erkannt",
+  "index.commercials.hint_selected": "bestimmte Kanäle",
+  "index.commercials.hint_all": "läuft auf allen Kanälen",
+  "index.commercials.reset_auto": "↺ auto",
+  "index.commercials.reset_auto_title": "Manuelle Auswahl löschen und zur automatischen Erkennung zurückkehren",
+  "index.commercials.err_save_failed": "Speichern fehlgeschlagen",
+  "index.commercials.alert_save_channels": "Fehler beim Speichern der Kanäle: {error}"
 }
