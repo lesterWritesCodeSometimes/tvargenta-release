@@ -31,7 +31,7 @@ from settings import (
     APP_DIR, CONTENT_DIR, VIDEO_DIR, THUMB_DIR,
     METADATA_FILE, TAGS_FILE, CONFIG_FILE, CANALES_FILE, CANAL_ACTIVO_FILE,
     SPLASH_DIR, SPLASH_STATE_FILE, INTRO_PATH, CHROME_PROFILE, CHROME_CACHE,
-    PLAYS_FILE, USER, TMP_DIR, CONFIG_PATH, LOG_DIR, I18N_DIR,
+    USER, TMP_DIR, CONFIG_PATH, LOG_DIR, I18N_DIR,
     VCR_TRIGGER_FILE, VCR_RECORDING_STATE_FILE,
     SERIES_FILE, SERIES_VIDEO_DIR, COMMERCIALS_DIR, CHANNEL_DETECTION_CACHE_FILE,
 )
@@ -211,7 +211,6 @@ try:
 except Exception:
     pass
 
-os.makedirs(os.path.dirname(PLAYS_FILE), exist_ok=True)
 
 # Tags y grupos por defecto
 DEFAULT_TAGS = {
@@ -241,18 +240,6 @@ DEFAULT_CANALES = {
     }
 }
 
-shown_videos_por_canal = {}
-
-# --- Anti-bounce / cooldown ---
-last_next_call = {}   # canal_id -> timestamp del Ãºltimo /api/next_video servido
-NEXT_COOLDOWN = 0.5   # segundos de ventana anti-encadenados (reduced for responsiveness)
-STICKY_WINDOW = 1.0   # segundos (reduced for responsiveness)
-last_choice_per_canal = {}  # canal_id -> {"video_id": str, "ts": float}
-
-# --- De-dupe primer NEXT por canal ---
-pending_pick = {}  # canal_id -> {"video_id": str, "ts": float}
-PENDING_TTL = 12.0  # segundos; reusar el mismo pick dentro de este tiempo
-
 _last_trigger_mtime_served = 0.0  # para /api/should_reload (one-shot)
 _last_menu_mtime_served = 0.0
 _last_nav_mtime_served = 0.0
@@ -260,7 +247,6 @@ _last_sel_mtime_served = 0.0
 # --- Para distinguir el origen del trigger (p. ej. BTN_NEXT) ---
 _last_trigger_reason = ""
 _last_trigger_mtime  = 0.0
-_force_next_once     = False  # si True, el próximo /api/next_video ignora sticky/cooldown
 
 # --- Boot / Frontend probes -------------------------------------------------
 _last_frontend_ping = 0.0  # epoch de Ãºltimo ping recibido
@@ -281,7 +267,7 @@ def _write_json_atomic(path, data):
     path = Path(path)  # acepta str o Path
     path.parent.mkdir(parents=True, exist_ok=True)
 
-    tmp = path.with_suffix(path.suffix + ".tmp")  # p.ej. plays.json.tmp
+    tmp = path.with_suffix(path.suffix + ".tmp")  # p.ej. canales.json.tmp
     with tmp.open("w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
         f.flush()
@@ -970,21 +956,6 @@ def _read_json(path, default):
 
 
 
-def load_plays():
-    return _read_json(PLAYS_FILE, {})
-
-def save_plays(d):
-    _write_json_atomic(PLAYS_FILE, d)
-
-def bump_play(video_id):
-    d = load_plays()
-    item = d.get(video_id, {"plays": 0, "last_played": None})
-    item["plays"] = int(item.get("plays", 0)) + 1
-    item["last_played"] = datetime.now(UTC).isoformat()
-    d[video_id] = item
-    save_plays(d)
-    return item
-
 def load_metadata():
     return _read_json(METADATA_FILE, {})
 
@@ -995,29 +966,6 @@ metadata = load_metadata()
 
 # Note: Directory scanning moved to metadata_daemon.py (Phase 0)
 # The daemon handles discovery of both series and commercials
-
-def _iso_to_ts(iso_str):
-    try:
-        return datetime.fromisoformat(iso_str.replace("Z","")).timestamp()
-    except Exception:
-        return 0.0
-
-def score_for_video(video_id, metadata, plays_map):
-    md = metadata.get(video_id, {})
-    dur = float(md.get("duracion", 0.0))  # segundos
-    minutes = max(1, math.ceil(dur / 60.0))
-
-    pinfo = plays_map.get(video_id, {"plays": 0, "last_played": None})
-    plays = int(pinfo.get("plays", 0))
-    last_ts = _iso_to_ts(pinfo.get("last_played")) if pinfo.get("last_played") else 0.0
-
-    plays_norm = plays / minutes
-    # jitter muy pequeÃ±o para no ser determinista total
-    jitter = random.random() * 0.01
-
-    # Orden principal: menor plays_norm primero (mÃ¡s justo),
-    # luego menos reciente (last_ts chico), luego jitter
-    return (plays_norm, last_ts, jitter)
 
 def _load_splash_state():
     """Lee /srv/tvargenta/Splash/splash_state.json -> {"index": int}"""
@@ -1339,211 +1287,16 @@ def api_next_video():
                 logger.error(f"[NEXT] Broadcast scheduling error for {activo_canal_id}: {e}")
                 # Fall through to normal selection if scheduler fails
 
-    metadata = load_metadata()
-
-    global _force_next_once
-    force_next = _force_next_once
-    _force_next_once = False
-
-    # Canal activo + config
-    canal_id = "canal_base"
-    config = load_config()
-
-    if activo_canal_id in canales:
-        canal_id = activo_canal_id
-        config = canales[canal_id]
-    
-    # --- De-dupe: si hay pick pendiente "fresco", reusalo ---
-    now = time.time()
-    pp = pending_pick.get(canal_id)
-    if (not force_next) and pp and (now - pp.get("ts", 0.0)) < PENDING_TTL:
-        vid = pp["video_id"]
-        info = metadata.get(vid, {})
-        series_path = info.get("series_path")
-        video_url = f"/videos/{series_path}.mp4" if series_path else f"/videos/{vid}.mp4"
-        logger.info(f"[NEXT-DUPE] Reuso pick pendiente canal={canal_id} video={vid}")
-        return jsonify({
-            "video_id": vid,
-            "video_url": video_url,
-            "title": info.get("title", vid.replace("_", " ")),
-            "tags": info.get("tags", []),
-            "modo": canal_id,
-            "canal_nombre": canales[canal_id].get("nombre", canal_id),
-            "canal_numero": get_canal_numero(canal_id, canales),
-            "reused": True,
-            "do_not_restart": True
-        })
-
-    # --- Sticky window ---
-    now = time.time()
-    sticky = last_choice_per_canal.get(canal_id)
-    if (not force_next) and sticky and (now - sticky["ts"]) < STICKY_WINDOW:
-        elegido_id = sticky["video_id"]
-        elegido_data = metadata.get(elegido_id, {})
-        if elegido_data:
-            series_path = elegido_data.get("series_path")
-            video_url = f"/videos/{series_path}.mp4" if series_path else f"/videos/{elegido_id}.mp4"
-            return jsonify({
-                "video_id": elegido_id,
-                "video_url": video_url,
-                "title": elegido_data.get("title", elegido_id.replace("_", " ")),
-                "tags": elegido_data.get("tags", []),
-                "score_tags": 0,
-                "fair_plays_norm": 0.0,
-                "fair_last_ts": 0.0,
-                "modo": canal_id,
-                "canal_nombre": canales[canal_id].get("nombre", canal_id),
-                "canal_numero": get_canal_numero(canal_id, canales),
-                "sticky": True
-            })
-
-    # --- Cooldown por canal ---
-    now = time.time()
-    ultimo = last_next_call.get(canal_id, 0.0)
-    sticky = last_choice_per_canal.get(canal_id)
-    if (not force_next) and (now - ultimo) < NEXT_COOLDOWN and sticky and (now - sticky["ts"]) >= STICKY_WINDOW:
-        logger.info(f"[NEXT] cooldown canal={canal_id} dt={now-ultimo:.2f}s -> bloqueo")
-        return jsonify({"cooldown": True, "canal_id": canal_id}), 200
-
-    # --- Series filter: if channel has series_filter, only show TV Episodes from those series ---
-    series_filter = config.get("series_filter", [])
-    series_filter_set = set(series_filter) if series_filter else None
-
-    prioridad = config.get("tags_prioridad", [])
-    incluidos = set(config.get("tags_incluidos", prioridad))  # fallback
-
-    # Only require tags_incluidos for non-series channels
-    if not incluidos and not series_filter_set:
-        return jsonify({"error": "No hay tags incluidos definidos en la configuración."}), 400
-
-    canal_shown = shown_videos_por_canal.get(canal_id, [])
-
-    # ====== (ya lo tenías) tags del último video del canal ======
-    prev = last_choice_per_canal.get(canal_id)
-    last_tags = set()
-    if prev:
-        prev_md = metadata.get(prev["video_id"], {})
-        last_tags = set(prev_md.get("tags", []))
-
-    # Debug logging for series filter
-    if series_filter_set:
-        tv_episodes = [(vid, d.get("series")) for vid, d in metadata.items() if d.get("category") == "tv_episode"]
-        logger.info(f"[NEXT] Series filter active: {series_filter}, found {len(tv_episodes)} TV episodes in metadata")
-        for vid, ser in tv_episodes[:5]:  # Log first 5
-            logger.info(f"[NEXT]   - {vid}: series={ser}, match={ser in series_filter_set if ser else False}")
-
-    # --- Candidatos por tags e inéditos en el canal ---
-    candidatos = []
-    for video_id, data in metadata.items():
-        if video_id in canal_shown:
-            continue
-
-        # Series filter: when active, only include TV Episodes with matching series
-        if series_filter_set:
-            if data.get("category") != "tv_episode":
-                continue
-            video_series = data.get("series")
-            if not video_series or video_series not in series_filter_set:
-                continue
-            # Series videos don't require tag matching - include them directly
-            video_tags = set(data.get("tags", []))
-            tag_score = sum((len(prioridad) - prioridad.index(tag)) for tag in video_tags if tag in prioridad)
-            overlap = len(video_tags & last_tags)
-            candidatos.append((video_id, data, tag_score, video_tags, overlap))
-            continue
-
-        # Non-series: require tag matching
-        video_tags = set(data.get("tags", []))
-        if not (video_tags & incluidos):
-            continue
-        tag_score = sum((len(prioridad) - prioridad.index(tag)) for tag in video_tags if tag in prioridad)
-        overlap = len(video_tags & last_tags)
-        candidatos.append((video_id, data, tag_score, video_tags, overlap))
-
-    # ====== NUEVO: Anti-repetición por tiempo mínimo global ======
-    # Podés configurar por canal en canales.json: {"min_gap_minutes": 60}
-    MIN_GAP_MIN = int(config.get("min_gap_minutes", 60))  # default 60 min si no se define
-    MIN_GAP_SEC = max(0, MIN_GAP_MIN) * 60
-
-    plays_map = load_plays()  # << movido arriba para usarlo en el filtro
-    now_ts = time.time()
-
-    def _age_seconds(vid):
-        p = plays_map.get(vid, {})
-        last_ts = _iso_to_ts(p.get("last_played")) if p.get("last_played") else 0.0
-        return float('inf') if last_ts == 0 else (now_ts - last_ts)
-
-    # 1) Filtrado estricto: excluir todo lo “demasiado fresco”
-    candidatos_ok = [t for t in candidatos if _age_seconds(t[0]) >= MIN_GAP_SEC]
-    # Guardamos también los rechazados para fallback
-    candidatos_frescos = [t for t in candidatos if _age_seconds(t[0]) <  MIN_GAP_SEC]
-
-    # Si te quedaste sin nada por el gap, relajamos: usamos los “menos frescos” primero
-    if not candidatos_ok and candidatos_frescos:
-        logger.info(f"[NEXT] Relax gap: no candidates >= {MIN_GAP_MIN} min; usando los más antiguos entre los frescos")
-        # Ordenar frescos por mayor edad primero (los que están más cerca de cumplir el gap)
-        candidatos_ok = sorted(
-            candidatos_frescos,
-            key=lambda t: (_age_seconds(t[0]) * -1)  # mayor edad -> primero
-        )
-
-    # Reemplazamos la lista original por la filtrada/relajada
-    candidatos = candidatos_ok
-    # ============================================================
-
-    # Si no quedan, limpiá "ya vistos" y reintentá
-    if not candidatos:
-        if canal_shown:
-            shown_videos_por_canal[canal_id] = []
-            return api_next_video()
-        else:
-            logger.warning(f"[NEXT] No videos found for canal={canal_id}, series_filter={series_filter}")
-            return jsonify({"no_videos": True, "canal_id": canal_id})
-
-    # --- Fairness + diversidad + prioridad + jitter ---
-    def sort_key(t):
-        video_id, data, tag_score, video_tags, overlap = t
-        plays_norm, last_ts, jitter = score_for_video(video_id, metadata, plays_map)
-        # ascendente: plays_norm, menos reciente, menos overlap, más prioridad, jitter
-        return (plays_norm, last_ts, overlap, -tag_score, jitter)
-
-    candidatos.sort(key=sort_key)
-
-    elegido_id, elegido_data, tag_score, elegido_tags, elegido_overlap = candidatos[0]
-    pending_pick[canal_id] = {"video_id": elegido_id, "ts": time.time()}
-
-    canal_shown.append(elegido_id)
-    shown_videos_por_canal[canal_id] = canal_shown
-
-    last_next_call[canal_id] = time.time()
-
-    fair_plays_norm, fair_last_ts, _ = score_for_video(elegido_id, metadata, plays_map)
-    edad_s = _age_seconds(elegido_id)  # para debug
-    logger.info(f"[NEXT] canal={canal_id} elegido={elegido_id} tagscore={tag_score} plays_norm={fair_plays_norm:.3f} overlap_prev={elegido_overlap} age={edad_s:.0f}s gap={MIN_GAP_MIN}m")
-
-    print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]}] [API] Reproduciendo video: {elegido_id} del canal {canal_id}")
-    last_choice_per_canal[canal_id] = {"video_id": elegido_id, "ts": time.time()}
-
-    # Determine video path - series videos use series_path, regular videos use video_id
-    series_path = elegido_data.get("series_path")
-    video_url = f"/videos/{series_path}.mp4" if series_path else f"/videos/{elegido_id}.mp4"
-
+    # Canal sin series_filter: el selector legacy por tags fue retirado; sin
+    # programación no hay contenido que emitir. El player muestra "no signal".
+    logger.warning(f"[NEXT] canal={activo_canal_id!r} sin series_filter -> no_videos")
+    canal_cfg = canales.get(activo_canal_id, {}) if activo_canal_id else {}
     return jsonify({
-        "video_id": elegido_id,
-        "video_url": video_url,
-        "title": elegido_data.get("title", elegido_id.replace("_", " ")),
-        "tags": elegido_data.get("tags", []),
-        "score_tags": tag_score,
-        "fair_plays_norm": fair_plays_norm,
-        "fair_last_ts": fair_last_ts,
-        "overlap_prev": elegido_overlap,
-        "modo": canal_id,
-        "canal_nombre": canales[canal_id].get("nombre", canal_id),
-        "canal_numero": get_canal_numero(canal_id, canales),
-        "min_gap_minutes": MIN_GAP_MIN,        # debug útil
-        "age_seconds": None if edad_s == float('inf') else int(edad_s)
+        "no_videos": True,
+        "modo": activo_canal_id or "canal_base",
+        "canal_nombre": canal_cfg.get("nombre", activo_canal_id or ""),
+        "canal_numero": get_canal_numero(activo_canal_id, canales) if activo_canal_id in canales else "",
     })
-
 
 
 def _get_all_series():
@@ -2481,7 +2234,7 @@ def tv():
     
 @app.route("/api/should_reload")
 def api_should_reload():
-    global _last_trigger_mtime_served, _last_trigger_reason, _last_trigger_mtime, _force_next_once
+    global _last_trigger_mtime_served, _last_trigger_reason, _last_trigger_mtime
 
     if not os.path.exists(TRIGGER_PATH):
         return jsonify({"should_reload": False})
@@ -2499,10 +2252,6 @@ def api_should_reload():
             _last_trigger_reason = ""
 
         _last_trigger_mtime = mtime
-
-        # Si viene del botón físico, forzamos el próximo NEXT
-        if _last_trigger_reason == "BTN_NEXT":
-            _force_next_once = True
 
         _last_trigger_mtime_served = mtime
         return jsonify({"should_reload": True})
@@ -2610,31 +2359,6 @@ def api_ui_prefs():
         return jsonify({"ok": True, **load_ui_prefs()})
     return jsonify(load_ui_prefs())
 
-
-@app.route("/api/played", methods=["POST"])
-def api_played():
-    data = request.get_json(force=True) or {}
-    video_id = data.get("video_id")
-
-    try:
-        for cid, pp in list(pending_pick.items()):
-            if pp.get("video_id") == video_id:
-                pending_pick.pop(cid, None)
-                logger.info(f"[PLAYED] confirm canal={cid} video={video_id} -> limpio pending_pick")
-    except Exception as e:
-        logger.warning(f"[PLAYED] limpiar pending_pick: {e}")
-
-    if not video_id:
-        return jsonify({"ok": False, "error": "missing video_id"}), 400
-
-    d = load_plays()
-    item = d.get(video_id, {"plays": 0, "last_played": None})
-    item["plays"] = int(item.get("plays", 0)) + 1
-    item["last_played"] = datetime.now(UTC).isoformat()
-    d[video_id] = item
-    save_plays(d)
-
-    return jsonify({"ok": True, "video_id": video_id, **item})
 
 @app.route("/splash_video/<path:filename>")
 def serve_splash_video(filename):

@@ -834,10 +834,6 @@
 	let reloadTimer = null;         // timer para reintento diferido de reload
 	let requestSequence = 0;        // sequence number to detect stale responses
 
-	let playedReportedFor = null;   // video_id para el que ya se reportó play
-	let playedTimer = null;         // timeout a 10s
-	let playedArmed = false;        // evita múltiples enganches
-	let _prevTimeUpdateHandler = null; // ref to previous timeupdate listener (avoid leak)
 	let _prevCanplayHandler = null;    // ref to previous canplay listener (avoid leak)
 
 	// Release old media resources before loading a new source.
@@ -1053,18 +1049,6 @@
 		}
 	  }
 
-
-	async function reportPlayed(videoId) {
-	  try {
-		await fetch("/api/played", {
-		  method: "POST",
-		  headers: {"Content-Type": "application/json"},
-		  body: JSON.stringify({ video_id: videoId })
-		});
-	  } catch (e) {
-		console.warn("[TV] reportPlayed falló:", e);
-	  }
-	}
 	
 	
     // Fullscreen automático
@@ -1262,46 +1246,6 @@
 			  applyLoudnessVolumeAdjustment(data.loudness_lufs);
 			}
 
-			// --- armado del umbral de "play real" ---
-			// Skip play reporting for broadcast system videos (test pattern, commercials)
-			if (isBroadcast && (data.broadcast_type === 'test_pattern' || data.broadcast_type === 'commercial')) {
-			  // Don't track plays for system content
-			  playedReportedFor = currentVideo;
-			}
-			playedArmed = false;
-			clearTimeout(playedTimer);
-
-			// A) 10 segundos
-			playedTimer = setTimeout(() => {
-			  if (currentVideo && playedReportedFor !== currentVideo) {
-				playedReportedFor = currentVideo;
-				reportPlayed(currentVideo);
-			  }
-			}, 10000);
-
-			// B) 30% de duración (cuando se conozca el metadata)
-			// Remove previous listener by stored ref to prevent accumulation
-			if (_prevTimeUpdateHandler) {
-			  video.removeEventListener("timeupdate", _prevTimeUpdateHandler);
-			}
-			const onTimeUpdate = () => {
-			  const dur = video.duration || 0;
-			  if (!playedArmed && dur > 0) {
-				playedArmed = true; // sólo armamos una vez cuando tengamos duración
-			  }
-			  if (dur > 0) {
-				const threshold = 0.30 * dur; // 30%
-				if (video.currentTime >= threshold && playedReportedFor !== currentVideo) {
-				  playedReportedFor = currentVideo;
-				  clearTimeout(playedTimer);
-				  reportPlayed(currentVideo);
-				  video.removeEventListener("timeupdate", onTimeUpdate);
-				  _prevTimeUpdateHandler = null;
-				}
-			  }
-			};
-			_prevTimeUpdateHandler = onTimeUpdate;
-			video.addEventListener("timeupdate", onTimeUpdate);
 
 		  }
 
@@ -1407,11 +1351,6 @@
       }
 
       // Normal channel behavior - load next video
-      // Si por algún motivo no se reportó (video muy corto, etc.), reportá ahora:
-	  if (currentVideo && playedReportedFor !== currentVideo) {
-		playedReportedFor = currentVideo;
-		reportPlayed(currentVideo);
-	  }
 	  cargarSiguienteVideo(true);
     });
 	
