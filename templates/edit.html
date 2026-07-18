@@ -45,7 +45,6 @@
       <h1 class="text-2xl sm:text-3xl font-bold text-yellow-400">{{ tr("edit.header") }}</h1>
       <div class="flex items-center gap-3">
         <a href="{{ url_for('index') }}" class="text-blue-400 underline text-sm sm:text-base">{{ tr("edit.nav.home") }}</a>
-        <a href="{{ url_for('tags', from_edit=video_id) }}" class="text-blue-400 underline text-sm sm:text-base">{{ tr("edit.nav.tags") }}</a>
       </div>
     </header>
 
@@ -216,7 +215,6 @@
       <!-- Acciones -->
       <div class="flex justify-between items-center mt-2 flex-wrap gap-3">
         <a href="{{ url_for('index') }}" class="text-sm text-blue-400 hover:underline">{{ tr("edit.back_home") }}</a>
-        <a href="{{ url_for('tags', from_edit=video_id) }}" class="text-sm text-blue-400 hover:underline">{{ tr("edit.edit_tags_link") }}</a>
         <button type="submit" class="bg-yellow-500 hover:bg-yellow-600 text-black px-4 py-2 rounded font-bold">
           {{ tr("edit.save") }}
         </button>
@@ -228,7 +226,6 @@
       <div class="max-w-screen-lg mx-auto px-3 py-3 flex items-center justify-between">
         <span class="text-xs text-gray-300">{{ tr("edit.ready") }}</span>
         <div class="flex items-center gap-2">
-          <a href="{{ url_for('tags', from_edit=video_id) }}" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded text-sm">{{ tr("edit.nav.tags") }}</a>
           <button form="__noform__" onclick="document.querySelector('form').requestSubmit();" class="bg-yellow-500 hover:bg-yellow-600 text-black px-4 py-2 rounded text-sm">{{ tr("edit.save") }}</button>
         </div>
       </div>

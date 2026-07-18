@@ -1,15 +1,11 @@
 {
   "edit.page_title": "Editar video",
   "edit.header": "✏️ Editar video",
-
   "edit.nav.home": "⬅ Inicio",
-  "edit.nav.tags": "🛠 Tags",
-
   "edit.file_label": "Archivo:",
   "edit.title_label": "Título",
   "edit.character_label": "Personaje principal",
   "edit.date_label": "Fecha",
-
   "edit.category.header": "📁 Categoría",
   "edit.category.type_label": "Tipo de contenido",
   "edit.category.tv_episode": "📺 TV Episode",
@@ -24,7 +20,6 @@
   "edit.category.series_hint_pre": "To add TV Episodes, use the",
   "edit.category.series_hint_link": "Series Upload",
   "edit.category.series_hint_post": "feature.",
-
   "edit.tags.header": "🏷 Tags",
   "edit.tags.toggle": "Mostrar/Ocultar",
   "edit.tags.show": "Mostrar",
@@ -34,13 +29,10 @@
   "edit.tags.search_placeholder": "Buscar tag…",
   "edit.tags.expand": "Expandir grupos",
   "edit.tags.collapse": "Colapsar grupos",
-
   "edit.modes.header": "🎛 Modos de reproducción",
   "edit.modes.all": "Todos",
   "edit.modes.none": "Ninguno",
-
   "edit.back_home": "⬅ Volver al inicio",
-  "edit.edit_tags_link": "🛠 Editar grupos y tags",
   "edit.save": "💾 Guardar",
   "edit.ready": "¿Listo?"
 }

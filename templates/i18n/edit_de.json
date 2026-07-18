@@ -1,15 +1,11 @@
 {
   "edit.page_title": "Video bearbeiten",
   "edit.header": "✏️ Video bearbeiten",
-
   "edit.nav.home": "⬅ Start",
-  "edit.nav.tags": "🛠 Tags",
-
   "edit.file_label": "Datei:",
   "edit.title_label": "Titel",
   "edit.character_label": "Hauptfigur",
   "edit.date_label": "Datum",
-
   "edit.category.header": "📁 Kategorie",
   "edit.category.type_label": "Inhaltstyp",
   "edit.category.tv_episode": "📺 TV-Episode",
@@ -24,7 +20,6 @@
   "edit.category.series_hint_pre": "Zum Hinzufügen von TV-Episoden die Funktion",
   "edit.category.series_hint_link": "Serien-Upload",
   "edit.category.series_hint_post": "verwenden.",
-
   "edit.tags.header": "🏷 Tags",
   "edit.tags.toggle": "Anzeigen/Ausblenden",
   "edit.tags.show": "Anzeigen",
@@ -34,13 +29,10 @@
   "edit.tags.search_placeholder": "Tag suchen…",
   "edit.tags.expand": "Gruppen ausklappen",
   "edit.tags.collapse": "Gruppen einklappen",
-
   "edit.modes.header": "🎛 Wiedergabemodi",
   "edit.modes.all": "Alle",
   "edit.modes.none": "Keine",
-
   "edit.back_home": "⬅ Zurück zur Startseite",
-  "edit.edit_tags_link": "🛠 Gruppen und Tags bearbeiten",
   "edit.save": "💾 Speichern",
   "edit.ready": "Fertig?"
 }
