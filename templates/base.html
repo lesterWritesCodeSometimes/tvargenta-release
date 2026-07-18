@@ -209,6 +209,10 @@
   </div>
 
   <script>
+    // Traducciones para strings generados desde JS (mismo dict que tr() en Jinja)
+    window.TR = {{ translations | tojson }};
+    window.tr = function (key) { return window.TR[key] || key; };
+
     // Language switcher
     (function() {
       const select = document.getElementById("lang-select");

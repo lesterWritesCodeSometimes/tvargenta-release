@@ -7,11 +7,14 @@
   "vertele.video.no_tags": "🏷️ Keine Tags",
   "vertele.video.tags_prefix": "🏷️ Tags:",
   "vertele.video.score_prefix": "🔢 Bewertung:",
+  "vertele.video.load_error": "Das nächste Video konnte nicht geladen werden.",
+  "vertele.video.html5_unsupported": "Dein Browser unterstützt kein HTML5-Video.",
 
   "vertele.channel.title": "📡 Wähle einen Kanal",
   "vertele.channel.current": "📡 Aktueller Kanal:",
   "vertele.channel.error": "Kanalliste konnte nicht geladen werden",
   "vertele.channel.btn_next": "⏭ Nächster",
+  "vertele.channel.select_aria": "Kanal {name} auswählen",
 
   "vertele.nav.back_home": "⬅ Zur Startseite"
 }

@@ -5,10 +5,10 @@
 -->
 
 <!DOCTYPE html>
-<html lang="en">
+<html lang="{{ lang }}">
 <head>
   <meta charset="UTF-8">
-  <title>Record VHS Tape - TVArgenta</title>
+  <title>{{ tr("vcr_record.page_title") }}</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
@@ -81,10 +81,10 @@
   <!-- Initial State: Press to Record -->
   <div id="state-initial" class="flex flex-col items-center gap-8">
     <h1 class="text-2xl sm:text-3xl text-center font-bold text-white">
-      Press to start recording
+      {{ tr("vcr_record.initial.header") }}
     </h1>
 
-    <button id="record-btn" class="record-button" aria-label="Start recording">
+    <button id="record-btn" class="record-button" aria-label="{{ tr('vcr_record.initial.record_aria') }}">
       <div class="record-circle"></div>
     </button>
 
@@ -94,7 +94,7 @@
            class="hidden">
 
     <p class="text-gray-500 text-sm text-center">
-      Only .mp4 files allowed (max 3GB)
+      {{ tr("vcr_record.initial.hint") }}
     </p>
   </div>
 
@@ -102,7 +102,7 @@
   <div id="state-recording" class="hidden flex flex-col items-center gap-6">
     <div class="flex items-center gap-3 recording-pulse">
       <div class="w-4 h-4 bg-red-600 rounded-full"></div>
-      <h1 class="text-3xl sm:text-4xl font-bold text-red-500">Recording...</h1>
+      <h1 class="text-3xl sm:text-4xl font-bold text-red-500">{{ tr("vcr_record.recording.header") }}</h1>
     </div>
 
     <div class="progress-bar-container">
@@ -115,22 +115,25 @@
   <!-- Complete State -->
   <div id="state-complete" class="hidden flex flex-col items-center gap-6">
     <div class="text-6xl">✓</div>
-    <h1 class="text-3xl sm:text-4xl font-bold text-green-500">Recording Complete</h1>
-    <p class="text-gray-400">Your video has been saved to the tape.</p>
+    <h1 class="text-3xl sm:text-4xl font-bold text-green-500">{{ tr("vcr_record.complete.header") }}</h1>
+    <p class="text-gray-400">{{ tr("vcr_record.complete.detail") }}</p>
   </div>
 
   <!-- Error State -->
   <div id="state-error" class="hidden flex flex-col items-center gap-6">
     <div class="text-6xl">✗</div>
-    <h1 class="text-3xl sm:text-4xl font-bold text-red-500">Recording Failed</h1>
+    <h1 class="text-3xl sm:text-4xl font-bold text-red-500">{{ tr("vcr_record.error.header") }}</h1>
     <p id="error-message" class="text-gray-400 text-center"></p>
     <button id="retry-btn"
             class="bg-gray-700 hover:bg-gray-600 text-white font-bold py-3 px-8 rounded-lg transition">
-      Try Again
+      {{ tr("vcr_record.error.retry") }}
     </button>
   </div>
 
   <script>
+    window.TR = {{ translations | tojson }};
+    window.tr = k => TR[k] || k;
+
     const tapeUid = "{{ tape_uid }}";
 
     const stateInitial = document.getElementById('state-initial');
@@ -162,7 +165,7 @@
     function updateProgress(percent) {
       progressBar.style.width = `${percent}%`;
       if (percent >= 100) {
-        progressText.textContent = 'Finalizing...';
+        progressText.textContent = tr('vcr_record.recording.finalizing');
       } else {
         progressText.textContent = `${percent}%`;
       }
@@ -205,7 +208,7 @@
 
       // Validate file type
       if (!file.name.toLowerCase().endsWith('.mp4')) {
-        errorMessage.textContent = 'Only .mp4 files are allowed.';
+        errorMessage.textContent = tr('vcr_record.error.only_mp4');
         showState('error');
         return;
       }
@@ -213,14 +216,14 @@
       // Validate file size (3GB)
       const maxSize = 3 * 1024 * 1024 * 1024;
       if (file.size > maxSize) {
-        errorMessage.textContent = 'File is too large. Maximum size is 3GB.';
+        errorMessage.textContent = tr('vcr_record.error.too_large');
         showState('error');
         return;
       }
 
       // Check tape UID
       if (!tapeUid) {
-        errorMessage.textContent = 'No tape detected. Please insert a tape and try again.';
+        errorMessage.textContent = tr('vcr_record.error.no_tape');
         showState('error');
         return;
       }
@@ -238,12 +241,12 @@
         });
         const startData = await startResp.json();
         if (!startData.ok) {
-          errorMessage.textContent = startData.message || startData.error || 'Failed to start recording.';
+          errorMessage.textContent = startData.message || startData.error || tr('vcr_record.error.start_failed');
           showState('error');
           return;
         }
       } catch (err) {
-        errorMessage.textContent = 'Failed to initialize recording: ' + (err.message || 'Network error');
+        errorMessage.textContent = tr('vcr_record.error.init_failed').replace('{error}', err.message || tr('vcr_record.error.network'));
         showState('error');
         return;
       }
@@ -277,31 +280,31 @@
                 updateProgress(100);
                 showState('complete');
               } else {
-                errorMessage.textContent = response.message || response.error || 'Upload failed.';
+                errorMessage.textContent = response.message || response.error || tr('vcr_record.error.upload_failed');
                 showState('error');
               }
             } catch {
-              errorMessage.textContent = 'Invalid server response.';
+              errorMessage.textContent = tr('vcr_record.error.invalid_response');
               showState('error');
             }
           } else {
             try {
               const response = JSON.parse(xhr.responseText);
-              errorMessage.textContent = response.message || response.error || `Upload failed (${xhr.status})`;
+              errorMessage.textContent = response.message || response.error || tr('vcr_record.error.upload_failed_code').replace('{status}', xhr.status);
             } catch {
-              errorMessage.textContent = `Upload failed with status ${xhr.status}`;
+              errorMessage.textContent = tr('vcr_record.error.upload_failed_status').replace('{status}', xhr.status);
             }
             showState('error');
           }
         });
 
         xhr.addEventListener('error', () => {
-          errorMessage.textContent = 'Network error. Please check your connection.';
+          errorMessage.textContent = tr('vcr_record.error.network_check');
           showState('error');
         });
 
         xhr.addEventListener('abort', () => {
-          errorMessage.textContent = 'Upload was cancelled.';
+          errorMessage.textContent = tr('vcr_record.error.cancelled');
           showState('error');
         });
 
@@ -309,7 +312,7 @@
         xhr.send(formData);
 
       } catch (err) {
-        errorMessage.textContent = err.message || 'An unexpected error occurred.';
+        errorMessage.textContent = err.message || tr('vcr_record.error.unexpected');
         showState('error');
       }
 

@@ -1,0 +1,29 @@
+{
+  "vcr_record.page_title": "Grabar casete VHS - TVArgenta",
+
+  "vcr_record.initial.header": "Presioná para empezar a grabar",
+  "vcr_record.initial.record_aria": "Empezar a grabar",
+  "vcr_record.initial.hint": "Solo se permiten archivos .mp4 (máx. 3GB)",
+
+  "vcr_record.recording.header": "Grabando...",
+  "vcr_record.recording.finalizing": "Finalizando...",
+
+  "vcr_record.complete.header": "Grabación completada",
+  "vcr_record.complete.detail": "Tu video se guardó en el casete.",
+
+  "vcr_record.error.header": "Falló la grabación",
+  "vcr_record.error.retry": "Reintentar",
+  "vcr_record.error.only_mp4": "Solo se permiten archivos .mp4.",
+  "vcr_record.error.too_large": "El archivo es demasiado grande. El tamaño máximo es 3GB.",
+  "vcr_record.error.no_tape": "No se detectó ningún casete. Insertá un casete y volvé a intentar.",
+  "vcr_record.error.start_failed": "No se pudo iniciar la grabación.",
+  "vcr_record.error.init_failed": "No se pudo inicializar la grabación: {error}",
+  "vcr_record.error.network": "Error de conexión",
+  "vcr_record.error.upload_failed": "Falló la subida.",
+  "vcr_record.error.invalid_response": "Respuesta inválida del servidor.",
+  "vcr_record.error.upload_failed_code": "Falló la subida ({status})",
+  "vcr_record.error.upload_failed_status": "Falló la subida con estado {status}",
+  "vcr_record.error.network_check": "Error de conexión. Revisá tu conexión e intentá de nuevo.",
+  "vcr_record.error.cancelled": "La subida fue cancelada.",
+  "vcr_record.error.unexpected": "Ocurrió un error inesperado."
+}

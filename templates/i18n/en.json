@@ -3,13 +3,11 @@
   "nav.library": "Library",
   "nav.content": "Content",
   "nav.channels": "Channels",
-
   "settings.language": "Language",
   "lang.es": "Spanish",
   "lang.en": "English",
   "lang.de": "German",
   "overlay.lang_changed": "Language updated",
-
   "app.title": "TVArgenta",
   "overlay.loading_channel": "Loading channel...",
   "overlay.no_videos": "No videos available",
@@ -23,11 +21,9 @@
   "overlay.enter_gaming": "Entering Retro Gaming Mode…",
   "overlay.shutting_down": "Shutting down…",
   "overlay.searching": "Searching...",
-
   "vol.label": "Volume",
   "vol.mute_badge": "MUTE",
   "vol.mute_title": "Volume at 0",
-
   "menu.title": "MAIN MENU",
   "menu.predefined": "Predefined Channels",
   "menu.mine": "My Channels",
@@ -36,16 +32,13 @@
   "menu.gaming": "Retro Gaming Mode",
   "menu.poweroff": "Power Off",
   "menu.back": "Back",
-
   "menu.footer.nav": "[Rotate] Navigate",
   "menu.footer.select": "[Press] Select",
-
   "settings.title": "Settings",
   "settings.show_channel_name": "Show channel name",
   "settings.yes": "Yes",
   "settings.no": "No",
   "settings.timezone": "Timezone",
-
   "tz.new_york": "New York (EST)",
   "tz.chicago": "Chicago (CST)",
   "tz.denver": "Denver (MST)",
@@ -59,22 +52,16 @@
   "tz.tokyo": "Tokyo (JST)",
   "tz.sydney": "Sydney (AEST)",
   "tz.utc": "UTC",
-
   "power.confirm": "Confirm shutdown",
-
   "bt.root.known": "Known Devices",
   "bt.root.scan": "Scan for New",
-
   "bt.dev.connect": "Connect",
   "bt.dev.disconnect": "Disconnect",
   "bt.dev.forget": "Forget",
-
   "bt.new.pairconnect": "Pair & Connect",
-
   "bt.status_on": "[ON]",
   "bt.status_off": "[OFF]",
   "bt.unknown": "(unknown)",
-
   "settings.wifi": "Wi-Fi / Connection",
   "wifi.show_status": "Show Wi-Fi status",
   "wifi.start_ap": "Configure from phone",
@@ -95,13 +82,11 @@
   "wifi.forget_error": "Could not forget network",
   "wifi.ap_hint": "Use your camera to scan the code or enter the URL. Press the button/encoder to exit.",
   "wifi.ap_qr_desc": "1) Connect your device to {ssid} (password {password}). 2) Scan the code or open the URL to configure WiFi.",
-
   "wifi.show_gestion_qr": "Management QR (web)",
   "wifi.qr_gestion_title": "Content Management",
   "wifi.qr_gestion_desc": "From a device on the same network, open this address:",
-  "wifi.qr_error": "Could not generate QR code",
+  "wifi.qr_error": "Couldn't generate the management QR code.",
   "wifi.qr_offline": "TVArgenta is currently offline. Connect it to Wi-Fi or Ethernet to manage it from another device.",
-  "wifi.qr_error": "Couldn't generate the management QR code."
-
-
+  "wifi.ap_qr_title": "Manage WiFi connection",
+  "menu.gaming_entering": "Entering Game Mode…"
 }

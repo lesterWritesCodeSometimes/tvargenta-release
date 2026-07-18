@@ -1,0 +1,49 @@
+{
+  "vcr_admin.page_title": "VCR-Kassettenverwaltung - TVArgenta",
+  "vcr_admin.header": "VCR-Kassettenverwaltung",
+  "vcr_admin.nav.back": "← Zurück zur Übersicht",
+
+  "vcr_admin.reader.checking": "NFC-Leser wird geprüft...",
+  "vcr_admin.reader.error": "Fehler",
+  "vcr_admin.reader.unknown_error": "Unbekannter Fehler",
+  "vcr_admin.reader.not_detected": "NFC-Leser nicht erkannt",
+  "vcr_admin.reader.not_detected_detail": "Schließe den USB-NFC-Leser an, um fortzufahren",
+  "vcr_admin.reader.tape_inserted": "Kassette eingelegt",
+  "vcr_admin.reader.playing": "Wiedergabe: {title}",
+  "vcr_admin.reader.unregistered": "Nicht registrierte Kassette erkannt",
+  "vcr_admin.reader.unregistered_detail": "Registriere sie unten",
+  "vcr_admin.reader.ready": "NFC-Leser bereit",
+  "vcr_admin.reader.ready_detail": "Lege eine Kassette auf den Leser",
+
+  "vcr_admin.register.header": "Neue Kassette registrieren",
+  "vcr_admin.register.instructions": "Lege eine nicht registrierte Mini-VHS-Kassette auf den NFC-Leser, um sie zu scannen.",
+  "vcr_admin.register.waiting": "Warte auf Kassette...",
+  "vcr_admin.register.detected": "Neue Kassette erkannt!",
+  "vcr_admin.register.uid_label": "UID:",
+  "vcr_admin.register.select_label": "Video für diese Kassette auswählen:",
+  "vcr_admin.register.select_placeholder": "-- Video auswählen --",
+  "vcr_admin.register.title_label": "Eigener Titel (optional):",
+  "vcr_admin.register.title_placeholder": "Leer lassen, um den Videotitel zu verwenden",
+  "vcr_admin.register.submit": "Kassette registrieren",
+
+  "vcr_admin.tapes.header": "Registrierte Kassetten",
+  "vcr_admin.tapes.loading": "Kassetten werden geladen...",
+  "vcr_admin.tapes.empty": "Noch keine Kassetten registriert. Scanne oben eine Kassette, um sie zu registrieren.",
+  "vcr_admin.tapes.video_label": "Video:",
+  "vcr_admin.tapes.position_label": "Position:",
+  "vcr_admin.tapes.reset_btn": "Position zurücksetzen",
+  "vcr_admin.tapes.delete_btn": "Löschen",
+  "vcr_admin.tapes.load_error": "Fehler beim Laden der Kassetten",
+
+  "vcr_admin.alert.select_video": "Bitte wähle ein Video aus",
+  "vcr_admin.alert.register_ok": "Kassette erfolgreich registriert!",
+  "vcr_admin.alert.error": "Fehler: {error}",
+  "vcr_admin.alert.register_failed": "Kassette konnte nicht registriert werden",
+  "vcr_admin.alert.delete_failed": "Kassette konnte nicht gelöscht werden",
+  "vcr_admin.alert.reset_not_implemented": "Zurücksetzen der Position ist noch nicht implementiert",
+
+  "vcr_admin.confirm.delete": "Möchtest du diese Kassettenzuordnung wirklich löschen?",
+  "vcr_admin.confirm.reset": "Diese Kassette an den Anfang zurücksetzen?",
+
+  "vcr_admin.debug.summary": "Debug: VCR-Status"
+}

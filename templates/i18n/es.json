@@ -3,13 +3,11 @@
   "nav.library": "Biblioteca",
   "nav.content": "Contenido",
   "nav.channels": "Canales",
-
   "settings.language": "Idioma",
   "lang.es": "Español",
   "lang.en": "Inglés",
   "lang.de": "Alemán",
   "overlay.lang_changed": "Idioma actualizado",
-
   "app.title": "TVArgenta",
   "overlay.loading_channel": "Cargando canal...",
   "overlay.no_videos": "Sin videos disponibles",
@@ -23,11 +21,9 @@
   "overlay.enter_gaming": "Entrando en Modo Juegos…",
   "overlay.shutting_down": "Apagando…",
   "overlay.searching": "Buscando...",
-
   "vol.label": "Volumen",
   "vol.mute_badge": "MUTE",
   "vol.mute_title": "Volumen en 0",
-
   "menu.title": "MENÚ PRINCIPAL",
   "menu.predefined": "Canales predefinidos",
   "menu.mine": "Mis canales",
@@ -36,16 +32,13 @@
   "menu.gaming": "Modo Juegos Retro",
   "menu.poweroff": "Apagar",
   "menu.back": "Volver",
-
   "menu.footer.nav": "[Giro] Navegar",
   "menu.footer.select": "[Apretar] Seleccionar",
-
   "settings.title": "Configuraciones",
   "settings.show_channel_name": "Mostrar nombre canal",
   "settings.yes": "Sí",
   "settings.no": "No",
   "settings.timezone": "Zona horaria",
-
   "tz.new_york": "Nueva York (EST)",
   "tz.chicago": "Chicago (CST)",
   "tz.denver": "Denver (MST)",
@@ -59,22 +52,16 @@
   "tz.tokyo": "Tokio (JST)",
   "tz.sydney": "Sídney (AEST)",
   "tz.utc": "UTC",
-
   "power.confirm": "Confirmar apagado",
-
   "bt.root.known": "Dispositivos Conocidos",
   "bt.root.scan": "Buscar Nuevos",
-
   "bt.dev.connect": "Conectar",
   "bt.dev.disconnect": "Desconectar",
   "bt.dev.forget": "Olvidar",
-
   "bt.new.pairconnect": "Emparejar y Conectar",
-
   "bt.status_on": "[ON]",
   "bt.status_off": "[OFF]",
   "bt.unknown": "(desconocido)",
-
   "settings.wifi": "Wi-Fi / Conexión",
   "wifi.show_status": "Ver estado Wi-Fi",
   "wifi.start_ap": "Configurar desde el celular",
@@ -93,16 +80,13 @@
   "wifi.best_error": "No se pudo conectar a una red conocida",
   "wifi.forget_ok": "Red olvidada: {ssid}",
   "wifi.forget_error": "No se pudo olvidar la red",
-
   "wifi.show_gestion_qr": "QR Gestión (web)",
   "wifi.qr_gestion_title": "Gestión de Contenido",
   "wifi.qr_gestion_desc": "Desde un dispositivo en la misma red, abrí esta dirección:",
-  "wifi.qr_error": "No pude generar el código QR",
+  "wifi.qr_error": "No pude generar el código QR de gestión.",
   "wifi.ap_hint": "Usá la cámara para escanear el código o ingresá la URL. Pulsá el botón/encoder para salir.",
-
   "wifi.ap_qr_title": "Gestión de conexión WiFi",
   "wifi.ap_qr_desc": "1) Conectá tu dispositivo a la red {ssid} (clave {password}). 2) Escaneá el código o abrí la dirección para configurar la conexión WiFi.",
   "wifi.qr_offline": "TVArgenta está funcionando offline. Conectala a una red para gestionarla desde otro dispositivo.",
-  "wifi.qr_error": "No pude generar el código QR de gestión."
-
+  "menu.gaming_entering": "Entrando en Modo Juegos…"
 }

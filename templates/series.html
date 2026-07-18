@@ -8,7 +8,7 @@
 <html lang="{{ lang }}">
 <head>
   <meta charset="UTF-8">
-  <title>TV Series Management</title>
+  <title>{{ tr("series.page_title") }}</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
@@ -16,13 +16,13 @@
   <div class="max-w-4xl mx-auto">
     <header class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
       <h1 class="text-2xl sm:text-3xl text-purple-400 font-bold">
-        TV Series Management
+        {{ tr("series.header") }}
       </h1>
 
       <div class="flex items-center gap-4">
         <a href="{{ url_for('index') }}"
            class="text-blue-400 hover:underline text-sm sm:text-base whitespace-nowrap">
-          Back to Admin
+          {{ tr("series.back_admin") }}
         </a>
       </div>
     </header>
@@ -39,32 +39,32 @@
             </h2>
           </div>
           <p class="text-sm text-gray-300 mb-2">
-            <span class="text-purple-300 font-semibold">{{ series.episode_count }}</span> episode{% if series.episode_count != 1 %}s{% endif %}
+            <span class="text-purple-300 font-semibold">{{ series.episode_count }}</span> {{ tr("series.episodes") if series.episode_count != 1 else tr("series.episode") }}
           </p>
           {% if series.created %}
-          <p class="text-xs text-gray-500 mb-2">Created: {{ series.created }}</p>
+          <p class="text-xs text-gray-500 mb-2">{{ tr("series.created_label") }} {{ series.created }}</p>
           {% endif %}
 
           <!-- Time of Day Preference -->
           <div class="mt-3 mb-3">
-            <label class="block text-xs text-gray-400 mb-1">Broadcast Time Slot</label>
+            <label class="block text-xs text-gray-400 mb-1">{{ tr("series.time_slot_label") }}</label>
             <select class="time-of-day-select w-full bg-gray-800 text-white px-2 py-1 rounded border border-gray-600 text-sm"
                     data-series="{{ series.folder_name }}">
-              <option value="any" {% if series.time_of_day == 'any' %}selected{% endif %}>Any Time (24h)</option>
-              <option value="early_morning" {% if series.time_of_day == 'early_morning' %}selected{% endif %}>Early Morning (4am-7am)</option>
-              <option value="late_morning" {% if series.time_of_day == 'late_morning' %}selected{% endif %}>Late Morning (7am-12pm)</option>
-              <option value="afternoon" {% if series.time_of_day == 'afternoon' %}selected{% endif %}>Afternoon (12pm-5pm)</option>
-              <option value="evening" {% if series.time_of_day == 'evening' %}selected{% endif %}>Evening (5pm-9pm)</option>
-              <option value="night" {% if series.time_of_day == 'night' %}selected{% endif %}>Night (9pm-2am)</option>
+              <option value="any" {% if series.time_of_day == 'any' %}selected{% endif %}>{{ tr("series.slot_any") }}</option>
+              <option value="early_morning" {% if series.time_of_day == 'early_morning' %}selected{% endif %}>{{ tr("series.slot_early_morning") }}</option>
+              <option value="late_morning" {% if series.time_of_day == 'late_morning' %}selected{% endif %}>{{ tr("series.slot_late_morning") }}</option>
+              <option value="afternoon" {% if series.time_of_day == 'afternoon' %}selected{% endif %}>{{ tr("series.slot_afternoon") }}</option>
+              <option value="evening" {% if series.time_of_day == 'evening' %}selected{% endif %}>{{ tr("series.slot_evening") }}</option>
+              <option value="night" {% if series.time_of_day == 'night' %}selected{% endif %}>{{ tr("series.slot_night") }}</option>
             </select>
           </div>
 
           <div class="flex justify-end gap-4 mt-4">
             <a href="{{ url_for('upload_series') }}?series={{ series.folder_name }}"
-               class="text-green-400 hover:underline text-sm">Upload Episodes</a>
+               class="text-green-400 hover:underline text-sm">{{ tr("series.upload_episodes") }}</a>
             <form action="{{ url_for('series_delete', series_name=series.folder_name) }}" method="post"
-                  onsubmit="return confirm('Delete {{ series.display_name }} and all its episodes? This cannot be undone!');">
-              <button type="submit" class="text-red-400 hover:underline text-sm">Delete</button>
+                  onsubmit="return confirm('{{ tr("series.delete_confirm") | replace("{name}", series.display_name) }}');">
+              <button type="submit" class="text-red-400 hover:underline text-sm">{{ tr("series.delete") }}</button>
             </form>
           </div>
         </div>
@@ -72,37 +72,40 @@
     </div>
     {% else %}
     <div class="bg-gray-900 border border-gray-600 rounded-lg p-8 text-center mb-8">
-      <p class="text-gray-400 text-lg mb-2">No TV series yet</p>
-      <p class="text-gray-500 text-sm">Create your first series below to start organizing episodes.</p>
+      <p class="text-gray-400 text-lg mb-2">{{ tr("series.empty_title") }}</p>
+      <p class="text-gray-500 text-sm">{{ tr("series.empty_hint") }}</p>
     </div>
     {% endif %}
 
     <!-- ADD NEW SERIES FORM -->
     <div class="bg-gray-800 border border-purple-600 rounded-lg p-6 shadow">
-      <h2 class="text-xl font-bold text-green-400 mb-4">Add New Series</h2>
+      <h2 class="text-xl font-bold text-green-400 mb-4">{{ tr("series.add_title") }}</h2>
       <form action="{{ url_for('series_add') }}" method="post" class="flex flex-col sm:flex-row gap-4">
         <div class="flex-1">
-          <label class="block text-sm mb-1 text-gray-300">Series Name</label>
+          <label class="block text-sm mb-1 text-gray-300">{{ tr("series.name_label") }}</label>
           <input type="text" name="name" required
-                 placeholder="e.g. Los Simuladores"
+                 placeholder="{{ tr('series.name_placeholder') }}"
                  class="w-full bg-gray-900 text-white px-3 py-2 rounded border border-gray-600 focus:border-purple-500 focus:outline-none">
-          <p class="text-xs text-gray-500 mt-1">Spaces will be converted to underscores in folder names.</p>
+          <p class="text-xs text-gray-500 mt-1">{{ tr("series.name_hint") }}</p>
         </div>
         <div class="flex items-end">
           <button type="submit"
                   class="bg-purple-600 hover:bg-purple-700 text-white font-bold px-6 py-2 rounded shadow">
-            Create Series
+            {{ tr("series.create_button") }}
           </button>
         </div>
       </form>
     </div>
 
     <div class="text-center mt-8">
-      <a href="{{ url_for('index') }}" class="text-blue-400 hover:underline text-sm">Back to Admin</a>
+      <a href="{{ url_for('index') }}" class="text-blue-400 hover:underline text-sm">{{ tr("series.back_admin") }}</a>
     </div>
   </div>
 
   <script>
+    window.TR = {{ translations | tojson }};
+    window.tr = k => TR[k] || k;
+
     // Handle time-of-day dropdown changes
     document.querySelectorAll('.time-of-day-select').forEach(select => {
       select.addEventListener('change', async function() {
@@ -133,13 +136,13 @@
               this.style.borderColor = '';
             }, 1000);
           } else {
-            alert('Error: ' + (data.error || 'Unknown error'));
+            alert(tr("series.update_error").replace("{msg}", data.error || tr("series.unknown_error")));
             // Revert selection
             location.reload();
           }
         } catch (err) {
           console.error('Error updating time of day:', err);
-          alert('Network error. Please try again.');
+          alert(tr("series.network_error"));
           location.reload();
         } finally {
           this.style.opacity = '1';

@@ -179,8 +179,8 @@
       <div class="flex items-center gap-3">
         <span class="text-2xl">📺</span>
         <div>
-          <h2 class="text-lg font-bold text-purple-400">TV Series</h2>
-          <p class="text-xs text-gray-400"><span id="series-count">0</span> series</p>
+          <h2 class="text-lg font-bold text-purple-400">{{ tr("index.series.heading") }}</h2>
+          <p class="text-xs text-gray-400"><span id="series-count">0</span> {{ tr("index.series.count_suffix") }}</p>
         </div>
       </div>
       <span id="series-toggle" class="text-xl text-gray-400">▼</span>
@@ -189,7 +189,7 @@
     <div id="series-content" class="p-4">
       <!-- Series Cards Container -->
       <div id="series-list" class="space-y-3">
-        <div class="text-gray-500 italic text-sm">Loading...</div>
+        <div class="text-gray-500 italic text-sm">{{ tr("index.loading") }}</div>
       </div>
     </div>
   </section>
@@ -202,8 +202,8 @@
       <div class="flex items-center gap-3">
         <span class="text-2xl">🎬</span>
         <div>
-          <h2 class="text-lg font-bold text-blue-400">Movies</h2>
-          <p class="text-xs text-gray-400"><span id="movies-count">0</span> movies</p>
+          <h2 class="text-lg font-bold text-blue-400">{{ tr("index.movies.heading") }}</h2>
+          <p class="text-xs text-gray-400"><span id="movies-count">0</span> {{ tr("index.movies.count_suffix") }}</p>
         </div>
       </div>
       <span id="movies-toggle" class="text-xl text-gray-400">▼</span>
@@ -212,10 +212,10 @@
     <div id="movies-content" class="p-4">
       <!-- Upload Movies -->
       <div class="mb-4 p-3 bg-gray-900/50 rounded-lg border border-blue-500/50">
-        <h3 class="text-sm font-bold text-blue-300 mb-2">Upload Movies</h3>
+        <h3 class="text-sm font-bold text-blue-300 mb-2">{{ tr("index.movies.upload_heading") }}</h3>
         <div id="movies-dropzone" class="dropzone dropzone-blue rounded-lg p-4 text-center cursor-pointer mb-2">
           <input type="file" id="movies-file-input" multiple accept=".mp4" class="hidden">
-          <p class="text-gray-300 text-sm">Drop movie files here</p>
+          <p class="text-gray-300 text-sm">{{ tr("index.movies.drop_hint") }}</p>
         </div>
         <div id="movies-file-list" class="hidden mb-2">
           <div id="movies-file-items"></div>
@@ -224,14 +224,14 @@
           <span id="movies-upload-status" class="text-xs text-gray-400 self-center"></span>
           <button id="movies-upload-btn" disabled
                   class="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-bold px-3 py-1.5 rounded text-sm">
-            Upload
+            {{ tr("index.upload_button") }}
           </button>
         </div>
       </div>
 
       <!-- Movies List -->
       <div id="movies-list" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-        <div class="text-gray-500 italic text-sm">Loading...</div>
+        <div class="text-gray-500 italic text-sm">{{ tr("index.loading") }}</div>
       </div>
     </div>
   </section>
@@ -244,8 +244,8 @@
       <div class="flex items-center gap-3">
         <span class="text-2xl">📢</span>
         <div>
-          <h2 class="text-lg font-bold text-green-400">Commercials</h2>
-          <p class="text-xs text-gray-400"><span id="commercials-count">0</span> commercials</p>
+          <h2 class="text-lg font-bold text-green-400">{{ tr("index.commercials.heading") }}</h2>
+          <p class="text-xs text-gray-400"><span id="commercials-count">0</span> {{ tr("index.commercials.count_suffix") }}</p>
         </div>
       </div>
       <span id="commercials-toggle" class="text-xl text-gray-400">▼</span>
@@ -254,10 +254,10 @@
     <div id="commercials-content" class="p-4">
       <!-- Upload Commercials -->
       <div class="mb-4 p-3 bg-gray-900/50 rounded-lg border border-green-500/50">
-        <h3 class="text-sm font-bold text-green-300 mb-2">Upload Commercials</h3>
+        <h3 class="text-sm font-bold text-green-300 mb-2">{{ tr("index.commercials.upload_heading") }}</h3>
         <div id="commercials-dropzone" class="dropzone dropzone-green rounded-lg p-4 text-center cursor-pointer mb-2">
           <input type="file" id="commercials-file-input" multiple accept=".mp4" class="hidden">
-          <p class="text-gray-300 text-sm">Drop commercial files here</p>
+          <p class="text-gray-300 text-sm">{{ tr("index.commercials.drop_hint") }}</p>
         </div>
         <div id="commercials-file-list" class="hidden mb-2">
           <div id="commercials-file-items"></div>
@@ -266,14 +266,14 @@
           <span id="commercials-upload-status" class="text-xs text-gray-400 self-center"></span>
           <button id="commercials-upload-btn" disabled
                   class="bg-green-600 hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-bold px-3 py-1.5 rounded text-sm">
-            Upload
+            {{ tr("index.upload_button") }}
           </button>
         </div>
       </div>
 
       <!-- Commercials List -->
       <div id="commercials-list" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-        <div class="text-gray-500 italic text-sm">Loading...</div>
+        <div class="text-gray-500 italic text-sm">{{ tr("index.loading") }}</div>
       </div>
     </div>
   </section>
@@ -286,8 +286,8 @@
       <div class="flex items-center gap-3">
         <span class="text-2xl">📼</span>
         <div>
-          <h2 class="text-lg font-bold text-yellow-400">VHS Tapes</h2>
-          <p class="text-xs text-gray-400"><span id="vhs-count">0</span> tapes</p>
+          <h2 class="text-lg font-bold text-yellow-400">{{ tr("index.vhs.heading") }}</h2>
+          <p class="text-xs text-gray-400"><span id="vhs-count">0</span> {{ tr("index.vhs.count_suffix") }}</p>
         </div>
       </div>
       <span id="vhs-toggle" class="text-xl text-gray-400">▼</span>
@@ -299,7 +299,7 @@
         <div class="flex items-center gap-3">
           <span id="reader-icon" class="text-2xl">🔌</span>
           <div class="flex-1">
-            <div id="reader-text" class="font-bold text-sm">Checking NFC Reader...</div>
+            <div id="reader-text" class="font-bold text-sm">{{ tr("index.vhs.checking_reader") }}</div>
             <div id="reader-detail" class="text-xs text-gray-400"></div>
           </div>
         </div>
@@ -307,30 +307,30 @@
 
       <!-- Register New Tape (shown when unregistered tape detected) -->
       <div id="register-tape-section" class="hidden mb-4 p-3 bg-green-900/30 rounded-lg border border-green-500">
-        <h3 class="text-sm font-bold text-green-400 mb-2">New Tape Detected!</h3>
-        <p class="text-xs text-gray-300 mb-2">UID: <span id="detected-uid" class="font-mono"></span></p>
+        <h3 class="text-sm font-bold text-green-400 mb-2">{{ tr("index.vhs.new_tape_detected") }}</h3>
+        <p class="text-xs text-gray-300 mb-2">{{ tr("index.vhs.uid_label") }} <span id="detected-uid" class="font-mono"></span></p>
         <form id="register-form" class="space-y-2">
           <input type="hidden" id="register-uid">
           <div>
-            <label class="block text-xs mb-1 text-gray-300">Assign to Video:</label>
+            <label class="block text-xs mb-1 text-gray-300">{{ tr("index.vhs.assign_to_video") }}</label>
             <select id="register-video" required class="w-full bg-gray-800 text-white px-2 py-1.5 rounded border border-gray-600 text-sm">
-              <option value="">-- Select video --</option>
+              <option value="">{{ tr("index.vhs.select_video_option") }}</option>
             </select>
           </div>
           <div>
-            <label class="block text-xs mb-1 text-gray-300">Custom Label (optional):</label>
-            <input type="text" id="register-title" placeholder="e.g. Summer Vacation 1995"
+            <label class="block text-xs mb-1 text-gray-300">{{ tr("index.vhs.custom_label") }}</label>
+            <input type="text" id="register-title" placeholder="{{ tr('index.vhs.label_placeholder') }}"
                    class="w-full bg-gray-800 text-white px-2 py-1.5 rounded border border-gray-600 text-sm">
           </div>
           <button type="submit" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-1.5 rounded text-sm">
-            Register Tape
+            {{ tr("index.vhs.register_button") }}
           </button>
         </form>
       </div>
 
       <!-- VHS Tapes List -->
       <div id="vhs-list" class="space-y-2">
-        <div class="text-gray-500 italic text-sm">Loading...</div>
+        <div class="text-gray-500 italic text-sm">{{ tr("index.loading") }}</div>
       </div>
     </div>
   </section>
@@ -341,16 +341,16 @@
   {% if nuevos or fantasmas %}
   <details class="section-card rounded-lg border border-red-600/50 mb-4">
     <summary class="p-3 cursor-pointer text-red-400 hover:bg-red-900/20">
-      Debug: {{ (nuevos|length) + (fantasmas|length) }} issue(s)
+      {{ tr("index.debug.issues") | replace("{count}", (((nuevos|length) + (fantasmas|length)) | string)) }}
     </summary>
     <div class="p-4 border-t border-red-600/30">
       {% if nuevos %}
       <div class="mb-4">
-        <h3 class="text-sm font-bold text-blue-400 mb-2">New Files (no metadata)</h3>
+        <h3 class="text-sm font-bold text-blue-400 mb-2">{{ tr("index.debug.new_files") }}</h3>
         {% for video_id in nuevos %}
         <div class="flex items-center justify-between bg-gray-900/50 p-2 rounded mb-1 text-sm">
           <span class="font-mono text-xs truncate flex-1">{{ video_id }}</span>
-          <a href="{{ url_for('edit_video', video_id=video_id) }}" class="text-blue-400 hover:underline text-xs ml-2">Add metadata</a>
+          <a href="{{ url_for('edit_video', video_id=video_id) }}" class="text-blue-400 hover:underline text-xs ml-2">{{ tr("index.debug.add_metadata") }}</a>
         </div>
         {% endfor %}
       </div>
@@ -358,15 +358,15 @@
       {% if fantasmas %}
       <div>
         <div class="flex items-center justify-between mb-2">
-          <h3 class="text-sm font-bold text-red-400">Ghost Entries (no file)</h3>
-          <button onclick="confirmDeleteAllGhosts()" class="text-xs bg-red-600 hover:bg-red-700 text-white px-2 py-1 rounded">Delete All</button>
+          <h3 class="text-sm font-bold text-red-400">{{ tr("index.debug.ghost_entries") }}</h3>
+          <button onclick="confirmDeleteAllGhosts()" class="text-xs bg-red-600 hover:bg-red-700 text-white px-2 py-1 rounded">{{ tr("index.debug.delete_all") }}</button>
         </div>
         {% for video_id, video in fantasmas.items() %}
         <div class="flex items-center justify-between bg-gray-900/50 p-2 rounded mb-1 text-sm">
           <span class="truncate flex-1">{{ video.title or video_id }}</span>
           <div class="flex gap-2 ml-2">
-            <a href="{{ url_for('edit_video', video_id=video_id) }}" class="text-yellow-400 hover:underline text-xs">Edit</a>
-            <button onclick="confirmDeleteGhost('{{ video_id }}')" class="text-red-400 hover:underline text-xs">Delete</button>
+            <a href="{{ url_for('edit_video', video_id=video_id) }}" class="text-yellow-400 hover:underline text-xs">{{ tr("index.edit") }}</a>
+            <button onclick="confirmDeleteGhost('{{ video_id }}')" class="text-red-400 hover:underline text-xs">{{ tr("index.delete") }}</button>
           </div>
         </div>
         {% endfor %}
@@ -388,13 +388,13 @@
   }
 
   function confirmDeleteGhost(videoId) {
-    if (confirm("Delete ghost entry '" + videoId + "'?")) {
+    if (confirm(tr("index.debug.confirm_delete_ghost").replace("{id}", videoId))) {
       window.location.href = "/delete/" + videoId;
     }
   }
 
   function confirmDeleteAllGhosts() {
-    if (confirm("Delete ALL ghost entries?")) {
+    if (confirm(tr("index.debug.confirm_delete_all"))) {
       window.location.href = "/delete_fantasmas";
     }
   }
@@ -534,7 +534,7 @@
         item.dataset.filename = f.name;
 
         if (isDuplicate) {
-          item.innerHTML = `<span class="text-yellow-400 mr-2">⊘</span><span class="flex-1 truncate text-xs text-yellow-300">${f.name}</span><span class="text-xs text-yellow-500 ml-2">Already exists</span>`;
+          item.innerHTML = `<span class="text-yellow-400 mr-2">⊘</span><span class="flex-1 truncate text-xs text-yellow-300">${f.name}</span><span class="text-xs text-yellow-500 ml-2">${tr("index.already_exists")}</span>`;
         } else {
           item.innerHTML = `<div class="progress-bar"><div class="progress-fill"></div></div><span class="flex-1 truncate text-xs">${f.name}</span>`;
         }
@@ -554,13 +554,13 @@
       const skipped = duplicateFiles.size;
 
       if (files.length === 0) {
-        statusEl.textContent = skipped > 0 ? `All ${skipped} file(s) already exist` : 'No files';
+        statusEl.textContent = skipped > 0 ? tr("index.all_files_exist").replace("{count}", skipped) : tr("index.no_files");
         setTimeout(() => { statusEl.textContent = ''; }, 2000);
         return;
       }
 
       uploadBtn.disabled = true;
-      uploadBtn.textContent = 'Uploading...';
+      uploadBtn.textContent = tr("index.uploading");
 
       let completed = 0;
       let errors = 0;
@@ -570,7 +570,7 @@
         const itemEl = fileItems.querySelector(`[data-filename="${CSS.escape(file.name)}"]`);
         const progressFill = itemEl?.querySelector('.progress-fill');
 
-        statusEl.textContent = `Uploading ${completed + 1}/${files.length}...`;
+        statusEl.textContent = tr("index.uploading_progress").replace("{current}", completed + 1).replace("{total}", files.length);
 
         const formData = new FormData();
         formData.append('videos[]', file);
@@ -586,7 +586,7 @@
           );
 
           if (result.error === 'already_exists') {
-            if (itemEl) itemEl.innerHTML = `<span class="text-yellow-400 mr-2">⊘</span><span class="flex-1 truncate text-xs text-yellow-300">${file.name}</span><span class="text-xs text-yellow-500 ml-2">Already exists</span>`;
+            if (itemEl) itemEl.innerHTML = `<span class="text-yellow-400 mr-2">⊘</span><span class="flex-1 truncate text-xs text-yellow-300">${file.name}</span><span class="text-xs text-yellow-500 ml-2">${tr("index.already_exists")}</span>`;
             existingIds.add(getVideoIdFromFilename(file.name));
           } else {
             completed++;
@@ -600,11 +600,11 @@
         }
       }
 
-      let msg = `Done! ${completed} uploaded`;
-      if (skipped > 0) msg += `, ${skipped} skipped`;
-      if (errors > 0) msg += `, ${errors} failed`;
+      let msg = tr("index.done_uploaded").replace("{count}", completed);
+      if (skipped > 0) msg += tr("index.done_skipped").replace("{count}", skipped);
+      if (errors > 0) msg += tr("index.done_failed").replace("{count}", errors);
       statusEl.textContent = msg;
-      uploadBtn.textContent = 'Upload';
+      uploadBtn.textContent = tr("index.upload_button");
       fileInput.value = '';
       if (config.onComplete) config.onComplete();
       setTimeout(() => { statusEl.textContent = ''; fileList.classList.add('hidden'); uploadBtn.disabled = true; }, 2500);
@@ -625,12 +625,12 @@
   let seriesData = [];      // Store loaded series data for re-rendering
 
   const TIME_OF_DAY_LABELS = {
-    'any': 'Any Time',
-    'early_morning': 'Early Morning',
-    'late_morning': 'Late Morning',
-    'afternoon': 'Afternoon',
-    'evening': 'Evening',
-    'night': 'Night'
+    'any': tr("index.time.any"),
+    'early_morning': tr("index.time.early_morning"),
+    'late_morning': tr("index.time.late_morning"),
+    'afternoon': tr("index.time.afternoon"),
+    'evening': tr("index.time.evening"),
+    'night': tr("index.time.night")
   };
 
   function toggleSeriesCard(seriesName, event) {
@@ -764,7 +764,7 @@
       item.dataset.filename = f.name;
 
       if (isDuplicate) {
-        item.innerHTML = `<span class="text-yellow-400 mr-2">⊘</span><span class="flex-1 truncate text-xs text-yellow-300">${f.name}</span><span class="text-xs text-yellow-500 ml-2">Already exists</span>`;
+        item.innerHTML = `<span class="text-yellow-400 mr-2">⊘</span><span class="flex-1 truncate text-xs text-yellow-300">${f.name}</span><span class="text-xs text-yellow-500 ml-2">${tr("index.already_exists")}</span>`;
       } else {
         item.innerHTML = `<div class="progress-bar"><div class="progress-fill"></div></div><span class="flex-1 truncate text-xs">${f.name}</span>`;
       }
@@ -789,13 +789,13 @@
     const skipped = duplicates.size;
 
     if (files.length === 0) {
-      statusEl.textContent = skipped > 0 ? `All ${skipped} file(s) already exist` : 'No files';
+      statusEl.textContent = skipped > 0 ? tr("index.all_files_exist").replace("{count}", skipped) : tr("index.no_files");
       setTimeout(() => { statusEl.textContent = ''; }, 2000);
       return;
     }
 
     uploadBtn.disabled = true;
-    uploadBtn.textContent = 'Uploading...';
+    uploadBtn.textContent = tr("index.uploading");
 
     let completed = 0;
     let errors = 0;
@@ -805,7 +805,7 @@
       const itemEl = fileItems.querySelector(`[data-filename="${CSS.escape(file.name)}"]`);
       const progressFill = itemEl?.querySelector('.progress-fill');
 
-      statusEl.textContent = `Uploading ${completed + 1}/${files.length}...`;
+      statusEl.textContent = tr("index.uploading_progress").replace("{current}", completed + 1).replace("{total}", files.length);
 
       const formData = new FormData();
       formData.append('videos[]', file);
@@ -821,7 +821,7 @@
         );
 
         if (result.error === 'already_exists') {
-          if (itemEl) itemEl.innerHTML = `<span class="text-yellow-400 mr-2">⊘</span><span class="flex-1 truncate text-xs text-yellow-300">${file.name}</span><span class="text-xs text-yellow-500 ml-2">Already exists</span>`;
+          if (itemEl) itemEl.innerHTML = `<span class="text-yellow-400 mr-2">⊘</span><span class="flex-1 truncate text-xs text-yellow-300">${file.name}</span><span class="text-xs text-yellow-500 ml-2">${tr("index.already_exists")}</span>`;
         } else {
           completed++;
           if (itemEl) itemEl.innerHTML = `<span class="text-green-400 mr-2">&#10003;</span><span class="flex-1 truncate text-xs text-green-300">${file.name}</span>`;
@@ -833,11 +833,11 @@
       }
     }
 
-    let msg = `Done! ${completed} uploaded`;
-    if (skipped > 0) msg += `, ${skipped} skipped`;
-    if (errors > 0) msg += `, ${errors} failed`;
+    let msg = tr("index.done_uploaded").replace("{count}", completed);
+    if (skipped > 0) msg += tr("index.done_skipped").replace("{count}", skipped);
+    if (errors > 0) msg += tr("index.done_failed").replace("{count}", errors);
     statusEl.textContent = msg;
-    uploadBtn.textContent = 'Upload';
+    uploadBtn.textContent = tr("index.upload_button");
     fileInput.value = '';
     loadSeries();
     setTimeout(() => { statusEl.textContent = ''; fileList.classList.add('hidden'); uploadBtn.disabled = true; }, 2500);
@@ -852,13 +852,13 @@
   }
 
   async function deleteEpisode(videoId, seriesName) {
-    if (!confirm('Delete this episode?')) return;
+    if (!confirm(tr("index.series.confirm_delete_episode"))) return;
     await fetch(`/delete/${videoId}`);
     loadSeries();
   }
 
   async function deleteSeries(folderName, displayName) {
-    if (!confirm(`Delete "${displayName}" and all episodes?`)) return;
+    if (!confirm(tr("index.series.confirm_delete_series").replace("{name}", displayName))) return;
     await fetch(`/series/delete/${encodeURIComponent(folderName)}`, { method: 'POST' });
     loadSeries();
   }
@@ -873,7 +873,7 @@
     }
 
     let html = seriesData.map(s => {
-      const timeLabel = TIME_OF_DAY_LABELS[s.time_of_day] || 'Any Time';
+      const timeLabel = TIME_OF_DAY_LABELS[s.time_of_day] || tr("index.time.any");
       const isExpanded = expandedSeriesCard === s.folder_name;
 
       // Build seasons HTML
@@ -889,8 +889,8 @@
                 <span class="text-gray-500 ml-2">${formatDuration(ep.duration)}</span>
               </div>
               <div class="flex gap-2 ml-2">
-                <a href="/edit/${ep.video_id}" class="text-blue-400 hover:underline text-xs">Edit</a>
-                <button onclick="deleteEpisode('${ep.video_id}', '${s.folder_name}')" class="text-red-400 hover:underline text-xs">Delete</button>
+                <a href="/edit/${ep.video_id}" class="text-blue-400 hover:underline text-xs">${tr("index.edit")}</a>
+                <button onclick="deleteEpisode('${ep.video_id}', '${s.folder_name}')" class="text-red-400 hover:underline text-xs">${tr("index.delete")}</button>
               </div>
             </div>
           `).join('');
@@ -899,22 +899,22 @@
             <div class="season-item rounded-lg overflow-hidden ${isSeasonExpanded ? 'expanded' : ''}"
                  data-series="${s.folder_name}" data-season="${season.season}">
               <div class="flex items-center justify-between p-3 cursor-pointer" onclick="toggleSeason('${s.folder_name}', ${season.season}, event)">
-                <span class="font-semibold text-purple-300">Season ${season.season}</span>
+                <span class="font-semibold text-purple-300">${tr("index.series.season_label").replace("{num}", season.season)}</span>
                 <div class="flex items-center gap-2">
-                  <span class="text-xs text-gray-400">${season.episodes.length} episodes</span>
+                  <span class="text-xs text-gray-400">${tr("index.series.episodes_count").replace("{count}", season.episodes.length)}</span>
                   <span class="text-gray-400">${isSeasonExpanded ? '▼' : '▶'}</span>
                 </div>
               </div>
               <div class="season-episodes">
                 <div class="p-2 pt-0 space-y-1">
-                  ${episodesHtml || '<p class="text-gray-500 text-xs p-2">No episodes</p>'}
+                  ${episodesHtml || '<p class="text-gray-500 text-xs p-2">' + tr("index.series.no_episodes") + '</p>'}
                 </div>
               </div>
             </div>
           `;
         }).join('');
       } else {
-        seasonsHtml = '<p class="text-gray-500 text-sm">No episodes uploaded yet</p>';
+        seasonsHtml = '<p class="text-gray-500 text-sm">' + tr("index.series.no_episodes_yet") + '</p>';
       }
 
       return `
@@ -926,7 +926,7 @@
                 <h3 class="text-lg font-bold text-white truncate">${s.display_name}</h3>
               </div>
               <div class="flex items-center gap-4 ml-4">
-                <span class="text-sm text-purple-300">${s.episode_count} ep</span>
+                <span class="text-sm text-purple-300">${tr("index.series.ep_count").replace("{count}", s.episode_count)}</span>
                 <span class="text-xs text-gray-400 px-2 py-0.5 bg-gray-700 rounded">${timeLabel}</span>
                 <span class="text-gray-400">${isExpanded ? '▼' : '▶'}</span>
               </div>
@@ -937,10 +937,10 @@
           <div class="card-form">
             <!-- Upload Area -->
             <div class="mb-4 p-3 bg-gray-900/50 rounded-lg border border-purple-500/30">
-              <h4 class="text-sm font-semibold text-purple-300 mb-2">Upload Episodes</h4>
+              <h4 class="text-sm font-semibold text-purple-300 mb-2">${tr("index.series.upload_heading")}</h4>
               <div id="dropzone-${s.folder_name}" class="dropzone rounded-lg p-4 text-center cursor-pointer mb-2">
                 <input type="file" id="file-input-${s.folder_name}" multiple accept=".mp4" class="hidden">
-                <p class="text-gray-300 text-sm">Drop episode files here <span class="text-gray-500">(S01E05.mp4, 1x05.mp4)</span></p>
+                <p class="text-gray-300 text-sm">${tr("index.series.drop_hint")} <span class="text-gray-500">(S01E05.mp4, 1x05.mp4)</span></p>
               </div>
               <div id="file-list-${s.folder_name}" class="hidden mb-2">
                 <div id="file-items-${s.folder_name}"></div>
@@ -949,38 +949,38 @@
                 <span id="upload-status-${s.folder_name}" class="text-xs text-gray-400 self-center"></span>
                 <button id="upload-btn-${s.folder_name}" disabled
                         class="bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-bold px-3 py-1.5 rounded text-sm">
-                  Upload
+                  ${tr("index.upload_button")}
                 </button>
               </div>
             </div>
 
             <!-- Broadcast Time -->
             <div class="mb-4 flex items-center gap-3">
-              <label class="text-sm text-gray-300">Broadcast Time:</label>
+              <label class="text-sm text-gray-300">${tr("index.series.broadcast_time")}</label>
               <select class="bg-gray-800 text-white px-3 py-1.5 rounded border border-gray-600 text-sm"
                       onchange="updateSeriesTimeOfDay('${s.folder_name}', this.value)">
-                <option value="any" ${s.time_of_day === 'any' ? 'selected' : ''}>Any Time</option>
-                <option value="early_morning" ${s.time_of_day === 'early_morning' ? 'selected' : ''}>Early Morning</option>
-                <option value="late_morning" ${s.time_of_day === 'late_morning' ? 'selected' : ''}>Late Morning</option>
-                <option value="afternoon" ${s.time_of_day === 'afternoon' ? 'selected' : ''}>Afternoon</option>
-                <option value="evening" ${s.time_of_day === 'evening' ? 'selected' : ''}>Evening</option>
-                <option value="night" ${s.time_of_day === 'night' ? 'selected' : ''}>Night</option>
+                <option value="any" ${s.time_of_day === 'any' ? 'selected' : ''}>${tr("index.time.any")}</option>
+                <option value="early_morning" ${s.time_of_day === 'early_morning' ? 'selected' : ''}>${tr("index.time.early_morning")}</option>
+                <option value="late_morning" ${s.time_of_day === 'late_morning' ? 'selected' : ''}>${tr("index.time.late_morning")}</option>
+                <option value="afternoon" ${s.time_of_day === 'afternoon' ? 'selected' : ''}>${tr("index.time.afternoon")}</option>
+                <option value="evening" ${s.time_of_day === 'evening' ? 'selected' : ''}>${tr("index.time.evening")}</option>
+                <option value="night" ${s.time_of_day === 'night' ? 'selected' : ''}>${tr("index.time.night")}</option>
               </select>
             </div>
 
             <!-- Seasons List -->
             <div class="space-y-2">
-              <h4 class="text-sm font-semibold text-gray-300 mb-2">Episodes by Season</h4>
+              <h4 class="text-sm font-semibold text-gray-300 mb-2">${tr("index.series.episodes_by_season")}</h4>
               ${seasonsHtml}
             </div>
 
             <!-- Actions -->
             <div class="flex items-center justify-between pt-4 mt-4 border-t border-gray-600">
               <button onclick="deleteSeries('${s.folder_name}', '${s.display_name}')" class="text-red-400 hover:text-red-300 text-sm">
-                Delete Series
+                ${tr("index.series.delete_series")}
               </button>
               <button onclick="toggleSeriesCard('${s.folder_name}')" class="text-gray-400 hover:text-white text-sm">
-                Close
+                ${tr("index.close")}
               </button>
             </div>
           </div>
@@ -1007,23 +1007,23 @@
         <!-- Collapsed View -->
         <div class="card-header text-center">
           <span class="text-3xl text-gray-500">➕</span>
-          <p class="text-gray-400 mt-1">Create New Series</p>
+          <p class="text-gray-400 mt-1">${tr("index.series.create_new")}</p>
         </div>
 
         <!-- Expanded Create Form -->
         <div class="card-form" onclick="event.stopPropagation()">
           <form id="create-series-form" action="/series/add" method="POST" class="space-y-3">
             <div>
-              <label class="block text-xs mb-1 text-gray-400">Series Name</label>
-              <input type="text" name="name" id="new-series-name" placeholder="e.g. Los Simuladores"
+              <label class="block text-xs mb-1 text-gray-400">${tr("index.series.name_label")}</label>
+              <input type="text" name="name" id="new-series-name" placeholder="${tr("index.series.name_placeholder")}"
                      class="w-full bg-gray-800 text-white px-3 py-2 rounded border border-gray-600 focus:border-green-500 text-sm" required>
             </div>
             <div class="flex items-center gap-3">
               <button type="submit" class="bg-green-500 hover:bg-green-600 text-black font-bold px-4 py-1.5 rounded text-sm">
-                Create Series
+                ${tr("index.series.create_button")}
               </button>
               <button type="button" onclick="toggleSeriesCard('__new__')" class="text-gray-400 hover:text-white text-sm">
-                Cancel
+                ${tr("index.cancel")}
               </button>
             </div>
           </form>
@@ -1082,7 +1082,7 @@
       const container = document.getElementById('movies-list');
 
       if (!data.ok || !data.movies || data.movies.length === 0) {
-        container.innerHTML = '<div class="text-gray-500 italic text-sm col-span-3">No movies yet</div>';
+        container.innerHTML = '<div class="text-gray-500 italic text-sm col-span-3">' + tr("index.movies.empty") + '</div>';
         document.getElementById('movies-count').textContent = '0';
         return;
       }
@@ -1099,8 +1099,8 @@
             </div>
           </div>
           <div class="flex gap-2">
-            <a href="/edit/${m.video_id}" class="flex-1 text-center text-xs bg-gray-600 hover:bg-gray-700 text-white py-1 rounded">Edit</a>
-            <button onclick="deleteMovie('${m.video_id}')" class="flex-1 text-center text-xs bg-red-600 hover:bg-red-700 text-white py-1 rounded">Delete</button>
+            <a href="/edit/${m.video_id}" class="flex-1 text-center text-xs bg-gray-600 hover:bg-gray-700 text-white py-1 rounded">${tr("index.edit")}</a>
+            <button onclick="deleteMovie('${m.video_id}')" class="flex-1 text-center text-xs bg-red-600 hover:bg-red-700 text-white py-1 rounded">${tr("index.delete")}</button>
           </div>
         </div>
       `).join('');
@@ -1108,7 +1108,7 @@
   }
 
   async function deleteMovie(videoId) {
-    if (!confirm('Delete this movie?')) return;
+    if (!confirm(tr("index.movies.confirm_delete"))) return;
     await fetch(`/api/movies/${videoId}`, { method: 'DELETE' });
     loadMovies();
   }
@@ -1135,7 +1135,7 @@
       const container = document.getElementById('commercials-list');
 
       if (!data.ok || !data.commercials || data.commercials.length === 0) {
-        container.innerHTML = '<div class="text-gray-500 italic text-sm col-span-3">No commercials yet</div>';
+        container.innerHTML = '<div class="text-gray-500 italic text-sm col-span-3">' + tr("index.commercials.empty") + '</div>';
         document.getElementById('commercials-count').textContent = '0';
         return;
       }
@@ -1152,8 +1152,8 @@
             </div>
           </div>
           <div class="flex gap-2">
-            <a href="/edit/${c.video_id}" class="flex-1 text-center text-xs bg-gray-600 hover:bg-gray-700 text-white py-1 rounded">Edit</a>
-            <button onclick="deleteCommercial('${c.video_id}')" class="flex-1 text-center text-xs bg-red-600 hover:bg-red-700 text-white py-1 rounded">Delete</button>
+            <a href="/edit/${c.video_id}" class="flex-1 text-center text-xs bg-gray-600 hover:bg-gray-700 text-white py-1 rounded">${tr("index.edit")}</a>
+            <button onclick="deleteCommercial('${c.video_id}')" class="flex-1 text-center text-xs bg-red-600 hover:bg-red-700 text-white py-1 rounded">${tr("index.delete")}</button>
           </div>
         </div>
       `).join('');
@@ -1161,7 +1161,7 @@
   }
 
   async function deleteCommercial(videoId) {
-    if (!confirm('Delete this commercial?')) return;
+    if (!confirm(tr("index.commercials.confirm_delete"))) return;
     await fetch(`/api/commercials/${videoId}`, { method: 'DELETE' });
     loadCommercials();
   }
@@ -1177,7 +1177,7 @@
       const data = await res.json();
       if (data.ok) {
         const select = document.getElementById('register-video');
-        select.innerHTML = '<option value="">-- Select video --</option>' +
+        select.innerHTML = '<option value="">' + tr("index.vhs.select_video_option") + '</option>' +
           (data.videos || []).map(v => `<option value="${v.video_id}">${v.title} (${formatDuration(v.duration)})</option>`).join('');
       }
     } catch (e) { console.error(e); }
@@ -1190,7 +1190,7 @@
       const container = document.getElementById('vhs-list');
 
       if (!data.ok || !data.tapes || data.tapes.length === 0) {
-        container.innerHTML = '<div class="text-gray-500 italic text-sm">No tapes registered</div>';
+        container.innerHTML = '<div class="text-gray-500 italic text-sm">' + tr("index.vhs.empty") + '</div>';
         document.getElementById('vhs-count').textContent = '0';
         return;
       }
@@ -1204,14 +1204,14 @@
             <div class="flex-1 min-w-0">
               <div class="flex items-center gap-2">
                 <h4 class="font-bold text-sm text-white truncate">${tape.title || tape.video_id}</h4>
-                ${isInserted ? '<span class="inserted-badge bg-green-500 text-black text-[10px] px-1.5 py-0.5 rounded font-bold">INSERTED</span>' : ''}
+                ${isInserted ? '<span class="inserted-badge bg-green-500 text-black text-[10px] px-1.5 py-0.5 rounded font-bold">' + tr("index.vhs.inserted_badge") + '</span>' : ''}
               </div>
-              <p class="text-xs text-gray-400 truncate">Video: ${tape.video_title || tape.video_id}</p>
-              <p class="text-xs text-gray-500">Position: ${formatDuration(tape.position_sec || 0)}</p>
+              <p class="text-xs text-gray-400 truncate">${tr("index.vhs.video_label")} ${tape.video_title || tape.video_id}</p>
+              <p class="text-xs text-gray-500">${tr("index.vhs.position_label")} ${formatDuration(tape.position_sec || 0)}</p>
             </div>
             <div class="flex flex-col gap-1">
-              <button onclick="reassignTape('${tape.uid}')" class="text-yellow-400 hover:underline text-xs">Reassign</button>
-              <button onclick="deleteTape('${tape.uid}')" class="text-red-400 hover:underline text-xs">Delete</button>
+              <button onclick="reassignTape('${tape.uid}')" class="text-yellow-400 hover:underline text-xs">${tr("index.vhs.reassign")}</button>
+              <button onclick="deleteTape('${tape.uid}')" class="text-red-400 hover:underline text-xs">${tr("index.delete")}</button>
             </div>
           </div>
         `;
@@ -1233,7 +1233,7 @@
       if (!data.ok) {
         statusEl.className = 'mb-4 p-3 rounded-lg border-2 border-red-600 bg-red-900/30';
         iconEl.textContent = '❌';
-        textEl.textContent = 'Error';
+        textEl.textContent = tr("index.reader.error");
         detailEl.textContent = data.error || '';
         registerSection.classList.add('hidden');
         currentInsertedTapeUid = null;
@@ -1243,15 +1243,15 @@
       if (!data.reader_attached) {
         statusEl.className = 'mb-4 p-3 rounded-lg border-2 border-gray-600 bg-gray-900/50';
         iconEl.textContent = '🔌';
-        textEl.textContent = 'NFC Reader Not Connected';
-        detailEl.textContent = 'Connect USB NFC reader';
+        textEl.textContent = tr("index.reader.not_connected");
+        detailEl.textContent = tr("index.reader.connect_hint");
         registerSection.classList.add('hidden');
         currentInsertedTapeUid = null;
       } else if (data.tape_inserted) {
         statusEl.className = 'mb-4 p-3 rounded-lg border-2 border-green-600 bg-green-900/30';
         iconEl.textContent = '▶️';
-        textEl.textContent = 'Playing: ' + (data.title || data.video_id);
-        detailEl.textContent = 'Tape inserted';
+        textEl.textContent = tr("index.reader.playing").replace("{name}", data.title || data.video_id);
+        detailEl.textContent = tr("index.reader.tape_inserted");
         registerSection.classList.add('hidden');
         currentInsertedTapeUid = data.tape_uid || null;
         // Update tape list to show inserted badge
@@ -1260,7 +1260,7 @@
           el.classList.toggle('tape-inserted', isThis);
           const badge = el.querySelector('.inserted-badge');
           if (isThis && !badge) {
-            el.querySelector('h4').insertAdjacentHTML('afterend', '<span class="inserted-badge bg-green-500 text-black text-[10px] px-1.5 py-0.5 rounded font-bold ml-2">INSERTED</span>');
+            el.querySelector('h4').insertAdjacentHTML('afterend', '<span class="inserted-badge bg-green-500 text-black text-[10px] px-1.5 py-0.5 rounded font-bold ml-2">' + tr("index.vhs.inserted_badge") + '</span>');
           } else if (!isThis && badge) {
             badge.remove();
           }
@@ -1268,8 +1268,8 @@
       } else if (data.unknown_tape_uid) {
         statusEl.className = 'mb-4 p-3 rounded-lg border-2 border-yellow-600 bg-yellow-900/30';
         iconEl.textContent = '❓';
-        textEl.textContent = 'Unregistered Tape';
-        detailEl.textContent = 'Register it below';
+        textEl.textContent = tr("index.reader.unregistered");
+        detailEl.textContent = tr("index.reader.register_below");
         registerSection.classList.remove('hidden');
         document.getElementById('detected-uid').textContent = data.unknown_tape_uid;
         document.getElementById('register-uid').value = data.unknown_tape_uid;
@@ -1277,8 +1277,8 @@
       } else {
         statusEl.className = 'mb-4 p-3 rounded-lg border-2 border-blue-600 bg-blue-900/30';
         iconEl.textContent = '📡';
-        textEl.textContent = 'Ready';
-        detailEl.textContent = 'Place tape on reader';
+        textEl.textContent = tr("index.reader.ready");
+        detailEl.textContent = tr("index.reader.place_tape");
         registerSection.classList.add('hidden');
         currentInsertedTapeUid = null;
       }
@@ -1291,7 +1291,7 @@
     const videoId = document.getElementById('register-video').value;
     const title = document.getElementById('register-title').value;
 
-    if (!uid || !videoId) { alert('Select a video'); return; }
+    if (!uid || !videoId) { alert(tr("index.vhs.alert_select_video")); return; }
 
     const res = await fetch('/api/vcr/tapes/register', {
       method: 'POST',
@@ -1304,18 +1304,18 @@
       loadVhsTapes();
       updateReaderStatus();
     } else {
-      alert('Error: ' + (data.error || 'Unknown'));
+      alert(tr("index.vhs.error_prefix").replace("{msg}", data.error || tr("index.vhs.unknown_error")));
     }
   });
 
   async function deleteTape(uid) {
-    if (!confirm('Delete this tape?')) return;
+    if (!confirm(tr("index.vhs.confirm_delete_tape"))) return;
     await fetch(`/api/vcr/tapes/${encodeURIComponent(uid)}`, { method: 'DELETE' });
     loadVhsTapes();
   }
 
   async function reassignTape(uid) {
-    const videoId = prompt('Enter new video ID (or leave empty to cancel):');
+    const videoId = prompt(tr("index.vhs.reassign_prompt"));
     if (!videoId) return;
     // For now, delete and re-register
     await fetch(`/api/vcr/tapes/${encodeURIComponent(uid)}`, { method: 'DELETE' });

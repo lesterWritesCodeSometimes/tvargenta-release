@@ -80,7 +80,7 @@
               {% endif %}
               {{ canal.nombre }}
             </h2>
-            <p class="text-sm text-gray-300 italic">{{ canal.descripcion or 'No description' }}</p>
+            <p class="text-sm text-gray-300 italic">{{ canal.descripcion or tr("canales.card.no_desc") }}</p>
             {% if canal.series_filter %}
             <div class="flex flex-wrap gap-1 mt-2">
               {% for s in canal.series_filter %}
@@ -88,7 +88,7 @@
               {% endfor %}
             </div>
             {% else %}
-            <p class="text-xs text-gray-500 mt-2">All content (no filter)</p>
+            <p class="text-xs text-gray-500 mt-2">{{ tr("canales.card.no_filter") }}</p>
             {% endif %}
           </div>
           <div class="flex gap-3">
@@ -137,19 +137,18 @@
           </div>
 
           <div>
-            <label class="block text-xs mb-1 text-amber-300">Detection aliases</label>
+            <label class="block text-xs mb-1 text-amber-300">{{ tr("canales.form.label_aliases") }}</label>
             <input type="text" name="aliases" value="{{ (canal.aliases or []) | join(', ') }}"
-                   placeholder="e.g. nick, nick jr, snick"
+                   placeholder="{{ tr('canales.form.aliases_placeholder') }}"
                    class="w-full bg-gray-800 text-white px-3 py-2 rounded border border-gray-600 focus:border-amber-500 text-sm">
             <p class="text-[11px] text-gray-500 mt-1">
-              Comma-separated words/phrases that identify this channel in commercials
-              (the channel name always matches). Saving re-checks all analyzed commercials.
+              {{ tr("canales.form.aliases_hint") }} {{ tr("canales.form.aliases_hint_recheck") }}
             </p>
           </div>
 
           {% if all_series %}
           <div>
-            <label class="block text-xs mb-2 text-purple-300 font-semibold">Series Filter</label>
+            <label class="block text-xs mb-2 text-purple-300 font-semibold">{{ tr("canales.form.label_series") }}</label>
             <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-32 overflow-y-auto p-2 bg-gray-800 rounded border border-gray-600">
               {% for series in all_series %}
               <label class="flex items-center gap-2 text-xs">
@@ -165,10 +164,10 @@
 
           <div class="flex items-center gap-3 pt-2">
             <button type="submit" class="bg-yellow-500 hover:bg-yellow-600 text-black font-bold px-4 py-1.5 rounded text-sm">
-              Save Changes
+              {{ tr("canales.form.submit_update") }}
             </button>
             <button type="button" onclick="toggleCard('{{ key }}')" class="text-gray-400 hover:text-white text-sm">
-              Cancel
+              {{ tr("canales.form.cancel_edit") }}
             </button>
           </div>
         </form>
@@ -181,17 +180,17 @@
       <!-- Collapsed View -->
       <div class="card-header text-center">
         <span class="text-3xl text-gray-500">➕</span>
-        <p class="text-gray-400 mt-1">Create New Channel</p>
+        <p class="text-gray-400 mt-1">{{ tr("canales.create.prompt") }}</p>
       </div>
 
       <!-- Expanded Create Form -->
       <div class="card-form" onclick="event.stopPropagation()">
-        <h3 class="text-lg font-bold text-green-400 mb-4 text-center">New Channel</h3>
+        <h3 class="text-lg font-bold text-green-400 mb-4 text-center">{{ tr("canales.form.title_new") }}</h3>
         <form action="/guardar_canal" method="post" class="space-y-4">
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label class="block text-xs mb-1 text-gray-400">{{ tr("canales.form.label_name") }}</label>
-              <input type="text" name="nombre" placeholder="e.g. Retro Cartoons"
+              <input type="text" name="nombre" placeholder="{{ tr('canales.form.name_placeholder') }}"
                      class="w-full bg-gray-800 text-white px-3 py-2 rounded border border-gray-600 focus:border-green-500 text-sm" required>
             </div>
             <div>
@@ -208,24 +207,23 @@
 
           <div>
             <label class="block text-xs mb-1 text-gray-400">{{ tr("canales.form.label_desc") }}</label>
-            <textarea name="descripcion" rows="2" placeholder="Brief description..."
+            <textarea name="descripcion" rows="2" placeholder="{{ tr('canales.form.desc_placeholder') }}"
                       class="w-full bg-gray-800 text-white px-3 py-2 rounded border border-gray-600 text-sm"></textarea>
           </div>
 
           <div>
-            <label class="block text-xs mb-1 text-amber-300">Detection aliases</label>
-            <input type="text" name="aliases" placeholder="e.g. nick, nick jr, snick"
+            <label class="block text-xs mb-1 text-amber-300">{{ tr("canales.form.label_aliases") }}</label>
+            <input type="text" name="aliases" placeholder="{{ tr('canales.form.aliases_placeholder') }}"
                    class="w-full bg-gray-800 text-white px-3 py-2 rounded border border-gray-600 focus:border-amber-500 text-sm">
             <p class="text-[11px] text-gray-500 mt-1">
-              Comma-separated words/phrases that identify this channel in commercials
-              (the channel name always matches).
+              {{ tr("canales.form.aliases_hint") }}
             </p>
           </div>
 
           {% if all_series %}
           <div>
-            <label class="block text-xs mb-2 text-purple-300 font-semibold">Series Filter</label>
-            <p class="text-xs text-gray-500 mb-2">Select series to include, or leave empty for all content.</p>
+            <label class="block text-xs mb-2 text-purple-300 font-semibold">{{ tr("canales.form.label_series") }}</label>
+            <p class="text-xs text-gray-500 mb-2">{{ tr("canales.form.series_hint") }}</p>
             <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-32 overflow-y-auto p-2 bg-gray-800 rounded border border-gray-600">
               {% for series in all_series %}
               <label class="flex items-center gap-2 text-xs">
@@ -239,10 +237,10 @@
 
           <div class="flex items-center gap-3 pt-2">
             <button type="submit" class="bg-green-500 hover:bg-green-600 text-black font-bold px-4 py-1.5 rounded text-sm">
-              Create Channel
+              {{ tr("canales.form.submit_create") }}
             </button>
             <button type="button" onclick="toggleCard('new')" class="text-gray-400 hover:text-white text-sm">
-              Cancel
+              {{ tr("canales.form.cancel_edit") }}
             </button>
           </div>
         </form>
@@ -251,7 +249,7 @@
   </div>
 
   {% if not canales %}
-  <p class="text-center text-gray-500 mt-4 text-sm">Click the card above to create your first channel!</p>
+  <p class="text-center text-gray-500 mt-4 text-sm">{{ tr("canales.empty_hint") }}</p>
   {% endif %}
 {% endblock %}
 
@@ -296,7 +294,7 @@
   }
 
   function deleteChannel(channelId, channelName) {
-    if (confirm(`Delete channel "${channelName}"?`)) {
+    if (confirm(tr("canales.js.confirm_delete").replace("{name}", channelName))) {
       // Create a form and submit it
       const form = document.createElement('form');
       form.method = 'POST';
@@ -312,7 +310,7 @@
 
     // Disable button and show loading state
     btn.disabled = true;
-    btn.textContent = 'Rebuilding...';
+    btn.textContent = tr("canales.js.rebuilding");
     btn.classList.add('opacity-50', 'cursor-not-allowed');
 
     fetch(`/api/rebuild_schedule/${channelId}`, {
@@ -324,7 +322,7 @@
     .then(response => response.json())
     .then(data => {
       if (data.ok) {
-        btn.textContent = 'Done!';
+        btn.textContent = tr("canales.js.done");
         btn.classList.remove('text-yellow-400', 'hover:text-yellow-300');
         btn.classList.add('text-green-400');
         setTimeout(() => {
@@ -334,14 +332,14 @@
           btn.disabled = false;
         }, 2000);
       } else {
-        alert(`Error rebuilding schedule: ${data.error || 'Unknown error'}`);
+        alert(tr("canales.js.rebuild_error").replace("{error}", data.error || tr("canales.js.unknown_error")));
         btn.textContent = originalText;
         btn.classList.remove('opacity-50', 'cursor-not-allowed');
         btn.disabled = false;
       }
     })
     .catch(error => {
-      alert(`Error rebuilding schedule: ${error.message}`);
+      alert(tr("canales.js.rebuild_error").replace("{error}", error.message));
       btn.textContent = originalText;
       btn.classList.remove('opacity-50', 'cursor-not-allowed');
       btn.disabled = false;

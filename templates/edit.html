@@ -4,10 +4,10 @@
      Ver LICENSE para términos completos.
 -->
 <!DOCTYPE html>
-<html lang="es">
+<html lang="{{ lang }}">
 <head>
   <meta charset="UTF-8">
-  <title>Editar video</title>
+  <title>{{ tr("edit.page_title") }}</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
@@ -42,10 +42,10 @@
 <body class="bg-black text-white min-h-screen font-mono">
   <div class="max-w-screen-lg mx-auto py-6 sm:py-8 px-3 sm:px-6">
     <header class="flex items-center justify-between mb-4 sm:mb-6">
-      <h1 class="text-2xl sm:text-3xl font-bold text-yellow-400">✏️ Editar video</h1>
+      <h1 class="text-2xl sm:text-3xl font-bold text-yellow-400">{{ tr("edit.header") }}</h1>
       <div class="flex items-center gap-3">
-        <a href="{{ url_for('index') }}" class="text-blue-400 underline text-sm sm:text-base">⬅ Inicio</a>
-        <a href="{{ url_for('tags', from_edit=video_id) }}" class="text-blue-400 underline text-sm sm:text-base">🛠 Tags</a>
+        <a href="{{ url_for('index') }}" class="text-blue-400 underline text-sm sm:text-base">{{ tr("edit.nav.home") }}</a>
+        <a href="{{ url_for('tags', from_edit=video_id) }}" class="text-blue-400 underline text-sm sm:text-base">{{ tr("edit.nav.tags") }}</a>
       </div>
     </header>
 
@@ -59,19 +59,19 @@
                  class="w-20 h-20 sm:w-24 sm:h-24 object-cover rounded border border-yellow-600" alt="thumb">
           </div>
           <div class="flex-1">
-            <p class="text-[11px] sm:text-xs text-gray-400 mb-1">Archivo: <code>{{ video_id }}.mp4</code></p>
-            <label class="block text-xs sm:text-sm mb-1">Título</label>
+            <p class="text-[11px] sm:text-xs text-gray-400 mb-1">{{ tr("edit.file_label") }} <code>{{ video_id }}.mp4</code></p>
+            <label class="block text-xs sm:text-sm mb-1">{{ tr("edit.title_label") }}</label>
             <input type="text" name="title" value="{{ video.get('title', '') }}" class="input w-full" required>
           </div>
         </div>
 
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 mt-4">
           <div>
-            <label class="block text-xs sm:text-sm mb-1">Personaje principal</label>
+            <label class="block text-xs sm:text-sm mb-1">{{ tr("edit.character_label") }}</label>
             <input type="text" name="personaje" value="{{ video.get('personaje', '') }}" class="input w-full">
           </div>
           <div>
-            <label class="block text-xs sm:text-sm mb-1">Fecha</label>
+            <label class="block text-xs sm:text-sm mb-1">{{ tr("edit.date_label") }}</label>
             <input type="date" name="fecha" value="{{ video.get('fecha', '') }}" class="input w-full">
           </div>
         </div>
@@ -79,35 +79,35 @@
 
       <!-- Category -->
       <section class="section rounded-lg p-3 sm:p-4">
-        <h2 class="text-lg sm:text-xl font-bold text-purple-300 mb-3">📁 Categoría</h2>
+        <h2 class="text-lg sm:text-xl font-bold text-purple-300 mb-3">{{ tr("edit.category.header") }}</h2>
 
         {% if is_series_video %}
         <!-- Series video: locked category and series -->
         <div class="mb-3">
-          <label class="block text-xs sm:text-sm mb-1">Tipo de contenido</label>
+          <label class="block text-xs sm:text-sm mb-1">{{ tr("edit.category.type_label") }}</label>
           <div class="input w-full bg-gray-700 cursor-not-allowed flex items-center gap-2">
-            <span>📺 TV Episode</span>
-            <span class="text-xs text-purple-400">(locked - series video)</span>
+            <span>{{ tr("edit.category.tv_episode") }}</span>
+            <span class="text-xs text-purple-400">{{ tr("edit.category.locked_note") }}</span>
           </div>
           <input type="hidden" name="category" value="tv_episode">
         </div>
 
         <div class="space-y-3 mt-4 p-3 bg-gray-800 border border-purple-500 rounded">
-          <h3 class="text-sm font-bold text-purple-200">Detalles de Episodio TV</h3>
+          <h3 class="text-sm font-bold text-purple-200">{{ tr("edit.category.tv_details") }}</h3>
 
           <div>
-            <label class="block text-xs sm:text-sm mb-1">Serie</label>
+            <label class="block text-xs sm:text-sm mb-1">{{ tr("edit.category.series_label") }}</label>
             <div class="input w-full bg-gray-700 cursor-not-allowed">{{ series_display }}</div>
           </div>
 
           <div class="grid grid-cols-2 gap-3">
             <div>
-              <label class="block text-xs sm:text-sm mb-1">Temporada</label>
+              <label class="block text-xs sm:text-sm mb-1">{{ tr("edit.category.season_label") }}</label>
               <input type="number" name="season" min="1" value="{{ video.get('season', '') or '' }}"
                      class="input w-full" placeholder="1">
             </div>
             <div>
-              <label class="block text-xs sm:text-sm mb-1">Episodio</label>
+              <label class="block text-xs sm:text-sm mb-1">{{ tr("edit.category.episode_label") }}</label>
               <input type="number" name="episode" min="1" value="{{ video.get('episode', '') or '' }}"
                      class="input w-full" placeholder="1">
             </div>
@@ -116,13 +116,13 @@
         {% else %}
         <!-- Non-series video: editable category (no TV Episode option) -->
         <div class="mb-3">
-          <label class="block text-xs sm:text-sm mb-1">Tipo de contenido <span class="text-red-400">*</span></label>
+          <label class="block text-xs sm:text-sm mb-1">{{ tr("edit.category.type_label") }} <span class="text-red-400">*</span></label>
           <select name="category" id="category-select" class="input w-full" required>
-            <option value="vhs_tape" {% if video.get('category', 'vhs_tape') == 'vhs_tape' %}selected{% endif %}>📼 VHS Tape</option>
-            <option value="movie" {% if video.get('category') == 'movie' %}selected{% endif %}>🎬 Movie</option>
-            <option value="commercial" {% if video.get('category') == 'commercial' %}selected{% endif %}>📢 Commercial</option>
+            <option value="vhs_tape" {% if video.get('category', 'vhs_tape') == 'vhs_tape' %}selected{% endif %}>{{ tr("edit.category.opt_vhs") }}</option>
+            <option value="movie" {% if video.get('category') == 'movie' %}selected{% endif %}>{{ tr("edit.category.opt_movie") }}</option>
+            <option value="commercial" {% if video.get('category') == 'commercial' %}selected{% endif %}>{{ tr("edit.category.opt_commercial") }}</option>
           </select>
-          <p class="text-xs text-gray-500 mt-1">To add TV Episodes, use the <a href="{{ url_for('upload_series') }}" class="text-purple-400 hover:underline">Series Upload</a> feature.</p>
+          <p class="text-xs text-gray-500 mt-1">{{ tr("edit.category.series_hint_pre") }} <a href="{{ url_for('upload_series') }}" class="text-purple-400 hover:underline">{{ tr("edit.category.series_hint_link") }}</a> {{ tr("edit.category.series_hint_post") }}</p>
         </div>
         {% endif %}
       </section>
@@ -130,10 +130,10 @@
       <!-- Tags -->
       <section class="section rounded-lg p-3 sm:p-4">
         <div class="flex items-center justify-between">
-          <h2 class="text-lg sm:text-xl font-bold text-yellow-300">🏷 Tags</h2>
+          <h2 class="text-lg sm:text-xl font-bold text-yellow-300">{{ tr("edit.tags.header") }}</h2>
           <div class="flex items-center gap-2">
             <button type="button" class="collapse-btn text-xs bg-gray-800 border border-gray-600 hover:border-yellow-500 rounded px-3 py-1.5"
-                    data-target="#tagsBody">Mostrar/Ocultar</button>
+                    data-target="#tagsBody">{{ tr("edit.tags.toggle") }}</button>
           </div>
         </div>
 
@@ -141,8 +141,8 @@
           <!-- Seleccionados -->
           <div class="mb-3">
             <div class="flex items-center justify-between mb-1">
-              <label class="block text-xs sm:text-sm">Seleccionados (<span id="selCount">0</span>)</label>
-              <button type="button" id="vaciarSeleccion" class="text-[11px] sm:text-xs text-red-300 hover:underline">Vaciar</button>
+              <label class="block text-xs sm:text-sm">{{ tr("edit.tags.selected") }} (<span id="selCount">0</span>)</label>
+              <button type="button" id="vaciarSeleccion" class="text-[11px] sm:text-xs text-red-300 hover:underline">{{ tr("edit.tags.clear") }}</button>
             </div>
             <ul id="selected-tags" class="min-h-[46px] flex flex-wrap gap-2 p-2 bg-gray-800 border border-yellow-500 rounded"></ul>
             <input type="hidden" name="tags" id="tags-input">
@@ -151,12 +151,12 @@
           <!-- Buscador global + acciones -->
           <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
             <div class="flex items-center gap-2">
-              <input id="buscarTagGlobal" type="text" placeholder="Buscar tag…"
+              <input id="buscarTagGlobal" type="text" placeholder="{{ tr('edit.tags.search_placeholder') }}"
                      class="input w-44 sm:w-72">
             </div>
             <div class="flex items-center gap-2">
-              <button type="button" id="expandir" class="text-[11px] sm:text-xs bg-gray-800 border border-gray-600 px-2 py-1.5 rounded hover:border-yellow-500">Expandir grupos</button>
-              <button type="button" id="colapsar" class="text-[11px] sm:text-xs bg-gray-800 border border-gray-600 px-2 py-1.5 rounded hover:border-yellow-500">Colapsar grupos</button>
+              <button type="button" id="expandir" class="text-[11px] sm:text-xs bg-gray-800 border border-gray-600 px-2 py-1.5 rounded hover:border-yellow-500">{{ tr("edit.tags.expand") }}</button>
+              <button type="button" id="colapsar" class="text-[11px] sm:text-xs bg-gray-800 border border-gray-600 px-2 py-1.5 rounded hover:border-yellow-500">{{ tr("edit.tags.collapse") }}</button>
             </div>
           </div>
 
@@ -195,10 +195,10 @@
       <!-- Modos -->
       <section class="section rounded-lg p-3 sm:p-4">
         <div class="flex items-center justify-between">
-          <h2 class="text-lg sm:text-xl font-bold text-blue-300">🎛 Modos de reproducción</h2>
+          <h2 class="text-lg sm:text-xl font-bold text-blue-300">{{ tr("edit.modes.header") }}</h2>
           <div class="flex items-center gap-2">
-            <button type="button" id="modosTodos" class="text-[11px] sm:text-xs bg-gray-800 border border-gray-600 px-2 py-1.5 rounded hover:border-yellow-500">Todos</button>
-            <button type="button" id="modosNinguno" class="text-[11px] sm:text-xs bg-gray-800 border border-gray-600 px-2 py-1.5 rounded hover:border-yellow-500">Ninguno</button>
+            <button type="button" id="modosTodos" class="text-[11px] sm:text-xs bg-gray-800 border border-gray-600 px-2 py-1.5 rounded hover:border-yellow-500">{{ tr("edit.modes.all") }}</button>
+            <button type="button" id="modosNinguno" class="text-[11px] sm:text-xs bg-gray-800 border border-gray-600 px-2 py-1.5 rounded hover:border-yellow-500">{{ tr("edit.modes.none") }}</button>
           </div>
         </div>
         <div class="mt-2 space-y-1 text-sm">
@@ -215,10 +215,10 @@
 
       <!-- Acciones -->
       <div class="flex justify-between items-center mt-2 flex-wrap gap-3">
-        <a href="{{ url_for('index') }}" class="text-sm text-blue-400 hover:underline">⬅ Volver al inicio</a>
-        <a href="{{ url_for('tags', from_edit=video_id) }}" class="text-sm text-blue-400 hover:underline">🛠 Editar grupos y tags</a>
+        <a href="{{ url_for('index') }}" class="text-sm text-blue-400 hover:underline">{{ tr("edit.back_home") }}</a>
+        <a href="{{ url_for('tags', from_edit=video_id) }}" class="text-sm text-blue-400 hover:underline">{{ tr("edit.edit_tags_link") }}</a>
         <button type="submit" class="bg-yellow-500 hover:bg-yellow-600 text-black px-4 py-2 rounded font-bold">
-          💾 Guardar
+          {{ tr("edit.save") }}
         </button>
       </div>
     </form>
@@ -226,16 +226,19 @@
     <!-- Barra sticky móvil -->
     <div class="sm:hidden sticky-bar mt-6">
       <div class="max-w-screen-lg mx-auto px-3 py-3 flex items-center justify-between">
-        <span class="text-xs text-gray-300">¿Listo?</span>
+        <span class="text-xs text-gray-300">{{ tr("edit.ready") }}</span>
         <div class="flex items-center gap-2">
-          <a href="{{ url_for('tags', from_edit=video_id) }}" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded text-sm">🛠 Tags</a>
-          <button form="__noform__" onclick="document.querySelector('form').requestSubmit();" class="bg-yellow-500 hover:bg-yellow-600 text-black px-4 py-2 rounded text-sm">💾 Guardar</button>
+          <a href="{{ url_for('tags', from_edit=video_id) }}" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded text-sm">{{ tr("edit.nav.tags") }}</a>
+          <button form="__noform__" onclick="document.querySelector('form').requestSubmit();" class="bg-yellow-500 hover:bg-yellow-600 text-black px-4 py-2 rounded text-sm">{{ tr("edit.save") }}</button>
         </div>
       </div>
     </div>
   </div>
 
   <script>
+    window.TR = {{ translations | tojson }};
+    window.tr = k => TR[k] || k;
+
     // ---------- Colapsables con persistencia ----------
     document.querySelectorAll('[data-toggle]').forEach(btn => {
       const sel = btn.getAttribute('data-toggle');
@@ -383,11 +386,11 @@
       const KEY = 'edit_tags_open';
       const open = (localStorage.getItem(KEY) ?? '1') === '1';
       body.style.display = open ? '' : 'none';
-      btn.textContent = open ? 'Ocultar' : 'Mostrar';
+      btn.textContent = open ? tr("edit.tags.hide") : tr("edit.tags.show");
       btn.addEventListener('click', () => {
         const vis = body.style.display !== 'none';
         body.style.display = vis ? 'none' : '';
-        btn.textContent = vis ? 'Mostrar' : 'Ocultar';
+        btn.textContent = vis ? tr("edit.tags.show") : tr("edit.tags.hide");
         try { localStorage.setItem(KEY, vis ? '0' : '1'); } catch {}
       });
     })();

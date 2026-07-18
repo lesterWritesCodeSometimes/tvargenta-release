@@ -3,13 +3,11 @@
   "nav.library": "Bibliothek",
   "nav.content": "Inhalte",
   "nav.channels": "Kanäle",
-
   "settings.language": "Sprache",
   "lang.es": "Spanisch",
   "lang.en": "Englisch",
   "lang.de": "Deutsch",
   "overlay.lang_changed": "Sprache aktualisiert",
-
   "app.title": "TVArgenta",
   "overlay.loading_channel": "Kanal wird geladen...",
   "overlay.no_videos": "Keine Videos verfügbar",
@@ -23,11 +21,9 @@
   "overlay.enter_gaming": "Wechsle in den Retro-Spielmodus…",
   "overlay.shutting_down": "Wird heruntergefahren…",
   "overlay.searching": "Suche läuft...",
-
   "vol.label": "Lautstärke",
   "vol.mute_badge": "STUMM",
   "vol.mute_title": "Lautstärke 0",
-
   "menu.title": "HAUPTMENÜ",
   "menu.predefined": "Vordefinierte Kanäle",
   "menu.mine": "Meine Kanäle",
@@ -36,16 +32,13 @@
   "menu.gaming": "Retro-Spielmodus",
   "menu.poweroff": "Ausschalten",
   "menu.back": "Zurück",
-
   "menu.footer.nav": "[Drehen] Navigieren",
   "menu.footer.select": "[Drücken] Auswählen",
-
   "settings.title": "Einstellungen",
   "settings.show_channel_name": "Kanalname anzeigen",
   "settings.yes": "Ja",
   "settings.no": "Nein",
   "settings.timezone": "Zeitzone",
-
   "tz.new_york": "New York (EST)",
   "tz.chicago": "Chicago (CST)",
   "tz.denver": "Denver (MST)",
@@ -59,22 +52,16 @@
   "tz.tokyo": "Tokio (JST)",
   "tz.sydney": "Sydney (AEST)",
   "tz.utc": "UTC",
-
   "power.confirm": "Ausschalten bestätigen",
-
   "bt.root.known": "Bekannte Geräte",
   "bt.root.scan": "Neue suchen",
-
   "bt.dev.connect": "Verbinden",
   "bt.dev.disconnect": "Trennen",
   "bt.dev.forget": "Vergessen",
-
   "bt.new.pairconnect": "Koppeln & Verbinden",
-
   "bt.status_on": "[AN]",
   "bt.status_off": "[AUS]",
   "bt.unknown": "(unbekannt)",
-
   "settings.wifi": "WLAN / Verbindung",
   "wifi.show_status": "WLAN-Status anzeigen",
   "wifi.start_ap": "Vom Handy aus einrichten",
@@ -94,16 +81,12 @@
   "wifi.forget_ok": "Netzwerk vergessen: {ssid}",
   "wifi.forget_error": "Netzwerk konnte nicht vergessen werden",
   "wifi.ap_hint": "Nutze die Kamera zum Scannen des Codes oder gib die URL ein. Drücke den Knopf/Encoder zum Beenden.",
-
   "wifi.show_gestion_qr": "Verwaltung QR (Web)",
   "wifi.qr_gestion_title": "Inhaltsverwaltung",
   "wifi.qr_gestion_desc": "Von einem Gerät im selben Netzwerk diese Adresse öffnen:",
-  "wifi.qr_error": "QR-Code konnte nicht erstellt werden",
-
+  "wifi.qr_error": "Der Verwaltungs-QR-Code konnte nicht erzeugt werden.",
   "wifi.ap_qr_title": "WLAN-Verbindung verwalten",
   "wifi.ap_qr_desc": "1) Verbinde dein Gerät mit dem Netzwerk {ssid} (Passwort {password}). 2) Scanne den QR-Code oder öffne die angegebene Adresse, um das WLAN einzurichten.",
   "wifi.qr_offline": "TVArgenta ist derzeit offline. Verbinde es mit WLAN oder LAN, um es von einem anderen Gerät zu verwalten.",
-  "wifi.qr_error": "Der Verwaltungs-QR-Code konnte nicht erzeugt werden."
-
-
+  "menu.gaming_entering": "Spielmodus wird gestartet…"
 }

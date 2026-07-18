@@ -7,11 +7,14 @@
   "vertele.video.no_tags": "🏷️ No tags",
   "vertele.video.tags_prefix": "🏷️ Tags:",
   "vertele.video.score_prefix": "🔢 Score:",
+  "vertele.video.load_error": "Could not load the next video.",
+  "vertele.video.html5_unsupported": "Your browser does not support HTML5 video.",
 
   "vertele.channel.title": "📡 Choose a channel",
   "vertele.channel.current": "📡 Current channel:",
   "vertele.channel.error": "Could not retrieve channel list",
   "vertele.channel.btn_next": "⏭ Next",
+  "vertele.channel.select_aria": "Select channel {name}",
 
   "vertele.nav.back_home": "⬅ Back to home"
 }

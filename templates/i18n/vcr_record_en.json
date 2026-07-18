@@ -1,0 +1,29 @@
+{
+  "vcr_record.page_title": "Record VHS Tape - TVArgenta",
+
+  "vcr_record.initial.header": "Press to start recording",
+  "vcr_record.initial.record_aria": "Start recording",
+  "vcr_record.initial.hint": "Only .mp4 files allowed (max 3GB)",
+
+  "vcr_record.recording.header": "Recording...",
+  "vcr_record.recording.finalizing": "Finalizing...",
+
+  "vcr_record.complete.header": "Recording Complete",
+  "vcr_record.complete.detail": "Your video has been saved to the tape.",
+
+  "vcr_record.error.header": "Recording Failed",
+  "vcr_record.error.retry": "Try Again",
+  "vcr_record.error.only_mp4": "Only .mp4 files are allowed.",
+  "vcr_record.error.too_large": "File is too large. Maximum size is 3GB.",
+  "vcr_record.error.no_tape": "No tape detected. Please insert a tape and try again.",
+  "vcr_record.error.start_failed": "Failed to start recording.",
+  "vcr_record.error.init_failed": "Failed to initialize recording: {error}",
+  "vcr_record.error.network": "Network error",
+  "vcr_record.error.upload_failed": "Upload failed.",
+  "vcr_record.error.invalid_response": "Invalid server response.",
+  "vcr_record.error.upload_failed_code": "Upload failed ({status})",
+  "vcr_record.error.upload_failed_status": "Upload failed with status {status}",
+  "vcr_record.error.network_check": "Network error. Please check your connection.",
+  "vcr_record.error.cancelled": "Upload was cancelled.",
+  "vcr_record.error.unexpected": "An unexpected error occurred."
+}

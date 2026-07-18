@@ -5,7 +5,7 @@
 -->
 
 <!DOCTYPE html>
-<html lang="es">
+<html lang="{{ lang }}">
 <head>
   <meta charset="UTF-8">
   <title>{{ video.title or video_id }}</title>
@@ -18,19 +18,19 @@
     </h1>
 
     <p class="text-sm text-gray-400 mb-1">
-      <strong>Archivo:</strong> {{ video_id }}.mp4
+      <strong>{{ tr("video.file_label") }}</strong> {{ video_id }}.mp4
     </p>
     <p class="text-sm text-gray-400 mb-1">
-      <strong>Fecha:</strong> {{ video.fecha or "?" }}
+      <strong>{{ tr("video.date_label") }}</strong> {{ video.fecha or "?" }}
     </p>
     <p class="text-sm text-gray-400 mb-4">
-      <strong>Personaje:</strong> {{ video.personaje or "?" }}
+      <strong>{{ tr("video.character_label") }}</strong> {{ video.personaje or "?" }}
     </p>
 
     <!-- Reproductor de video -->
     <video controls class="w-full rounded border border-yellow-500 shadow-lg">
       <source src="{{ video_url }}" type="video/mp4">
-      Tu navegador no soporta la etiqueta de video.
+      {{ tr("video.no_video_support") }}
     </video>
 
     <!-- Tags -->
@@ -41,7 +41,7 @@
     </div>
 
     <a href="{{ url_for('index') }}" class="mt-6 inline-block text-sm text-blue-300 underline">
-      ⬅ Volver al inicio
+      {{ tr("video.back_home") }}
     </a>
   </div>
 </body>

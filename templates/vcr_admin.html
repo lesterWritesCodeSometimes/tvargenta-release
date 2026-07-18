@@ -5,10 +5,10 @@
 -->
 
 <!DOCTYPE html>
-<html lang="en">
+<html lang="{{ lang }}">
 <head>
   <meta charset="UTF-8">
-  <title>VCR Tape Management - TVArgenta</title>
+  <title>{{ tr("vcr_admin.page_title") }}</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
@@ -33,11 +33,11 @@
     <header class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
       <h1 class="text-2xl sm:text-3xl text-yellow-400 font-bold flex items-center gap-3">
         <span class="text-4xl">📼</span>
-        VCR Tape Management
+        {{ tr("vcr_admin.header") }}
       </h1>
       <a href="{{ url_for('index') }}"
          class="text-blue-400 hover:underline text-sm sm:text-base whitespace-nowrap">
-        ← Back to Dashboard
+        {{ tr("vcr_admin.nav.back") }}
       </a>
     </header>
 
@@ -46,7 +46,7 @@
       <div class="flex items-center gap-3">
         <span id="reader-icon" class="text-3xl">🔌</span>
         <div>
-          <div id="reader-text" class="font-bold">Checking NFC Reader...</div>
+          <div id="reader-text" class="font-bold">{{ tr("vcr_admin.reader.checking") }}</div>
           <div id="reader-detail" class="text-sm text-gray-400"></div>
         </div>
       </div>
@@ -55,26 +55,26 @@
     <!-- Scan New Tape Section -->
     <div class="bg-gray-900 border border-blue-600 rounded-lg p-6 mb-8 shadow-lg">
       <h2 class="text-xl font-bold text-blue-400 mb-4 flex items-center gap-2">
-        <span>🔍</span> Register New Tape
+        <span>🔍</span> {{ tr("vcr_admin.register.header") }}
       </h2>
 
       <div id="scan-section">
-        <p class="text-gray-300 mb-4">Place an unregistered mini VHS tape on the NFC reader to scan it.</p>
+        <p class="text-gray-300 mb-4">{{ tr("vcr_admin.register.instructions") }}</p>
 
         <div id="scan-waiting" class="hidden">
           <div class="flex items-center gap-3 text-yellow-400 scanning">
             <span class="text-2xl">📡</span>
-            <span>Waiting for tape...</span>
+            <span>{{ tr("vcr_admin.register.waiting") }}</span>
           </div>
         </div>
 
         <div id="scan-detected" class="hidden">
           <div class="bg-green-900 border border-green-500 rounded p-4 mb-4">
             <div class="flex items-center gap-2 text-green-400 font-bold mb-2">
-              <span>✓</span> New Tape Detected!
+              <span>✓</span> {{ tr("vcr_admin.register.detected") }}
             </div>
             <div class="text-sm">
-              <span class="text-gray-400">UID:</span>
+              <span class="text-gray-400">{{ tr("vcr_admin.register.uid_label") }}</span>
               <span id="detected-uid" class="font-mono text-white"></span>
             </div>
           </div>
@@ -83,23 +83,23 @@
             <input type="hidden" id="register-uid" name="uid">
 
             <div>
-              <label class="block text-sm mb-1 text-gray-300">Select Video for this Tape:</label>
+              <label class="block text-sm mb-1 text-gray-300">{{ tr("vcr_admin.register.select_label") }}</label>
               <select id="register-video" name="video_id" required
                       class="w-full bg-gray-800 text-white px-3 py-2 rounded border border-gray-600 focus:border-blue-500">
-                <option value="">-- Select a video --</option>
+                <option value="">{{ tr("vcr_admin.register.select_placeholder") }}</option>
               </select>
             </div>
 
             <div>
-              <label class="block text-sm mb-1 text-gray-300">Custom Title (optional):</label>
+              <label class="block text-sm mb-1 text-gray-300">{{ tr("vcr_admin.register.title_label") }}</label>
               <input type="text" id="register-title" name="title"
-                     placeholder="Leave blank to use video title"
+                     placeholder="{{ tr('vcr_admin.register.title_placeholder') }}"
                      class="w-full bg-gray-800 text-white px-3 py-2 rounded border border-gray-600 focus:border-blue-500">
             </div>
 
             <button type="submit"
                     class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded transition">
-              Register Tape
+              {{ tr("vcr_admin.register.submit") }}
             </button>
           </form>
         </div>
@@ -108,21 +108,24 @@
 
     <!-- Registered Tapes List -->
     <h2 class="text-xl font-bold text-yellow-400 mb-4 flex items-center gap-2">
-      <span>📚</span> Registered Tapes
+      <span>📚</span> {{ tr("vcr_admin.tapes.header") }}
     </h2>
 
     <div id="tapes-list" class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
-      <div class="text-gray-500 italic">Loading tapes...</div>
+      <div class="text-gray-500 italic">{{ tr("vcr_admin.tapes.loading") }}</div>
     </div>
 
     <!-- Current VCR State (Debug) -->
     <details class="mt-8">
-      <summary class="text-gray-500 cursor-pointer hover:text-gray-300">Debug: VCR State</summary>
+      <summary class="text-gray-500 cursor-pointer hover:text-gray-300">{{ tr("vcr_admin.debug.summary") }}</summary>
       <pre id="vcr-state-debug" class="bg-gray-900 p-4 rounded mt-2 text-xs overflow-auto max-h-64"></pre>
     </details>
   </div>
 
   <script>
+    window.TR = {{ translations | tojson }};
+    window.tr = k => TR[k] || k;
+
     let videos = [];
     let lastUnknownUid = null;
 
@@ -145,7 +148,11 @@
         if (data.ok) {
           videos = data.videos || [];
           const select = document.getElementById('register-video');
-          select.innerHTML = '<option value="">-- Select a video --</option>';
+          const placeholder = document.createElement('option');
+          placeholder.value = '';
+          placeholder.textContent = tr('vcr_admin.register.select_placeholder');
+          select.innerHTML = '';
+          select.appendChild(placeholder);
           videos.forEach(v => {
             const opt = document.createElement('option');
             opt.value = v.video_id;
@@ -166,7 +173,7 @@
         const container = document.getElementById('tapes-list');
 
         if (!data.ok || !data.tapes || data.tapes.length === 0) {
-          container.innerHTML = '<div class="text-gray-500 italic col-span-2">No tapes registered yet. Scan a tape above to register it.</div>';
+          container.innerHTML = `<div class="text-gray-500 italic col-span-2">${tr('vcr_admin.tapes.empty')}</div>`;
           return;
         }
 
@@ -180,20 +187,20 @@
             </div>
             <div class="text-xs text-gray-400 mb-2 font-mono">${tape.uid}</div>
             <div class="text-sm text-gray-300 mb-2">
-              <span class="text-yellow-400">Video:</span> ${tape.video_title || tape.video_id}
+              <span class="text-yellow-400">${tr('vcr_admin.tapes.video_label')}</span> ${tape.video_title || tape.video_id}
             </div>
             <div class="text-sm text-gray-300 mb-3">
-              <span class="text-blue-400">Position:</span> ${formatDuration(tape.position_sec || 0)}
+              <span class="text-blue-400">${tr('vcr_admin.tapes.position_label')}</span> ${formatDuration(tape.position_sec || 0)}
               ${tape.video_duration ? ` / ${formatDuration(tape.video_duration)}` : ''}
             </div>
             <div class="flex justify-end gap-3">
               <button onclick="resetTapePosition('${tape.uid}')"
                       class="text-yellow-400 hover:underline text-sm">
-                Reset Position
+                ${tr('vcr_admin.tapes.reset_btn')}
               </button>
               <button onclick="deleteTape('${tape.uid}')"
                       class="text-red-400 hover:underline text-sm">
-                Delete
+                ${tr('vcr_admin.tapes.delete_btn')}
               </button>
             </div>
           </div>
@@ -201,7 +208,7 @@
       } catch (e) {
         console.error('Failed to load tapes:', e);
         document.getElementById('tapes-list').innerHTML =
-          '<div class="text-red-400">Error loading tapes</div>';
+          `<div class="text-red-400">${tr('vcr_admin.tapes.load_error')}</div>`;
       }
     }
 
@@ -222,30 +229,30 @@
         if (!data.ok) {
           statusEl.className = 'mb-6 p-4 rounded-lg border-2 border-red-600 bg-red-900/30';
           iconEl.textContent = '❌';
-          textEl.textContent = 'Error';
-          detailEl.textContent = data.error || 'Unknown error';
+          textEl.textContent = tr('vcr_admin.reader.error');
+          detailEl.textContent = data.error || tr('vcr_admin.reader.unknown_error');
           return;
         }
 
         if (!data.reader_attached) {
           statusEl.className = 'mb-6 p-4 rounded-lg border-2 border-gray-600 bg-gray-900/50';
           iconEl.textContent = '🔌';
-          textEl.textContent = 'NFC Reader Not Detected';
-          detailEl.textContent = 'Connect your USB NFC reader to continue';
+          textEl.textContent = tr('vcr_admin.reader.not_detected');
+          detailEl.textContent = tr('vcr_admin.reader.not_detected_detail');
           document.getElementById('scan-waiting').classList.add('hidden');
           document.getElementById('scan-detected').classList.add('hidden');
         } else if (data.tape_inserted) {
           statusEl.className = 'mb-6 p-4 rounded-lg border-2 border-green-600 bg-green-900/30';
           iconEl.textContent = '📼';
-          textEl.textContent = 'Tape Inserted';
-          detailEl.textContent = `Playing: ${data.title || data.video_id}`;
+          textEl.textContent = tr('vcr_admin.reader.tape_inserted');
+          detailEl.textContent = tr('vcr_admin.reader.playing').replace('{title}', data.title || data.video_id);
           document.getElementById('scan-waiting').classList.add('hidden');
           document.getElementById('scan-detected').classList.add('hidden');
         } else if (data.unknown_tape_uid) {
           statusEl.className = 'mb-6 p-4 rounded-lg border-2 border-yellow-600 bg-yellow-900/30';
           iconEl.textContent = '❓';
-          textEl.textContent = 'Unregistered Tape Detected';
-          detailEl.textContent = 'Register it below';
+          textEl.textContent = tr('vcr_admin.reader.unregistered');
+          detailEl.textContent = tr('vcr_admin.reader.unregistered_detail');
 
           // Show registration form
           document.getElementById('scan-waiting').classList.add('hidden');
@@ -256,8 +263,8 @@
         } else {
           statusEl.className = 'mb-6 p-4 rounded-lg border-2 border-blue-600 bg-blue-900/30';
           iconEl.textContent = '📡';
-          textEl.textContent = 'NFC Reader Ready';
-          detailEl.textContent = 'Place a tape on the reader';
+          textEl.textContent = tr('vcr_admin.reader.ready');
+          detailEl.textContent = tr('vcr_admin.reader.ready_detail');
           document.getElementById('scan-waiting').classList.remove('hidden');
           document.getElementById('scan-detected').classList.add('hidden');
         }
@@ -275,7 +282,7 @@
       const title = document.getElementById('register-title').value;
 
       if (!uid || !videoId) {
-        alert('Please select a video');
+        alert(tr('vcr_admin.alert.select_video'));
         return;
       }
 
@@ -288,22 +295,22 @@
 
         const data = await res.json();
         if (data.ok) {
-          alert('Tape registered successfully!');
+          alert(tr('vcr_admin.alert.register_ok'));
           document.getElementById('register-form').reset();
           loadTapes();
           updateReaderStatus();
         } else {
-          alert('Error: ' + (data.error || 'Unknown error'));
+          alert(tr('vcr_admin.alert.error').replace('{error}', data.error || tr('vcr_admin.reader.unknown_error')));
         }
       } catch (e) {
         console.error('Register failed:', e);
-        alert('Failed to register tape');
+        alert(tr('vcr_admin.alert.register_failed'));
       }
     });
 
     // Delete tape
     async function deleteTape(uid) {
-      if (!confirm('Are you sure you want to delete this tape mapping?')) {
+      if (!confirm(tr('vcr_admin.confirm.delete'))) {
         return;
       }
 
@@ -315,23 +322,23 @@
         if (data.ok) {
           loadTapes();
         } else {
-          alert('Error: ' + (data.error || 'Unknown error'));
+          alert(tr('vcr_admin.alert.error').replace('{error}', data.error || tr('vcr_admin.reader.unknown_error')));
         }
       } catch (e) {
         console.error('Delete failed:', e);
-        alert('Failed to delete tape');
+        alert(tr('vcr_admin.alert.delete_failed'));
       }
     }
 
     // Reset tape position
     async function resetTapePosition(uid) {
-      if (!confirm('Reset this tape to the beginning?')) {
+      if (!confirm(tr('vcr_admin.confirm.reset'))) {
         return;
       }
 
       // For now, we'd need to add an API endpoint for this
       // This is a placeholder
-      alert('Position reset not yet implemented');
+      alert(tr('vcr_admin.alert.reset_not_implemented'));
     }
 
     // Initialize

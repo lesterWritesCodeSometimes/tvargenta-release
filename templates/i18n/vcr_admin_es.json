@@ -1,0 +1,49 @@
+{
+  "vcr_admin.page_title": "Gestión de casetes VCR - TVArgenta",
+  "vcr_admin.header": "Gestión de casetes VCR",
+  "vcr_admin.nav.back": "← Volver al inicio",
+
+  "vcr_admin.reader.checking": "Verificando lector NFC...",
+  "vcr_admin.reader.error": "Error",
+  "vcr_admin.reader.unknown_error": "Error desconocido",
+  "vcr_admin.reader.not_detected": "Lector NFC no detectado",
+  "vcr_admin.reader.not_detected_detail": "Conectá el lector NFC USB para continuar",
+  "vcr_admin.reader.tape_inserted": "Casete insertado",
+  "vcr_admin.reader.playing": "Reproduciendo: {title}",
+  "vcr_admin.reader.unregistered": "Casete sin registrar detectado",
+  "vcr_admin.reader.unregistered_detail": "Registralo abajo",
+  "vcr_admin.reader.ready": "Lector NFC listo",
+  "vcr_admin.reader.ready_detail": "Colocá un casete sobre el lector",
+
+  "vcr_admin.register.header": "Registrar casete nuevo",
+  "vcr_admin.register.instructions": "Colocá un mini casete VHS sin registrar sobre el lector NFC para escanearlo.",
+  "vcr_admin.register.waiting": "Esperando casete...",
+  "vcr_admin.register.detected": "¡Casete nuevo detectado!",
+  "vcr_admin.register.uid_label": "UID:",
+  "vcr_admin.register.select_label": "Elegí el video para este casete:",
+  "vcr_admin.register.select_placeholder": "-- Elegí un video --",
+  "vcr_admin.register.title_label": "Título personalizado (opcional):",
+  "vcr_admin.register.title_placeholder": "Dejá en blanco para usar el título del video",
+  "vcr_admin.register.submit": "Registrar casete",
+
+  "vcr_admin.tapes.header": "Casetes registrados",
+  "vcr_admin.tapes.loading": "Cargando casetes...",
+  "vcr_admin.tapes.empty": "Todavía no hay casetes registrados. Escaneá un casete arriba para registrarlo.",
+  "vcr_admin.tapes.video_label": "Video:",
+  "vcr_admin.tapes.position_label": "Posición:",
+  "vcr_admin.tapes.reset_btn": "Reiniciar posición",
+  "vcr_admin.tapes.delete_btn": "Eliminar",
+  "vcr_admin.tapes.load_error": "Error al cargar los casetes",
+
+  "vcr_admin.alert.select_video": "Por favor, elegí un video",
+  "vcr_admin.alert.register_ok": "¡Casete registrado correctamente!",
+  "vcr_admin.alert.error": "Error: {error}",
+  "vcr_admin.alert.register_failed": "No se pudo registrar el casete",
+  "vcr_admin.alert.delete_failed": "No se pudo eliminar el casete",
+  "vcr_admin.alert.reset_not_implemented": "El reinicio de posición todavía no está implementado",
+
+  "vcr_admin.confirm.delete": "¿Seguro que querés eliminar este casete registrado?",
+  "vcr_admin.confirm.reset": "¿Reiniciar este casete desde el principio?",
+
+  "vcr_admin.debug.summary": "Debug: estado del VCR"
+}

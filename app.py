@@ -1059,6 +1059,11 @@ def bump_play(video_id):
 def load_metadata():
     return _read_json(METADATA_FILE, {})
 
+# Cache global usada por rutas como /video y /edit; las rutas de upload la
+# refrescan vía `global metadata`. Sin esto, /video y /edit lanzan NameError
+# hasta que otra ruta la inicialice.
+metadata = load_metadata()
+
 # Note: Directory scanning moved to metadata_daemon.py (Phase 0)
 # The daemon handles discovery of both series and commercials
 
@@ -1929,24 +1934,8 @@ def series_page():
     # Sort by display name
     series_list.sort(key=lambda s: s["display_name"].lower())
 
-    cfg = load_config_i18n()
-    lang = cfg.get("language", "es")
-    base_trans = load_translations(lang)
-
-    def tr(key, default=None):
-        keys = key.split(".")
-        val = base_trans
-        for k in keys:
-            if isinstance(val, dict):
-                val = val.get(k)
-            else:
-                return default if default else key
-        return val if val else (default if default else key)
-
     return render_template("series.html",
-                           series_list=series_list,
-                           lang=lang,
-                           tr=tr)
+                           series_list=series_list)
 
 @app.route("/series/add", methods=["POST"])
 def series_add():
@@ -2109,20 +2098,6 @@ def upload_series():
     # Check if a specific series was requested
     preselected = request.args.get("series", "")
 
-    cfg = load_config_i18n()
-    lang = cfg.get("language", "es")
-    base_trans = load_translations(lang)
-
-    def tr(key, default=None):
-        keys = key.split(".")
-        val = base_trans
-        for k in keys:
-            if isinstance(val, dict):
-                val = val.get(k)
-            else:
-                return default if default else key
-        return val if val else (default if default else key)
-
     # Get all existing video IDs for client-side duplicate detection
     metadata = load_metadata()
     existing_ids = list(metadata.keys())
@@ -2130,9 +2105,7 @@ def upload_series():
     return render_template("upload_series.html",
                            series_list=series_list,
                            preselected=preselected,
-                           existing_ids=existing_ids,
-                           lang=lang,
-                           tr=tr)
+                           existing_ids=existing_ids)
 
 @app.route("/upload/series", methods=["POST"])
 def upload_series_post():
@@ -2312,20 +2285,6 @@ def commercial_effective_channels(data):
 @app.route("/upload/commercials", methods=["GET"])
 def upload_commercials():
     """Commercial upload page."""
-    cfg = load_config_i18n()
-    lang = cfg.get("language", "es")
-    base_trans = load_translations(lang)
-
-    def tr(key, default=None):
-        keys = key.split(".")
-        val = base_trans
-        for k in keys:
-            if isinstance(val, dict):
-                val = val.get(k)
-            else:
-                return default if default else key
-        return val if val else (default if default else key)
-
     commercials = get_commercials_list()
 
     # Get all existing video IDs for client-side duplicate detection
@@ -2340,9 +2299,7 @@ def upload_commercials():
     return render_template("upload_commercials.html",
                            commercials=commercials,
                            existing_ids=existing_ids,
-                           channel_options=channel_options,
-                           lang=lang,
-                           tr=tr)
+                           channel_options=channel_options)
 
 
 @app.route("/upload/commercials", methods=["POST"])
@@ -4214,14 +4171,23 @@ def _i18n_before_request():
         
          # modo tele
         "vertele": "vertele",
-        
-        "wifi_setup": "wifi_setup"
 
-        # Si después querés i18n por página:
-        # "canales": "canales",
-        # "configuracion": "configuracion",
-        # "upload": "upload",
-        # etc.
+        "wifi_setup": "wifi_setup",
+
+        # Biblioteca / series / uploads
+        "series_page": "series",
+        "upload_series": "upload_series",
+        "upload_series_post": "upload_series",
+        "upload_commercials": "upload_commercials",
+        "upload_commercials_post": "upload_commercials",
+
+        # Video detail / editor
+        "video_detail": "video",
+        "edit_video": "edit",
+
+        # VCR
+        "vcr_admin": "vcr_admin",
+        "vcr_record": "vcr_record",
     }
 
     page = endpoint_to_page.get(request.endpoint)

@@ -1,0 +1,46 @@
+{
+  "edit.page_title": "Edit video",
+  "edit.header": "✏️ Edit video",
+
+  "edit.nav.home": "⬅ Home",
+  "edit.nav.tags": "🛠 Tags",
+
+  "edit.file_label": "File:",
+  "edit.title_label": "Title",
+  "edit.character_label": "Main character",
+  "edit.date_label": "Date",
+
+  "edit.category.header": "📁 Category",
+  "edit.category.type_label": "Content type",
+  "edit.category.tv_episode": "📺 TV Episode",
+  "edit.category.locked_note": "(locked - series video)",
+  "edit.category.tv_details": "TV Episode details",
+  "edit.category.series_label": "Series",
+  "edit.category.season_label": "Season",
+  "edit.category.episode_label": "Episode",
+  "edit.category.opt_vhs": "📼 VHS Tape",
+  "edit.category.opt_movie": "🎬 Movie",
+  "edit.category.opt_commercial": "📢 Commercial",
+  "edit.category.series_hint_pre": "To add TV Episodes, use the",
+  "edit.category.series_hint_link": "Series Upload",
+  "edit.category.series_hint_post": "feature.",
+
+  "edit.tags.header": "🏷 Tags",
+  "edit.tags.toggle": "Show/Hide",
+  "edit.tags.show": "Show",
+  "edit.tags.hide": "Hide",
+  "edit.tags.selected": "Selected",
+  "edit.tags.clear": "Clear",
+  "edit.tags.search_placeholder": "Search tag…",
+  "edit.tags.expand": "Expand groups",
+  "edit.tags.collapse": "Collapse groups",
+
+  "edit.modes.header": "🎛 Playback modes",
+  "edit.modes.all": "All",
+  "edit.modes.none": "None",
+
+  "edit.back_home": "⬅ Back to home",
+  "edit.edit_tags_link": "🛠 Edit groups and tags",
+  "edit.save": "💾 Save",
+  "edit.ready": "Ready?"
+}

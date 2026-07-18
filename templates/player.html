@@ -2448,7 +2448,7 @@ function ejecutarSeleccion() {
     if (label === tr("menu.settings")) return go("config");
 
     if (label === tr("menu.gaming")) {
-      mostrarOverlay("Entrando en Modo Juegos…");
+      mostrarOverlay("menu.gaming_entering");
       ocultarMenu();
       fetch("/api/gaming", {
         method: "POST",

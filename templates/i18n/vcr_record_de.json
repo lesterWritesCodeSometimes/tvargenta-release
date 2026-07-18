@@ -1,0 +1,29 @@
+{
+  "vcr_record.page_title": "VHS-Kassette aufnehmen - TVArgenta",
+
+  "vcr_record.initial.header": "Drücken, um die Aufnahme zu starten",
+  "vcr_record.initial.record_aria": "Aufnahme starten",
+  "vcr_record.initial.hint": "Nur .mp4-Dateien erlaubt (max. 3GB)",
+
+  "vcr_record.recording.header": "Aufnahme läuft...",
+  "vcr_record.recording.finalizing": "Wird abgeschlossen...",
+
+  "vcr_record.complete.header": "Aufnahme abgeschlossen",
+  "vcr_record.complete.detail": "Dein Video wurde auf der Kassette gespeichert.",
+
+  "vcr_record.error.header": "Aufnahme fehlgeschlagen",
+  "vcr_record.error.retry": "Erneut versuchen",
+  "vcr_record.error.only_mp4": "Nur .mp4-Dateien sind erlaubt.",
+  "vcr_record.error.too_large": "Die Datei ist zu groß. Die maximale Größe beträgt 3GB.",
+  "vcr_record.error.no_tape": "Keine Kassette erkannt. Bitte lege eine Kassette ein und versuche es erneut.",
+  "vcr_record.error.start_failed": "Aufnahme konnte nicht gestartet werden.",
+  "vcr_record.error.init_failed": "Aufnahme konnte nicht initialisiert werden: {error}",
+  "vcr_record.error.network": "Netzwerkfehler",
+  "vcr_record.error.upload_failed": "Upload fehlgeschlagen.",
+  "vcr_record.error.invalid_response": "Ungültige Serverantwort.",
+  "vcr_record.error.upload_failed_code": "Upload fehlgeschlagen ({status})",
+  "vcr_record.error.upload_failed_status": "Upload fehlgeschlagen mit Status {status}",
+  "vcr_record.error.network_check": "Netzwerkfehler. Bitte überprüfe deine Verbindung.",
+  "vcr_record.error.cancelled": "Der Upload wurde abgebrochen.",
+  "vcr_record.error.unexpected": "Ein unerwarteter Fehler ist aufgetreten."
+}

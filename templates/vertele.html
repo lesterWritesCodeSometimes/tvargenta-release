@@ -44,7 +44,7 @@
   <!-- CONTENEDOR DE VIDEO -->
   <div class="tv-wrapper w-full sm:w-4/5 md:w-2/3 lg:w-1/2 relative border-4 border-yellow-500 rounded-xl shadow-xl overflow-hidden">
     <video id="tv-video" class="w-full h-full object-contain bg-black" autoplay muted controls playsinline>
-      Tu navegador no soporta video HTML5.
+      {{ tr("vertele.video.html5_unsupported") }}
     </video>
   </div>
 
@@ -68,6 +68,9 @@
   </div>
 
   <script>
+	  window.TR = {{ translations | tojson }};
+	  window.tr = k => TR[k] || k;
+
 	  const videoEl = document.getElementById("tv-video");
 	  const infoTitle = document.getElementById("info-title");
 	  const infoTags = document.getElementById("info-tags");
@@ -98,14 +101,14 @@
 
 			infoTitle.textContent = data.title || data.video_id.replace(/_/g, " ");
 			infoTags.textContent = data.tags && data.tags.length
-			  ? `🏷️ Tags: ${data.tags.join(", ")}`
-			  : "🏷️ Sin tags";
+			  ? `${tr("vertele.video.tags_prefix")} ${data.tags.join(", ")}`
+			  : tr("vertele.video.no_tags");
 			infoScore.textContent = data.score !== undefined
-			  ? `🔢 Score: ${data.score}`
+			  ? `${tr("vertele.video.score_prefix")} ${data.score}`
 			  : "";
 		  })
 		  .catch(err => {
-			alert("No se pudo cargar el siguiente video.");
+			alert(tr("vertele.video.load_error"));
 			console.error(err);
 		  });
 	  }
@@ -130,13 +133,13 @@
 
           const btn = document.createElement("button");
           btn.textContent = `${canal.icono || "📺"} ${canal.nombre}`;
-          btn.setAttribute("aria-label", `Seleccionar canal ${canal.nombre}`);
+          btn.setAttribute("aria-label", tr("vertele.channel.select_aria").replace("{name}", canal.nombre));
           btn.className = "bg-gray-800 hover:bg-yellow-700 text-white px-4 py-2 rounded text-sm font-bold";
           btn.onclick = () => setCanalActivo(canal.id);
           canalesGrid.appendChild(btn);
         });
 
-        canalActivoLabel.textContent = `📡 Canal actual: ${data.canal_activo_nombre}`;
+        canalActivoLabel.textContent = `${tr("vertele.channel.current")} ${data.canal_activo_nombre}`;
       })
       .catch(err => {
         console.error("Error al cargar canales:", err);

@@ -8,7 +8,7 @@
 <html lang="{{ lang }}">
 <head>
   <meta charset="UTF-8">
-  <title>Upload Series Episodes</title>
+  <title>{{ tr("upload_series.page_title") }}</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
@@ -87,13 +87,13 @@
   <div class="max-w-2xl mx-auto">
     <header class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
       <h1 class="text-2xl sm:text-3xl text-purple-400 font-bold">
-        Upload Series Episodes
+        {{ tr("upload_series.header") }}
       </h1>
 
       <div class="flex items-center gap-4">
         <a href="{{ url_for('series_page') }}"
            class="text-blue-400 hover:underline text-sm sm:text-base whitespace-nowrap">
-          Back to Series
+          {{ tr("upload_series.back_series") }}
         </a>
       </div>
     </header>
@@ -101,14 +101,14 @@
     <form action="{{ url_for('upload_series') }}" method="post" enctype="multipart/form-data" id="upload-form">
       <!-- Series Selection -->
       <div class="bg-gray-800 border border-purple-600 rounded-lg p-6 mb-6">
-        <h2 class="text-lg font-bold text-purple-300 mb-4">Select Series</h2>
+        <h2 class="text-lg font-bold text-purple-300 mb-4">{{ tr("upload_series.select_title") }}</h2>
 
         {% if series_list %}
         <div class="mb-4">
-          <label class="block text-sm mb-2 text-gray-300">Choose existing series:</label>
+          <label class="block text-sm mb-2 text-gray-300">{{ tr("upload_series.choose_existing") }}</label>
           <select name="series" id="series-select"
                   class="w-full bg-gray-900 text-white px-3 py-2 rounded border border-gray-600 focus:border-purple-500 focus:outline-none">
-            <option value="">-- Select a series --</option>
+            <option value="">{{ tr("upload_series.select_placeholder") }}</option>
             {% for series in series_list %}
             <option value="{{ series.folder_name }}" {% if series.folder_name == preselected %}selected{% endif %}>
               {{ series.display_name }}
@@ -117,42 +117,42 @@
           </select>
         </div>
 
-        <div class="text-center text-gray-500 mb-4">— OR —</div>
+        <div class="text-center text-gray-500 mb-4">{{ tr("upload_series.or_divider") }}</div>
         {% endif %}
 
         <div>
-          <label class="block text-sm mb-2 text-gray-300">Create new series:</label>
+          <label class="block text-sm mb-2 text-gray-300">{{ tr("upload_series.create_new") }}</label>
           <input type="text" name="new_series" id="new-series-input"
-                 placeholder="e.g. Los Simuladores"
+                 placeholder="{{ tr('upload_series.new_placeholder') }}"
                  class="w-full bg-gray-900 text-white px-3 py-2 rounded border border-gray-600 focus:border-purple-500 focus:outline-none">
-          <p class="text-xs text-gray-500 mt-1">Leave empty to use selected series above.</p>
+          <p class="text-xs text-gray-500 mt-1">{{ tr("upload_series.new_hint") }}</p>
         </div>
       </div>
 
       <!-- File Upload -->
       <div class="bg-gray-800 border border-purple-600 rounded-lg p-6 mb-6">
-        <h2 class="text-lg font-bold text-purple-300 mb-4">Upload Episodes</h2>
+        <h2 class="text-lg font-bold text-purple-300 mb-4">{{ tr("upload_series.upload_title") }}</h2>
 
         <div id="dropzone" class="dropzone rounded-lg p-8 text-center cursor-pointer mb-4">
           <input type="file" name="videos[]" id="file-input" multiple accept=".mp4" class="hidden">
           <div class="text-4xl mb-2">📺</div>
-          <p class="text-gray-300 mb-2">Drag & drop episode files here</p>
-          <p class="text-sm text-gray-500">or click to browse</p>
-          <p class="text-xs text-gray-600 mt-2">Supported formats: S01E05.mp4, 1x05.mp4, Season1Episode5.mp4</p>
+          <p class="text-gray-300 mb-2">{{ tr("upload_series.drop_here") }}</p>
+          <p class="text-sm text-gray-500">{{ tr("upload_series.click_browse") }}</p>
+          <p class="text-xs text-gray-600 mt-2">{{ tr("upload_series.supported_formats") }}</p>
         </div>
 
         <div id="file-list" class="hidden">
-          <h3 class="text-sm font-bold text-gray-300 mb-2">Files to upload:</h3>
+          <h3 class="text-sm font-bold text-gray-300 mb-2">{{ tr("upload_series.files_to_upload") }}</h3>
           <div id="file-items"></div>
         </div>
       </div>
 
       <!-- Submit -->
       <div class="flex justify-between items-center">
-        <a href="{{ url_for('series_page') }}" id="cancel-link" class="text-blue-400 hover:underline text-sm">Cancel</a>
+        <a href="{{ url_for('series_page') }}" id="cancel-link" class="text-blue-400 hover:underline text-sm">{{ tr("upload_series.cancel") }}</a>
         <button type="button" id="submit-btn" disabled
                 class="bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-bold px-6 py-2 rounded shadow">
-          Upload Episodes
+          {{ tr("upload_series.upload_button") }}
         </button>
       </div>
 
@@ -162,6 +162,9 @@
   </div>
 
   <script>
+    window.TR = {{ translations | tojson }};
+    window.tr = k => TR[k] || k;
+
     const dropzone = document.getElementById('dropzone');
     const fileInput = document.getElementById('file-input');
     const fileList = document.getElementById('file-list');
@@ -239,7 +242,7 @@
         if (parsed) {
           parsedText = `<span class="parsed">→ S${parsed.season}E${parsed.episode}</span>`;
         } else {
-          parsedText = `<span class="parsed warning">⚠️ No S/E</span>`;
+          parsedText = `<span class="parsed warning">${tr("upload_series.no_episode_info")}</span>`;
         }
 
         item.innerHTML = `
@@ -247,7 +250,7 @@
           <div class="progress-bar"><div class="progress-fill ${isDuplicate ? 'exists' : ''}" style="width: ${isDuplicate ? '100%' : '0%'}"></div></div>
           <span class="flex-1 truncate text-sm">${file.name}</span>
           ${parsedText}
-          <span class="exists-msg ${isDuplicate ? '' : 'hidden'}">Already exists</span>
+          <span class="exists-msg ${isDuplicate ? '' : 'hidden'}">${tr("upload_series.already_exists")}</span>
           <span class="error-msg hidden"></span>
         `;
         if (isDuplicate) {
@@ -314,7 +317,7 @@
     function setUploadingState(uploading) {
       isUploading = uploading;
       submitBtn.disabled = uploading;
-      submitBtn.textContent = uploading ? 'Uploading...' : 'Upload Episodes';
+      submitBtn.textContent = uploading ? tr("upload_series.uploading_button") : tr("upload_series.upload_button");
       dropzone.style.pointerEvents = uploading ? 'none' : 'auto';
       dropzone.style.opacity = uploading ? '0.5' : '1';
       if (seriesSelect) seriesSelect.disabled = uploading;
@@ -340,7 +343,7 @@
       const newSeries = newSeriesInput.value.trim();
 
       if (!series && !newSeries) {
-        showStatus('Please select or create a series first.', 'error');
+        showStatus(tr("upload_series.select_first"), 'error');
         return;
       }
 
@@ -349,19 +352,19 @@
       const skipped = duplicateFiles.size;
 
       if (filesToUpload.length === 0) {
-        showStatus(`All ${skipped} file(s) already exist. Nothing to upload.`, 'warning');
+        showStatus(tr("upload_series.all_exist").replace("{n}", skipped), 'warning');
         return;
       }
 
       setUploadingState(true);
-      showStatus(`Uploading 0 of ${filesToUpload.length} files...`, 'info');
+      showStatus(tr("upload_series.uploading_start").replace("{n}", filesToUpload.length), 'info');
 
       let completed = 0;
       let errors = 0;
 
       for (let i = 0; i < filesToUpload.length; i++) {
         const file = filesToUpload[i];
-        showStatus(`Uploading ${i + 1} of ${filesToUpload.length}: ${file.name}`, 'info');
+        showStatus(tr("upload_series.uploading_file").replace("{i}", i + 1).replace("{n}", filesToUpload.length).replace("{file}", file.name), 'info');
 
         try {
           const result = await uploadSingleFile(file, series, newSeries);
@@ -387,19 +390,19 @@
       setUploadingState(false);
 
       if (errors === 0 && skipped === 0) {
-        showStatus(`All ${completed} file(s) uploaded successfully! Redirecting...`, 'success');
+        showStatus(tr("upload_series.all_uploaded").replace("{n}", completed), 'success');
         setTimeout(() => {
           window.location.href = "{{ url_for('series_page') }}";
         }, 1500);
       } else if (errors === 0 && completed > 0) {
-        showStatus(`${completed} uploaded, ${skipped} already existed. Redirecting...`, 'success');
+        showStatus(tr("upload_series.some_existed").replace("{completed}", completed).replace("{skipped}", skipped), 'success');
         setTimeout(() => {
           window.location.href = "{{ url_for('series_page') }}";
         }, 1500);
       } else if (errors === 0 && completed === 0) {
-        showStatus(`All ${skipped} file(s) already exist. Nothing to upload.`, 'warning');
+        showStatus(tr("upload_series.all_exist").replace("{n}", skipped), 'warning');
       } else {
-        showStatus(`${completed} uploaded, ${skipped} skipped, ${errors} failed.`, 'warning');
+        showStatus(tr("upload_series.summary_mixed").replace("{completed}", completed).replace("{skipped}", skipped).replace("{errors}", errors), 'warning');
       }
     }
 
@@ -431,18 +434,18 @@
                   resolve({ ok: true });
                 }
               } else {
-                resolve({ ok: false, error: response.error || 'Unknown error' });
+                resolve({ ok: false, error: response.error || tr("upload_series.unknown_error") });
               }
             } catch (e) {
-              resolve({ ok: false, error: 'Invalid server response' });
+              resolve({ ok: false, error: tr("upload_series.invalid_response") });
             }
           } else {
             resolve({ ok: false, error: `HTTP ${xhr.status}` });
           }
         });
 
-        xhr.addEventListener('error', () => reject(new Error('Network error')));
-        xhr.addEventListener('abort', () => reject(new Error('Aborted')));
+        xhr.addEventListener('error', () => reject(new Error(tr("upload_series.network_error"))));
+        xhr.addEventListener('abort', () => reject(new Error(tr("upload_series.aborted"))));
 
         xhr.open('POST', "{{ url_for('upload_series_post') }}");
         xhr.send(formData);

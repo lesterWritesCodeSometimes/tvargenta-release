@@ -2,23 +2,38 @@
   "canales.page_title": "📺 TVArgenta Channels",
   "canales.header": "📡 TVArgenta Channels",
 
-  "canales.card.tags_title": "🎯 Priority tags:",
   "canales.card.edit": "✏️ Edit channel",
   "canales.card.delete": "🗑️ Delete channel",
   "canales.card.rebuild_schedule": "🔄 Rebuild Schedule",
+  "canales.card.no_desc": "No description",
+  "canales.card.no_filter": "All content (no filter)",
 
-  "canales.form.title_edit": "✏️ Edit channel",
   "canales.form.title_new": "➕ Create a new channel",
 
   "canales.form.label_name": "📺 Channel name",
   "canales.form.label_desc": "📝 Description",
   "canales.form.label_icon": "🌟 Choose an icon (optional)",
   "canales.form.icon_none": "(No icon)",
-  "canales.form.label_tags": "🏷️ Priority tags (select all that apply)",
+  "canales.form.label_aliases": "Detection aliases",
+  "canales.form.label_series": "Series Filter",
 
-  "canales.form.submit_update": "💾 Update",
+  "canales.form.name_placeholder": "e.g. Retro Cartoons",
+  "canales.form.desc_placeholder": "Brief description...",
+  "canales.form.aliases_placeholder": "e.g. nick, nick jr, snick",
+  "canales.form.aliases_hint": "Comma-separated words/phrases that identify this channel in commercials (the channel name always matches).",
+  "canales.form.aliases_hint_recheck": "Saving re-checks all analyzed commercials.",
+  "canales.form.series_hint": "Select series to include, or leave empty for all content.",
+
+  "canales.form.submit_update": "💾 Save Changes",
   "canales.form.submit_create": "💾 Save channel",
-  "canales.form.cancel_edit": "❌ Cancel editing",
+  "canales.form.cancel_edit": "❌ Cancel",
 
-  "canales.nav.back_home": "⬅ Back to home"
+  "canales.create.prompt": "Create New Channel",
+  "canales.empty_hint": "Click the card above to create your first channel!",
+
+  "canales.js.confirm_delete": "Delete channel \"{name}\"?",
+  "canales.js.rebuilding": "Rebuilding...",
+  "canales.js.done": "Done!",
+  "canales.js.rebuild_error": "Error rebuilding schedule: {error}",
+  "canales.js.unknown_error": "Unknown error"
 }

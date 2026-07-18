@@ -2,23 +2,38 @@
   "canales.page_title": "📺 TVArgenta Kanäle",
   "canales.header": "📡 TVArgenta Kanäle",
 
-  "canales.card.tags_title": "🎯 Prioritäts-Tags:",
   "canales.card.edit": "✏️ Kanal bearbeiten",
   "canales.card.delete": "🗑️ Kanal löschen",
   "canales.card.rebuild_schedule": "🔄 Zeitplan neu erstellen",
+  "canales.card.no_desc": "Keine Beschreibung",
+  "canales.card.no_filter": "Alle Inhalte (kein Filter)",
 
-  "canales.form.title_edit": "✏️ Kanal bearbeiten",
   "canales.form.title_new": "➕ Neuen Kanal erstellen",
 
   "canales.form.label_name": "📺 Kanalname",
   "canales.form.label_desc": "📝 Beschreibung",
   "canales.form.label_icon": "🌟 Icon wählen (optional)",
   "canales.form.icon_none": "(Kein Icon)",
-  "canales.form.label_tags": "🏷️ Prioritäts-Tags (alle zutreffenden auswählen)",
+  "canales.form.label_aliases": "Erkennungs-Aliasse",
+  "canales.form.label_series": "Serienfilter",
 
-  "canales.form.submit_update": "💾 Aktualisieren",
+  "canales.form.name_placeholder": "z. B. Retro-Cartoons",
+  "canales.form.desc_placeholder": "Kurze Beschreibung...",
+  "canales.form.aliases_placeholder": "z. B. nick, nick jr, snick",
+  "canales.form.aliases_hint": "Kommagetrennte Wörter/Phrasen, die diesen Kanal in Werbespots identifizieren (der Kanalname passt immer).",
+  "canales.form.aliases_hint_recheck": "Beim Speichern werden alle analysierten Werbespots erneut geprüft.",
+  "canales.form.series_hint": "Wähle Serien aus, die enthalten sein sollen, oder lasse die Auswahl leer für alle Inhalte.",
+
+  "canales.form.submit_update": "💾 Änderungen speichern",
   "canales.form.submit_create": "💾 Kanal speichern",
-  "canales.form.cancel_edit": "❌ Bearbeitung abbrechen",
+  "canales.form.cancel_edit": "❌ Abbrechen",
 
-  "canales.nav.back_home": "⬅ Zur Startseite"
+  "canales.create.prompt": "Neuen Kanal erstellen",
+  "canales.empty_hint": "Klicke auf die Karte oben, um deinen ersten Kanal zu erstellen!",
+
+  "canales.js.confirm_delete": "Kanal \"{name}\" löschen?",
+  "canales.js.rebuilding": "Wird neu erstellt...",
+  "canales.js.done": "Fertig!",
+  "canales.js.rebuild_error": "Fehler beim Neuerstellen des Zeitplans: {error}",
+  "canales.js.unknown_error": "Unbekannter Fehler"
 }

@@ -8,7 +8,7 @@
 <html lang="{{ lang }}">
 <head>
   <meta charset="UTF-8">
-  <title>Upload Commercials</title>
+  <title>{{ tr("upload_commercials.title") }}</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
@@ -113,40 +113,40 @@
   <div class="max-w-4xl mx-auto">
     <header class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
       <h1 class="text-2xl sm:text-3xl text-green-400 font-bold">
-        Upload Commercials
+        {{ tr("upload_commercials.header") }}
       </h1>
 
       <div class="flex items-center gap-4">
         <a href="{{ url_for('index') }}"
            class="text-blue-400 hover:underline text-sm sm:text-base whitespace-nowrap">
-          Back to Home
+          {{ tr("upload_commercials.back_home") }}
         </a>
       </div>
     </header>
 
     <!-- Upload Section -->
     <div class="bg-gray-800 border border-green-600 rounded-lg p-6 mb-8">
-      <h2 class="text-lg font-bold text-green-300 mb-4">Upload New Commercials</h2>
+      <h2 class="text-lg font-bold text-green-300 mb-4">{{ tr("upload_commercials.upload_section") }}</h2>
 
       <div id="dropzone" class="dropzone rounded-lg p-8 text-center cursor-pointer mb-4">
         <input type="file" name="videos[]" id="file-input" multiple accept=".mp4" class="hidden">
         <div class="text-4xl mb-2">📢</div>
-        <p class="text-gray-300 mb-2">Drag & drop commercial files here</p>
-        <p class="text-sm text-gray-500">or click to browse</p>
-        <p class="text-xs text-gray-600 mt-2">Only H.264 encoded .mp4 files are accepted</p>
+        <p class="text-gray-300 mb-2">{{ tr("upload_commercials.dropzone_hint") }}</p>
+        <p class="text-sm text-gray-500">{{ tr("upload_commercials.dropzone_click") }}</p>
+        <p class="text-xs text-gray-600 mt-2">{{ tr("upload_commercials.dropzone_note") }}</p>
       </div>
 
       <div id="file-list" class="hidden">
-        <h3 class="text-sm font-bold text-gray-300 mb-2">Files to upload:</h3>
+        <h3 class="text-sm font-bold text-gray-300 mb-2">{{ tr("upload_commercials.files_to_upload") }}</h3>
         <div id="file-items"></div>
       </div>
 
       <!-- Submit -->
       <div class="flex justify-between items-center mt-4">
-        <a href="{{ url_for('index') }}" id="cancel-link" class="text-blue-400 hover:underline text-sm">Cancel</a>
+        <a href="{{ url_for('index') }}" id="cancel-link" class="text-blue-400 hover:underline text-sm">{{ tr("upload_commercials.cancel") }}</a>
         <button type="button" id="submit-btn" disabled
                 class="bg-green-600 hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-bold px-6 py-2 rounded shadow">
-          Upload Commercials
+          {{ tr("upload_commercials.submit") }}
         </button>
       </div>
 
@@ -157,14 +157,11 @@
     <!-- Existing Commercials Section -->
     <div class="mb-8">
       <div class="flex items-center justify-between mb-1">
-        <h2 class="text-xl font-bold text-green-400">Existing Commercials</h2>
-        <span class="text-sm text-gray-400">{{ commercials|length }} commercial(s)</span>
+        <h2 class="text-xl font-bold text-green-400">{{ tr("upload_commercials.existing_section") }}</h2>
+        <span class="text-sm text-gray-400">{{ tr("upload_commercials.count").replace("{n}", commercials|length|string) }}</span>
       </div>
       <p class="text-xs text-gray-500 mb-4">
-        Pick which channels each commercial can air on — no selection means it airs on all channels.
-        Amber chips are auto-detected from the commercial's audio and on-screen text; touching the
-        chips makes your selection permanent, and "↺ auto" returns to detection.
-        Changes take effect when a channel's schedule is next rebuilt.
+        {{ tr("upload_commercials.channels_help") }}
       </p>
 
       {% if commercials %}
@@ -183,7 +180,7 @@
             <div class="flex-1 min-w-0">
               <h3 class="font-semibold text-sm truncate" title="{{ comm.title }}">{{ comm.title }}</h3>
               <p class="text-xs text-gray-400 mt-1">
-                Duration: <span class="text-green-400">{{ "%.1f"|format(comm.duration) }}s</span>
+                {{ tr("upload_commercials.duration_label") }} <span class="text-green-400">{{ "%.1f"|format(comm.duration) }}s</span>
               </p>
               {% if comm.tags %}
               <div class="flex flex-wrap gap-1 mt-2">
@@ -201,16 +198,16 @@
           {% set is_auto = (not comm.channels_manual) and comm.channels %}
           <div class="mt-3 pt-3 border-t border-gray-700">
             <div class="flex items-center justify-between mb-1.5">
-              <span class="text-[10px] uppercase tracking-wider text-gray-500">Channels</span>
+              <span class="text-[10px] uppercase tracking-wider text-gray-500">{{ tr("upload_commercials.channels_label") }}</span>
               <span class="flex items-center gap-2">
                 <button type="button"
                         onclick="resetChannels('{{ comm.video_id }}')"
-                        title="Discard manual selection and use auto-detection"
+                        title="{{ tr('upload_commercials.reset_auto_title') }}"
                         class="reset-auto text-[10px] text-gray-500 hover:text-amber-400 underline {{ '' if comm.channels_manual else 'hidden' }}">
-                  ↺ auto
+                  {{ tr("upload_commercials.reset_auto") }}
                 </button>
                 <span class="channels-hint text-[10px] {{ 'text-amber-400' if is_auto else ('text-green-400' if comm.channels else 'text-gray-400') }}">
-                  {{ 'Auto-detected' if is_auto else ('Selected only' if comm.channels else 'All channels') }}
+                  {{ tr("upload_commercials.hint_auto") if is_auto else (tr("upload_commercials.hint_selected") if comm.channels else tr("upload_commercials.hint_all")) }}
                 </span>
               </span>
             </div>
@@ -230,15 +227,15 @@
           <div class="flex gap-2 mt-3 pt-3 border-t border-gray-700">
             <a href="{{ url_for('video_detail', video_id=comm.video_id) }}"
                class="flex-1 text-center text-xs bg-blue-600 hover:bg-blue-700 text-white py-1.5 rounded">
-              Preview
+              {{ tr("upload_commercials.preview") }}
             </a>
             <a href="{{ url_for('edit_video', video_id=comm.video_id) }}"
                class="flex-1 text-center text-xs bg-gray-600 hover:bg-gray-700 text-white py-1.5 rounded">
-              Edit
+              {{ tr("upload_commercials.edit") }}
             </a>
             <button onclick="deleteCommercial('{{ comm.video_id }}', '{{ comm.title }}')"
                     class="flex-1 text-center text-xs bg-red-600 hover:bg-red-700 text-white py-1.5 rounded">
-              Delete
+              {{ tr("upload_commercials.delete") }}
             </button>
           </div>
         </div>
@@ -247,14 +244,17 @@
       {% else %}
       <div class="text-center py-12 bg-gray-900/50 rounded-lg border border-gray-700">
         <div class="text-4xl mb-3">📢</div>
-        <p class="text-gray-400">No commercials uploaded yet.</p>
-        <p class="text-sm text-gray-500 mt-1">Upload your first commercial above!</p>
+        <p class="text-gray-400">{{ tr("upload_commercials.empty_title") }}</p>
+        <p class="text-sm text-gray-500 mt-1">{{ tr("upload_commercials.empty_hint") }}</p>
       </div>
       {% endif %}
     </div>
   </div>
 
   <script>
+    window.TR = {{ translations | tojson }};
+    window.tr = k => TR[k] || k;
+
     const dropzone = document.getElementById('dropzone');
     const fileInput = document.getElementById('file-input');
     const fileList = document.getElementById('file-list');
@@ -312,7 +312,7 @@
           <span class="status-icon">${isDuplicate ? '⊘' : ''}</span>
           <div class="progress-bar"><div class="progress-fill ${isDuplicate ? 'exists' : ''}" style="width: ${isDuplicate ? '100%' : '0%'}"></div></div>
           <span class="flex-1 truncate text-sm">${file.name}</span>
-          <span class="exists-msg ${isDuplicate ? '' : 'hidden'}">Already exists</span>
+          <span class="exists-msg ${isDuplicate ? '' : 'hidden'}">${tr("upload_commercials.already_exists")}</span>
           <span class="error-msg hidden"></span>
         `;
         if (isDuplicate) {
@@ -370,7 +370,7 @@
     function setUploadingState(uploading) {
       isUploading = uploading;
       submitBtn.disabled = uploading;
-      submitBtn.textContent = uploading ? 'Uploading...' : 'Upload Commercials';
+      submitBtn.textContent = uploading ? tr("upload_commercials.uploading_btn") : tr("upload_commercials.submit");
       dropzone.style.pointerEvents = uploading ? 'none' : 'auto';
       dropzone.style.opacity = uploading ? '0.5' : '1';
       cancelLink.style.pointerEvents = uploading ? 'none' : 'auto';
@@ -395,19 +395,22 @@
       const skipped = duplicateFiles.size;
 
       if (filesToUpload.length === 0) {
-        showStatus(`All ${skipped} file(s) already exist. Nothing to upload.`, 'warning');
+        showStatus(tr("upload_commercials.status_all_exist").replace("{n}", skipped), 'warning');
         return;
       }
 
       setUploadingState(true);
-      showStatus(`Uploading 0 of ${filesToUpload.length} files...`, 'info');
+      showStatus(tr("upload_commercials.status_uploading_init").replace("{total}", filesToUpload.length), 'info');
 
       let completed = 0;
       let errors = 0;
 
       for (let i = 0; i < filesToUpload.length; i++) {
         const file = filesToUpload[i];
-        showStatus(`Uploading ${i + 1} of ${filesToUpload.length}: ${file.name}`, 'info');
+        showStatus(tr("upload_commercials.status_uploading_file")
+          .replace("{i}", i + 1)
+          .replace("{total}", filesToUpload.length)
+          .replace("{name}", file.name), 'info');
 
         try {
           const result = await uploadSingleFile(file);
@@ -433,19 +436,24 @@
       setUploadingState(false);
 
       if (errors === 0 && skipped === 0) {
-        showStatus(`All ${completed} file(s) uploaded successfully! Refreshing...`, 'success');
+        showStatus(tr("upload_commercials.status_all_ok").replace("{n}", completed), 'success');
         setTimeout(() => {
           window.location.reload();
         }, 1500);
       } else if (errors === 0 && completed > 0) {
-        showStatus(`${completed} uploaded, ${skipped} already existed. Refreshing...`, 'success');
+        showStatus(tr("upload_commercials.status_some_existed")
+          .replace("{completed}", completed)
+          .replace("{skipped}", skipped), 'success');
         setTimeout(() => {
           window.location.reload();
         }, 1500);
       } else if (errors === 0 && completed === 0) {
-        showStatus(`All ${skipped} file(s) already exist. Nothing to upload.`, 'warning');
+        showStatus(tr("upload_commercials.status_all_exist").replace("{n}", skipped), 'warning');
       } else {
-        showStatus(`${completed} uploaded, ${skipped} skipped, ${errors} failed.`, 'warning');
+        showStatus(tr("upload_commercials.status_mixed")
+          .replace("{completed}", completed)
+          .replace("{skipped}", skipped)
+          .replace("{errors}", errors), 'warning');
       }
     }
 
@@ -475,18 +483,18 @@
                   resolve({ ok: true });
                 }
               } else {
-                resolve({ ok: false, error: response.error || 'Unknown error' });
+                resolve({ ok: false, error: response.error || tr("upload_commercials.err_unknown") });
               }
             } catch (e) {
-              resolve({ ok: false, error: 'Invalid server response' });
+              resolve({ ok: false, error: tr("upload_commercials.err_invalid_response") });
             }
           } else {
             resolve({ ok: false, error: `HTTP ${xhr.status}` });
           }
         });
 
-        xhr.addEventListener('error', () => reject(new Error('Network error')));
-        xhr.addEventListener('abort', () => reject(new Error('Aborted')));
+        xhr.addEventListener('error', () => reject(new Error(tr("upload_commercials.err_network"))));
+        xhr.addEventListener('abort', () => reject(new Error(tr("upload_commercials.err_aborted"))));
 
         xhr.open('POST', "{{ url_for('upload_commercials_post') }}");
         xhr.send(formData);
@@ -509,13 +517,13 @@
 
       hint.classList.remove('text-gray-400', 'text-green-400', 'text-amber-400');
       if (isAuto) {
-        hint.textContent = 'Auto-detected';
+        hint.textContent = tr("upload_commercials.hint_auto");
         hint.classList.add('text-amber-400');
       } else if (channels.length > 0) {
-        hint.textContent = 'Selected only';
+        hint.textContent = tr("upload_commercials.hint_selected");
         hint.classList.add('text-green-400');
       } else {
-        hint.textContent = 'All channels';
+        hint.textContent = tr("upload_commercials.hint_all");
         hint.classList.add('text-gray-400');
       }
     }
@@ -530,11 +538,11 @@
           body: body ? JSON.stringify(body) : undefined
         });
         const data = await response.json();
-        if (!data.ok) throw new Error(data.error || 'Save failed');
+        if (!data.ok) throw new Error(data.error || tr("upload_commercials.err_save_failed"));
         renderChannelState(videoId, data.channels, data.channels_manual);
         return true;
       } catch (err) {
-        alert(`Failed to save channels: ${err.message}`);
+        alert(tr("upload_commercials.alert_save_channels").replace("{error}", err.message));
         return false;
       } finally {
         chips.querySelectorAll('.channel-chip').forEach(b => b.classList.remove('saving'));
@@ -560,7 +568,7 @@
     }
 
     async function deleteCommercial(videoId, title) {
-      if (!confirm(`Delete commercial "${title}"?\n\nThis will remove the video file, metadata, and thumbnail.`)) {
+      if (!confirm(tr("upload_commercials.confirm_delete").replace("{title}", title))) {
         return;
       }
 
@@ -580,17 +588,17 @@
           const countSpan = document.querySelector('.text-gray-400');
           if (countSpan) {
             const remaining = document.querySelectorAll('.commercial-card').length;
-            countSpan.textContent = `${remaining} commercial(s)`;
+            countSpan.textContent = tr("upload_commercials.count").replace("{n}", remaining);
           }
           // If no more commercials, reload to show empty state
           if (document.querySelectorAll('.commercial-card').length === 0) {
             window.location.reload();
           }
         } else {
-          alert(`Failed to delete: ${data.error}`);
+          alert(tr("upload_commercials.alert_delete_failed").replace("{error}", data.error));
         }
       } catch (err) {
-        alert(`Error deleting commercial: ${err.message}`);
+        alert(tr("upload_commercials.alert_delete_error").replace("{error}", err.message));
       }
     }
 
