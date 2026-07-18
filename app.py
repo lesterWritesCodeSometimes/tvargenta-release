@@ -24,15 +24,15 @@ import random
 import logging
 from logging.handlers import RotatingFileHandler
 import math
-import base64, urllib.parse
+import urllib.parse
 import socket
 from pathlib import Path
 from settings import (
-    ROOT_DIR, APP_DIR, CONTENT_DIR, VIDEO_DIR, THUMB_DIR,
+    APP_DIR, CONTENT_DIR, VIDEO_DIR, THUMB_DIR,
     METADATA_FILE, TAGS_FILE, CONFIG_FILE, CANALES_FILE, CANAL_ACTIVO_FILE,
     SPLASH_DIR, SPLASH_STATE_FILE, INTRO_PATH, CHROME_PROFILE, CHROME_CACHE,
     PLAYS_FILE, USER, UPLOAD_STATUS, TMP_DIR, CONFIG_PATH, LOG_DIR, I18N_DIR,
-    VCR_STATE_FILE, VCR_TRIGGER_FILE, TAPES_FILE, VCR_RECORDING_STATE_FILE,
+    VCR_TRIGGER_FILE, VCR_RECORDING_STATE_FILE,
     SERIES_FILE, SERIES_VIDEO_DIR, COMMERCIALS_DIR, CHANNEL_DETECTION_CACHE_FILE,
 )
 import re
@@ -927,52 +927,6 @@ def verify_h264_codec(filepath):
         return False, "Codec verification timed out."
     except Exception as e:
         return False, f"Codec verification failed: {str(e)}"
-
-
-def analyze_loudness(filepath):
-    """
-    Analyze audio loudness of a video file using FFmpeg's ebur128 filter.
-    Returns integrated loudness in LUFS (Loudness Units relative to Full Scale).
-    Typical values: -23 LUFS (broadcast standard), -14 LUFS (streaming).
-    Louder audio = higher (closer to 0) LUFS values.
-    Returns None if analysis fails.
-    """
-    try:
-        # Use ebur128 filter to analyze loudness
-        # This outputs loudness stats to stderr
-        result = subprocess.run([
-            "ffmpeg", "-i", filepath,
-            "-af", "ebur128=framelog=verbose",
-            "-f", "null", "-"
-        ], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=300)
-
-        # Parse the integrated loudness from stderr
-        # Look for line like: "I:        -18.5 LUFS"
-        stderr = result.stderr
-        for line in stderr.split('\n'):
-            line = line.strip()
-            # Look for the summary integrated loudness line
-            if line.startswith('I:') and 'LUFS' in line:
-                # Extract the LUFS value
-                parts = line.split()
-                for i, part in enumerate(parts):
-                    if part == 'LUFS' and i > 0:
-                        try:
-                            lufs = float(parts[i-1])
-                            logger.info(f"[LOUDNESS] Analyzed {filepath}: {lufs} LUFS")
-                            return lufs
-                        except ValueError:
-                            continue
-
-        logger.warning(f"[LOUDNESS] Could not parse LUFS from ffmpeg output for {filepath}")
-        return None
-
-    except subprocess.TimeoutExpired:
-        logger.error(f"[LOUDNESS] Analysis timed out for {filepath}")
-        return None
-    except Exception as e:
-        logger.error(f"[LOUDNESS] Analysis failed for {filepath}: {e}")
-        return None
 
 
 def ensure_durations():
