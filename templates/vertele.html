@@ -51,8 +51,6 @@
   <!-- INFO DEL VIDEO -->
   <div id="video-info" class="mt-4 text-center space-y-2 text-sm text-gray-300">
     <p id="info-title" class="text-lg font-bold text-white"></p>
-    <p id="info-tags"></p>
-    <p id="info-score" class="italic text-xs text-gray-400"></p>
   </div>
 	<!-- SELECCIÓN DE CANAL -->
   <div id="canales-container" class="mb-6 text-center">
@@ -73,8 +71,6 @@
 
 	  const videoEl = document.getElementById("tv-video");
 	  const infoTitle = document.getElementById("info-title");
-	  const infoTags = document.getElementById("info-tags");
-	  const infoScore = document.getElementById("info-score");
 	  const canalActivoLabel = document.getElementById("canal-activo");
 	  const canalesGrid = document.getElementById("canales-grid");
 
@@ -100,12 +96,6 @@
 			videoEl.play();
 
 			infoTitle.textContent = data.title || data.video_id.replace(/_/g, " ");
-			infoTags.textContent = data.tags && data.tags.length
-			  ? `${tr("vertele.video.tags_prefix")} ${data.tags.join(", ")}`
-			  : tr("vertele.video.no_tags");
-			infoScore.textContent = data.score !== undefined
-			  ? `${tr("vertele.video.score_prefix")} ${data.score}`
-			  : "";
 		  })
 		  .catch(err => {
 			alert(tr("vertele.video.load_error"));

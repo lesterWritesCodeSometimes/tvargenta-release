@@ -182,16 +182,6 @@
               <p class="text-xs text-gray-400 mt-1">
                 {{ tr("upload_commercials.duration_label") }} <span class="text-green-400">{{ "%.1f"|format(comm.duration) }}s</span>
               </p>
-              {% if comm.tags %}
-              <div class="flex flex-wrap gap-1 mt-2">
-                {% for tag in comm.tags[:3] %}
-                <span class="bg-green-900 text-green-300 text-[10px] px-1.5 py-0.5 rounded">{{ tag }}</span>
-                {% endfor %}
-                {% if comm.tags|length > 3 %}
-                <span class="text-gray-500 text-[10px]">+{{ comm.tags|length - 3 }}</span>
-                {% endif %}
-              </div>
-              {% endif %}
             </div>
           </div>
           <!-- Channel assignment -->

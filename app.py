@@ -29,7 +29,7 @@ import socket
 from pathlib import Path
 from settings import (
     APP_DIR, CONTENT_DIR, VIDEO_DIR, THUMB_DIR,
-    METADATA_FILE, TAGS_FILE, CONFIG_FILE, CANALES_FILE, CANAL_ACTIVO_FILE,
+    METADATA_FILE, CONFIG_FILE, CANALES_FILE, CANAL_ACTIVO_FILE,
     SPLASH_DIR, SPLASH_STATE_FILE, INTRO_PATH, CHROME_PROFILE, CHROME_CACHE,
     USER, TMP_DIR, CONFIG_PATH, LOG_DIR, I18N_DIR,
     VCR_TRIGGER_FILE, VCR_RECORDING_STATE_FILE,
@@ -101,7 +101,7 @@ FRONT_PING_PATH = "/tmp/tvargenta_front_ping.json"
 
 CONTENT_DIR = Path(CONTENT_DIR)
 
-DEFAULT_CONFIG = {"tags_prioridad": [], "tags_incluidos": []}
+DEFAULT_CONFIG = {}
 DEFAULT_CANAL_ACTIVO = {"canal_id": "1"}
 
 
@@ -212,31 +212,13 @@ except Exception:
     pass
 
 
-# Tags y grupos por defecto
-DEFAULT_TAGS = {
-    "Personajes": {
-        "color": "#facc15",
-        "tags": ["Mirtha", "Franchella", "Menem", "Cristina", "Milei"]
-    },
-    "Temas": {
-        "color": "#3b82f6",
-        "tags": ["politica", "humor", "clasicos", "virales", "efemerides", "publicidad"]
-    },
-    "Otros": {
-        "color": "#ec4899",
-        "tags": ["Simuladores", "Simpsons", "familia", "personal", "milagros", "menemismo", "test"]
-    }
-}
-
 # Canales predefinidos (Channel 03 is a system channel, not stored here)
 DEFAULT_CANALES = {
     "Canal de Prueba": {
         "nombre": "Test",
         "descripcion": "Canal de prueba",
-        "tags_prioridad": ["test"],
-        "tags_excluidos": [],
-        "icono": "mate.png",
-        "intro_video_id": ""
+        "icono": "",
+        "series_filter": []
     }
 }
 
@@ -326,34 +308,7 @@ def save_metadata(data):
         _write_json_atomic(METADATA_FILE, data)
 
 
-def _all_tags_from_tagsfile():
-    """Devuelve el set de todos los tags definidos en tags.json."""
-    try:
-        tags_data = load_tags()  # ya la tenÃ©s definida mÃ¡s abajo
-        return {t for grupo in tags_data.values() for t in grupo.get("tags", [])}
-    except Exception:
-        return set()
-        
-def _bootstrap_config_from_tags_if_empty():
-    """
-    Si configuracion.json no tiene 'tags_incluidos', lo poblamos con TODOS los tags
-    de tags.json. Y si 'tags_prioridad' estÃ¡ vacÃ­o, lo iniciamos con el mismo orden.
-    """
-    try:
-        cfg = load_config()  # <- esta funciÃ³n ya debe estar definida al momento de llamar
-        if not cfg.get("tags_incluidos"):
-            todos = sorted(_all_tags_from_tagsfile())
-            if todos:
-                cfg["tags_incluidos"] = todos
-                if not cfg.get("tags_prioridad"):
-                    cfg["tags_prioridad"] = todos[:]
-                _write_json_atomic(CONFIG_FILE, cfg)  # ATÃ“MICO
-                logger.info(f"[BOOT] Config inicial poblada con {len(todos)} tags desde tags.json")
-    except Exception as e:
-        logger.warning(f"[BOOT] No pude poblar configuracion desde tags.json: {e}")
-
 # Semillas de JSONs (no pisan si ya existen)
-_ensure_json(TAGS_FILE,       DEFAULT_TAGS)
 _ensure_json(CONFIG_FILE,     DEFAULT_CONFIG)
 _ensure_json(CANALES_FILE,    DEFAULT_CANALES)
 _ensure_json(METADATA_FILE,   {})
@@ -697,18 +652,7 @@ def load_config():
     if os.path.exists(CONFIG_FILE):
         with open(CONFIG_FILE, "r", encoding="utf-8") as f:
             return json.load(f)
-    return {"tags_prioridad": [], "tags_incluidos": []}
-    
-# Ruta para ver y gestionar tags
-def load_tags():
-    with open(TAGS_FILE, "r", encoding="utf-8") as f:
-        return json.load(f)
-
-def save_tags(tags_data):
-    with open(TAGS_FILE, "w", encoding="utf-8") as f:
-        json.dump(tags_data, f, indent=2, ensure_ascii=False)
-
-_bootstrap_config_from_tags_if_empty()
+    return {}
 
 def _load_canal_activo_data():
     """Safely load canal_activo.json, recovering from empty/corrupt files."""
@@ -1040,7 +984,6 @@ def _ctx_gestion():
         videos=vids_ok,
         fantasmas=vids_fantasmas,
         nuevos=vids_nuevos,
-        tags=load_tags(),
         config=load_config(),
         recuerdos=get_total_recuerdos(),
         canales=load_canales(),
@@ -1087,14 +1030,12 @@ def edit_video(video_id):
 
     if request.method == "POST":
         form = request.form
-        tags = form.get("tags", "")
 
         # For series videos, category and series are locked
         if is_series_video:
             category = "tv_episode"
             video_data = {
                 "title": form.get("title"),
-                "tags": [tag.strip() for tag in tags.split(",") if tag.strip()],
                 "personaje": form.get("personaje"),
                 "fecha": form.get("fecha"),
                 "modo": form.getlist("modo"),
@@ -1111,7 +1052,6 @@ def edit_video(video_id):
             category = form.get("category", "vhs_tape")
             video_data = {
                 "title": form.get("title"),
-                "tags": [tag.strip() for tag in tags.split(",") if tag.strip()],
                 "personaje": form.get("personaje"),
                 "fecha": form.get("fecha"),
                 "modo": form.getlist("modo"),
@@ -1125,7 +1065,7 @@ def edit_video(video_id):
         # Preserve existing fields not exposed in the edit form
         if video_id in metadata:
             for key in ["duracion", "loudness_lufs", "commercials_path", "channels",
-                        "detected_channels", "detected_channels_evidence"]:
+                        "detected_channels", "detected_channels_evidence", "tags"]:
                 if key in metadata[video_id]:
                     video_data[key] = metadata[video_id][key]
 
@@ -1149,10 +1089,6 @@ def edit_video(video_id):
             "episode": None
         }
 
-    selected_tags = video.get("tags", [])
-    tags_data = load_tags()
-    tag_categoria = {tag: grupo for grupo, info in tags_data.items() for tag in info["tags"]}
-
     # For series videos, get display name
     series_name = video.get("series", "")
     series_display = series_display_name(series_name) if series_name else ""
@@ -1160,9 +1096,6 @@ def edit_video(video_id):
     return render_template("edit.html",
                        video_id=video_id,
                        video=video,
-                       selected_tags=selected_tags,
-                       tag_categoria=tag_categoria,
-                       tags=tags_data,
                        is_series_video=is_series_video,
                        series_display=series_display)
 
@@ -2091,9 +2024,7 @@ def guardar_canal():
     nombre = request.form.get("nombre", "").strip()
     descripcion = request.form.get("descripcion", "").strip()
     icono = request.form.get("icono", "").strip()
-    tags_prioridad = request.form.getlist("tags_prioridad")
     series_filter = request.form.getlist("series_filter")
-    intro = request.form.get("intro_video_id", "").strip()
     aliases_raw = request.form.get("aliases", "")
     aliases = []
     for alias in aliases_raw.split(","):
@@ -2112,21 +2043,18 @@ def guardar_canal():
         canal_id = str(max(existing_ids, default=0) + 1)
 
     # Start from the existing config so keys the form doesn't cover
-    # (e.g. min_gap_minutes) survive a save
+    # survive a save
     nuevo_canal = dict(canales.get(canal_id, {}))
     nuevo_canal.update({
         "nombre": nombre,
         "descripcion": descripcion,
         "icono": icono,
-        "tags_prioridad": tags_prioridad,
         "series_filter": series_filter,
         "aliases": aliases,
     })
-
-    # The canales form has no intro_video_id field; only set it when some
-    # caller provides one, and otherwise leave any existing value untouched
-    if intro:
-        nuevo_canal["intro_video_id"] = intro
+    # Purga claves del motor legacy por tags (retirado)
+    for stale in ("tags_prioridad", "tags_excluidos", "tags_incluidos", "intro_video_id"):
+        nuevo_canal.pop(stale, None)
 
     canales[canal_id] = nuevo_canal
     save_canales(canales)

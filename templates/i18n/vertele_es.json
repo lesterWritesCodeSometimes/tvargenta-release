@@ -1,20 +1,14 @@
 {
   "vertele.page_title": "📺 TVArgenta - Modo Tele",
   "vertele.header": "🎬 Mirando TVArgenta",
-
   "vertele.video.unsupported": "⚠️ Este canal no tiene videos compatibles.",
   "vertele.video.try_other": "Probá con otro canal o cambiá los tags.",
-  "vertele.video.no_tags": "🏷️ Sin tags",
-  "vertele.video.tags_prefix": "🏷️ Tags:",
-  "vertele.video.score_prefix": "🔢 Puntaje:",
   "vertele.video.load_error": "No se pudo cargar el siguiente video.",
   "vertele.video.html5_unsupported": "Tu navegador no soporta video HTML5.",
-
   "vertele.channel.title": "📡 Elegí un canal",
   "vertele.channel.current": "📡 Canal actual:",
   "vertele.channel.error": "No se pudo obtener la lista de canales",
   "vertele.channel.btn_next": "⏭ Siguiente",
   "vertele.channel.select_aria": "Seleccionar canal {name}",
-
   "vertele.nav.back_home": "⬅ Volver al inicio"
 }
