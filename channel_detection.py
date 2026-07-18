@@ -57,6 +57,8 @@ TESSERACT_BIN = os.environ.get("TVARGENTA_TESSERACT_BIN") or shutil.which("tesse
 
 OCR_FPS = 1          # frames per second sampled for OCR
 OCR_MAX_FRAMES = 120  # cap OCR work on unusually long commercials
+OCR_TAIL_SECONDS = 5  # closing seconds get a denser pass: end cards flash briefly
+OCR_TAIL_FPS = 5
 
 
 def _run(cmd, timeout):
@@ -178,9 +180,24 @@ def ocr_video_frames(video_path, run_cmd=_run):
         if not ok:
             return ""
 
-        for frame in sorted(Path(tmpdir).glob("frame_*.jpg")):
+        # Second, denser pass over the closing seconds: brand end cards are
+        # often on screen for under a second, which the 1fps pass straddles.
+        # -sseof seeks from the end so we don't need the duration.
+        run_cmd([
+            "ffmpeg", "-y", "-sseof", f"-{OCR_TAIL_SECONDS}", "-i", str(video_path),
+            "-vf", f"fps={OCR_TAIL_FPS},scale=960:-2",
+            "-frames:v", str(OCR_TAIL_SECONDS * OCR_TAIL_FPS),
+            str(Path(tmpdir) / "tail_%04d.jpg")
+        ], timeout=120)
+
+        frames = sorted(Path(tmpdir).glob("frame_*.jpg")) + \
+                 sorted(Path(tmpdir).glob("tail_*.jpg"))
+        for frame in frames:
+            # --psm 6 ("assume a block of text"): the default full-page layout
+            # analysis finds no text blocks in busy video frames and returns
+            # nothing, even for a screen-filling logo.
             stdout, _, ok = run_cmd(
-                [TESSERACT_BIN, str(frame), "stdout"], timeout=60
+                [TESSERACT_BIN, str(frame), "stdout", "--psm", "6"], timeout=60
             )
             if ok and stdout.strip():
                 key = normalize_text(stdout)
