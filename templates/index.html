@@ -1171,8 +1171,12 @@
         return `
         <div class="content-card rounded-lg p-3" id="commercial-${c.video_id}">
           <div class="flex gap-2 mb-2">
-            <img src="/thumbnails/${c.video_id}.jpg" onerror="this.src='/thumbnails/default_thumbnail.png'"
-                 class="w-14 h-14 object-cover rounded border border-gray-600">
+            <div class="comm-thumb cursor-pointer flex-shrink-0" data-video-id="${c.video_id}"
+                 title="${c.title} — ${tr("index.commercials.tap_preview")}"
+                 onclick="toggleCommPreview(this)">
+              <img src="/thumbnails/${c.video_id}.jpg" onerror="this.src='/thumbnails/default_thumbnail.png'"
+                   class="w-14 h-14 object-cover rounded border border-gray-600">
+            </div>
             <div class="flex-1 min-w-0">
               <h4 class="font-semibold text-xs truncate text-white">${c.title}</h4>
               <p class="text-xs text-gray-400">${formatDuration(c.duration)}</p>
@@ -1205,6 +1209,42 @@
     if (!confirm(tr("index.commercials.confirm_delete"))) return;
     await fetch(`/api/commercials/${videoId}`, { method: 'DELETE' });
     loadCommercials();
+  }
+
+  // --- Inline commercial preview on the cards ---
+  let activeCommPreview = null;
+
+  function toggleCommPreview(tile) {
+    if (tile.classList.contains('playing')) { stopCommPreview(tile); return; }
+    if (activeCommPreview) stopCommPreview(activeCommPreview);
+    activeCommPreview = tile;
+    tile.classList.add('playing');
+
+    const vid = document.createElement('video');
+    vid.src = `/videos/commercials/${tile.dataset.videoId}.mp4`;
+    vid.autoplay = true;
+    vid.playsInline = true;
+    vid.className = 'w-44 max-w-full h-auto rounded border border-gray-600 block';
+    vid.addEventListener('ended', () => stopCommPreview(tile));
+    vid.addEventListener('error', () => stopCommPreview(tile));
+
+    tile.querySelector('img').style.display = 'none';
+    tile.appendChild(vid);
+    vid.play().catch(() => {});
+  }
+
+  function stopCommPreview(tile) {
+    tile.classList.remove('playing');
+    tile.querySelectorAll('video').forEach(v => {
+      // liberar el pipeline de media antes de sacar el nodo (evita fugas en el Pi)
+      v.pause();
+      v.removeAttribute('src');
+      v.load();
+      v.remove();
+    });
+    const img = tile.querySelector('img');
+    if (img) img.style.display = '';
+    if (activeCommPreview === tile) activeCommPreview = null;
   }
 
   // --- Channel earmarking (auto-detected vs manual override) ---

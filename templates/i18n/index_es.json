@@ -94,5 +94,6 @@
   "index.commercials.reset_auto": "↺ auto",
   "index.commercials.reset_auto_title": "Borrar la selección manual y volver a la detección automática",
   "index.commercials.err_save_failed": "No se pudo guardar",
-  "index.commercials.alert_save_channels": "Error al guardar los canales: {error}"
+  "index.commercials.alert_save_channels": "Error al guardar los canales: {error}",
+  "index.commercials.tap_preview": "tocá para ver una vista previa"
 }

@@ -94,5 +94,6 @@
   "index.commercials.reset_auto": "↺ auto",
   "index.commercials.reset_auto_title": "Manuelle Auswahl löschen und zur automatischen Erkennung zurückkehren",
   "index.commercials.err_save_failed": "Speichern fehlgeschlagen",
-  "index.commercials.alert_save_channels": "Fehler beim Speichern der Kanäle: {error}"
+  "index.commercials.alert_save_channels": "Fehler beim Speichern der Kanäle: {error}",
+  "index.commercials.tap_preview": "zum Ansehen antippen"
 }

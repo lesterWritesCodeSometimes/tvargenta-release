@@ -94,5 +94,6 @@
   "index.commercials.reset_auto": "↺ auto",
   "index.commercials.reset_auto_title": "Clear manual selection and return to auto-detection",
   "index.commercials.err_save_failed": "Save failed",
-  "index.commercials.alert_save_channels": "Error saving channels: {error}"
+  "index.commercials.alert_save_channels": "Error saving channels: {error}",
+  "index.commercials.tap_preview": "tap to preview"
 }
