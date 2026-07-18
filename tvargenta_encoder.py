@@ -3,6 +3,7 @@ import os
 import subprocess
 import time
 import json
+import urllib.request
 from pathlib import Path
 from player_utils import cambiar_canal
 
@@ -24,10 +25,19 @@ VCR_CHANNEL_ID = "03"  # Channel 3 is VCR input
 VCR_TAP_THRESHOLD = 0.4  # Seconds - releases before this are "tap" (pause/play)
 VCR_REWIND_HOLD_SECONDS = 3.0  # Hold button for 3 seconds to start rewind
 
+# --- Press del boton (modo normal) ---
+# Tap corto (suelta antes del umbral, sin giro) = power toggle (standby CRT)
+# Press largo sin giro = abre el menu (se dispara al cumplir el umbral, aun apretado)
+# Press + giro = volumen (en cualquier momento del press)
+MENU_HOLD_SECONDS = 0.7
+POWER_API_URL = "http://127.0.0.1:5000/api/power"
+
 estado = "idle"          # idle | evaluando | volume | vcr_hold
 hubo_giro = False
 ultimo_estado = "idle"
 last_volume_activity = 0.0
+btn_press_time = 0.0     # When button was pressed in normal mode
+menu_open_at_press = False  # Menu state captured at BTN_PRESS
 
 # VCR-specific state
 vcr_btn_press_time = 0.0  # When button was pressed on VCR channel
@@ -133,6 +143,22 @@ def trigger_menu_select():
     except Exception as e:
         print(f"[{ts()}] [MENU] Error SELECT: {e}")
 
+def trigger_power_toggle():
+    """Tap corto: alterna standby suave via /api/power (tambien despierta la TV)."""
+    try:
+        req = urllib.request.Request(
+            POWER_API_URL,
+            data=json.dumps({"action": "toggle"}).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(req, timeout=2) as resp:
+            data = json.load(resp)
+        print(f"[{ts()}] [POWER] Toggle -> {'ON' if data.get('on') else 'STANDBY'}")
+    except Exception as e:
+        print(f"[{ts()}] [POWER] Error al alternar power: {e}")
+
+
 def trigger_next_video():
     # Tocar el trigger de reload para que el front pida /api/next_video
     try:
@@ -236,6 +262,14 @@ if __name__ == "__main__":
                 last_volume_activity = 0.0
                 print(f"[{ts()}] [ENCODER] Volume timeout -> volvemos a {estado}")
 
+            # --- Menu hold watchdog: press largo sin giro abre el menu ---
+            if estado == "evaluando" and not menu_open_at_press and btn_press_time > 0:
+                if (time.time() - btn_press_time) >= MENU_HOLD_SECONDS:
+                    trigger_menu()
+                    btn_press_time = 0.0
+                    estado = "idle"
+                    print(f"[{ts()}] [ENCODER] Hold {MENU_HOLD_SECONDS}s sin giro -> Menu. Estado=idle")
+
             # --- VCR hold watchdog: update countdown while button held ---
             if estado == "vcr_hold" and vcr_btn_press_time > 0:
                 elapsed = time.time() - vcr_btn_press_time
@@ -295,6 +329,7 @@ if __name__ == "__main__":
                     # Se estaba apretando: si gira, esto es volumen
                     estado = "volume"
                     hubo_giro = True
+                    btn_press_time = 0.0  # cancela el hold para menu
                     last_volume_activity = time.time()
                     print(f"[{ts()}] [ENCODER] Gesto = volumen (entrando a modo volume)")
 
@@ -334,6 +369,8 @@ if __name__ == "__main__":
                         ultimo_estado = estado
                         estado = "evaluando"
                         hubo_giro = False
+                        btn_press_time = time.time()
+                        menu_open_at_press = menu_is_open()
                         print(f"[{ts()}] [ENCODER] Entrando en modo evaluando (BTN_PRESS)")
 
             # --- Boton: flanco descendente (solto) ---
@@ -364,15 +401,17 @@ if __name__ == "__main__":
                     estado = "idle"
 
                 elif estado == "evaluando":
+                    btn_press_time = 0.0
                     if not hubo_giro:
-                        if menu_is_open():
+                        if menu_open_at_press or menu_is_open():
                             trigger_menu_select()
                             estado = "idle"
                             print(f"[{ts()}] [ENCODER] Select en menu. Estado=idle")
                         else:
-                            trigger_menu()
+                            # Tap corto sin giro, sin menu: power toggle (standby)
+                            trigger_power_toggle()
                             estado = "idle"
-                            print(f"[{ts()}] [ENCODER] Evaluando->Menu toggle. Estado=idle")
+                            print(f"[{ts()}] [ENCODER] Tap corto -> Power toggle. Estado=idle")
                     else:
                         estado = ultimo_estado
                         hubo_giro = False
