@@ -33,5 +33,7 @@
   "canales.commercials.legend_auto": "detectadas",
   "canales.commercials.legend_manual": "manuales",
   "canales.commercials.empty": "Todavía no hay publicidades asignadas — los alias de arriba alimentan la detección automática, o asigná manualmente desde la Biblioteca.",
-  "canales.commercials.general_count": "+{n} publicidad(es) generales también salen acá (sin restricción de canal)"
+  "canales.commercials.general_count": "+{n} publicidad(es) generales también salen acá (sin restricción de canal)",
+  "canales.commercials.tap_preview": "tocá para ver una vista previa",
+  "canales.commercials.open_library": "Abrir en la Biblioteca"
 }

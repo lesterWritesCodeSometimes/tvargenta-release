@@ -33,5 +33,7 @@
   "canales.commercials.legend_auto": "erkannt",
   "canales.commercials.legend_manual": "manuell",
   "canales.commercials.empty": "Noch keine Werbespots zugeordnet — die Aliase oben steuern die automatische Erkennung, oder ordne sie manuell über die Bibliothek zu.",
-  "canales.commercials.general_count": "+{n} allgemeine(r) Werbespot(s) laufen ebenfalls hier (ohne Kanalbeschränkung)"
+  "canales.commercials.general_count": "+{n} allgemeine(r) Werbespot(s) laufen ebenfalls hier (ohne Kanalbeschränkung)",
+  "canales.commercials.tap_preview": "zum Ansehen antippen",
+  "canales.commercials.open_library": "In der Bibliothek öffnen"
 }

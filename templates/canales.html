@@ -157,12 +157,14 @@
               {% if strip %}
               <div class="flex flex-wrap gap-1.5">
                 {% for comm in strip %}
-                <a href="{{ url_for('index') }}#commercial-{{ comm.video_id }}" title="{{ comm.title }}"
-                   class="block rounded border-2 {{ 'border-green-400' if comm.manual else 'border-amber-400' }} hover:opacity-80">
+                <div class="comm-thumb relative rounded border-2 cursor-pointer {{ 'border-green-400' if comm.manual else 'border-amber-400' }} hover:opacity-80"
+                     data-video-id="{{ comm.video_id }}"
+                     title="{{ comm.title }} — {{ tr('canales.commercials.tap_preview') }}"
+                     onclick="toggleCommPreview(this)">
                   <img src="{{ url_for('serve_thumbnail', filename=comm.video_id + '.jpg') }}"
                        onerror="this.onerror=null;this.src='{{ url_for('serve_thumbnail', filename='default_thumbnail.png') }}';"
                        class="w-12 h-12 object-cover rounded-sm" alt="{{ comm.title }}">
-                </a>
+                </div>
                 {% endfor %}
               </div>
               {% else %}
@@ -282,6 +284,51 @@
 {% endblock %}
 
 {% block extra_scripts %}
+  // --- Inline commercial preview on the channel strips ---
+  let activeCommPreview = null;
+
+  function toggleCommPreview(tile) {
+    if (tile.classList.contains('playing')) { stopCommPreview(tile); return; }
+    if (activeCommPreview) stopCommPreview(activeCommPreview);
+    activeCommPreview = tile;
+    tile.classList.add('playing');
+
+    const vid = document.createElement('video');
+    vid.src = `/videos/commercials/${tile.dataset.videoId}.mp4`;
+    vid.autoplay = true;
+    vid.playsInline = true;
+    vid.className = 'w-44 max-w-full h-auto rounded-sm block';
+    vid.addEventListener('ended', () => stopCommPreview(tile));
+    vid.addEventListener('error', () => stopCommPreview(tile));
+
+    const open = document.createElement('a');
+    open.href = `{{ url_for('index') }}#commercial-${tile.dataset.videoId}`;
+    open.textContent = '↗';
+    open.title = tr('canales.commercials.open_library');
+    open.className = 'comm-thumb-open absolute top-0.5 right-0.5 text-[11px] leading-none bg-black/70 text-white rounded px-1 py-0.5 hover:bg-black';
+    open.addEventListener('click', e => e.stopPropagation());
+
+    tile.querySelector('img').style.display = 'none';
+    tile.appendChild(vid);
+    tile.appendChild(open);
+    vid.play().catch(() => {});
+  }
+
+  function stopCommPreview(tile) {
+    tile.classList.remove('playing');
+    tile.querySelectorAll('video').forEach(v => {
+      // liberar el pipeline de media antes de sacar el nodo (evita fugas en el Pi)
+      v.pause();
+      v.removeAttribute('src');
+      v.load();
+      v.remove();
+    });
+    tile.querySelectorAll('.comm-thumb-open').forEach(el => el.remove());
+    const img = tile.querySelector('img');
+    if (img) img.style.display = '';
+    if (activeCommPreview === tile) activeCommPreview = null;
+  }
+
   let expandedCard = null;
 
   function toggleCard(cardId, event) {

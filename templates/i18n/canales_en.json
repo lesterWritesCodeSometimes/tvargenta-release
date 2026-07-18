@@ -33,5 +33,7 @@
   "canales.commercials.legend_auto": "detected",
   "canales.commercials.legend_manual": "manual",
   "canales.commercials.empty": "No commercials assigned yet — aliases above drive auto-detection, or assign manually from the Library.",
-  "canales.commercials.general_count": "+{n} general commercial(s) also air here (no channel restriction)"
+  "canales.commercials.general_count": "+{n} general commercial(s) also air here (no channel restriction)",
+  "canales.commercials.tap_preview": "tap to preview",
+  "canales.commercials.open_library": "Open in Library"
 }
