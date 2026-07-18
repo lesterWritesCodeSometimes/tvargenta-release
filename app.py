@@ -1218,10 +1218,6 @@ def edit_video(video_id):
                        is_series_video=is_series_video,
                        series_display=series_display)
 
-@app.route("/api/videos")
-def api_videos():
-    return jsonify(metadata)
-
 @app.route("/thumbnails/<filename>")
 def serve_thumbnail(filename):
     return send_from_directory(os.path.join(CONTENT_DIR, "thumbnails"), filename)
@@ -1249,33 +1245,6 @@ def serve_commercial_video(filename):
     """Serve commercial video files."""
     return send_from_directory(str(COMMERCIALS_DIR), filename)
 
-
-@app.route("/delete_full/<video_id>")
-def delete_full_video(video_id):
-    # Check if it's a series video
-    vid_info = metadata.get(video_id, {})
-    series_path = vid_info.get("series_path")
-    if series_path:
-        video_path = str(VIDEO_DIR / f"{series_path}.mp4")
-    else:
-        video_path = os.path.join(VIDEO_DIR, video_id + ".mp4")
-    if os.path.exists(video_path):
-        os.remove(video_path)
-        print(f"ðŸ§¨ Video eliminado: {video_path}")
-    else:
-        print(f"âš ï¸ Video no encontrado para: {video_id}")
-
-    thumbnail_path = os.path.join(CONTENT_DIR, "thumbnails", video_id + ".jpg")
-    if os.path.exists(thumbnail_path):
-        os.remove(thumbnail_path)
-        print(f"ðŸ§¹ Thumbnail eliminado: {thumbnail_path}")
-
-    if video_id in metadata:
-        del metadata[video_id]
-        save_metadata(metadata)
-        print(f"âœ… Metadata eliminada: {video_id}")
-
-    return redirect(url_for("index"))
 
 @app.route("/delete/<video_id>")
 def delete_video_metadata(video_id):
@@ -2424,11 +2393,6 @@ def eliminar_canal(canal_id):
         rematch_commercial_channels()
     return redirect(url_for("canales"))
 
-@app.route("/editar_canal/<canal_id>")
-def editar_canal(canal_id):
-    # Editing is now inline, redirect to main channels page
-    return redirect(url_for("canales"))
-
 @app.route("/api/set_canal_activo", methods=["POST"])
 def api_set_canal_activo():
     data = request.get_json()
@@ -2748,11 +2712,6 @@ def api_clear_intro():
     return jsonify({"ok": True})
 
 
-@app.route("/static-intro.mp4")
-def intro_video():
-    return send_file(INTRO_PATH, mimetype="video/mp4")
-
-
 @app.route("/api/boot_probe", methods=["POST", "GET"])
 def api_boot_probe():
     # Primer latido apenas carga splash.html (o player.html)
@@ -2802,10 +2761,6 @@ def index():
     return redirect(url_for("gestion"))
 
 # (Opcional) atajo cÃ³modo
-@app.route("/admin")
-def admin():
-    return redirect(url_for("gestion"))
-    
     
 # --- Power control (soft standby estilo CRT, no apaga el equipo) ---
 # Backlight del display DSI: escribible por el grupo video, sin sudo
@@ -3835,7 +3790,6 @@ def _i18n_before_request():
 
          # Canales
         "canales": "canales",
-        "editar_canal": "canales",
         "guardar_canal": "canales",
         "eliminar_canal": "canales",
         
