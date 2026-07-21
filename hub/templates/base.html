@@ -1,0 +1,77 @@
+<!-- SPDX-License-Identifier: LicenseRef-TVArgenta-NC-Attribution-Consult-First
+     Proyecto: TVArgenta — Retro TV | Autor: Ricardo Sappia (rsflightronics@gmail.com)
+     © 2025. No comercial, atribución y consulta previa. TAL CUAL, sin garantías.
+     Ver LICENSE para términos completos.
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>{% block title %}TVArgenta Hub{% endblock %}</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    .crt-scanlines {
+      background-image: repeating-linear-gradient(
+        to bottom,
+        rgba(255,255,255,0.10) 0px,
+        rgba(255,255,255,0.10) 1px,
+        rgba(0,0,0,0.04) 2px
+      );
+      opacity: .10;
+      pointer-events: none;
+    }
+    .card {
+      background: rgba(17,24,39,.55);
+      backdrop-filter: blur(2px);
+    }
+    .nav-link {
+      padding: 0.5rem 1rem;
+      border-radius: 0.375rem;
+      font-weight: 600;
+      font-size: 0.875rem;
+      transition: all 0.2s;
+    }
+    .nav-link:hover { background: rgba(255,255,255,0.1); }
+    .nav-link.active {
+      background: rgba(59,130,246,0.25);
+      color: #93c5fd;
+    }
+    {% block extra_styles %}{% endblock %}
+  </style>
+</head>
+<body class="relative bg-black text-white min-h-screen font-mono overflow-x-hidden">
+  <div class="fixed inset-0 bg-black z-0">
+    <div class="absolute inset-0 bg-gradient-to-b from-[#0a0a0a] via-[#0e1117] to-[#001a2e]"></div>
+    <div class="absolute inset-0 crt-scanlines" style="z-index:2"></div>
+  </div>
+
+  <div class="relative z-10 max-w-screen-xl mx-auto py-6 sm:py-8 px-3 sm:px-4">
+    <div class="flex items-center justify-center gap-3 mb-4">
+      <h1 class="text-2xl sm:text-3xl font-bold tracking-widest text-blue-300">
+        TVArgenta <span class="text-white">HUB</span>
+      </h1>
+    </div>
+
+    {% if session.get('logged_in') %}
+    <nav class="flex flex-wrap justify-center items-center gap-2 mb-6 sm:mb-8">
+      <a href="{{ url_for('library') }}" class="nav-link text-gray-300 {% if active_page == 'library' %}active{% endif %}">Library</a>
+      <a href="{{ url_for('channels') }}" class="nav-link text-gray-300 {% if active_page == 'channels' %}active{% endif %}">Channels</a>
+      <a href="{{ url_for('devices') }}" class="nav-link text-gray-300 {% if active_page == 'devices' %}active{% endif %}">Devices</a>
+      <a href="{{ url_for('tokens') }}" class="nav-link text-gray-300 {% if active_page == 'tokens' %}active{% endif %}">Tokens</a>
+      <form method="post" action="{{ url_for('logout') }}" class="inline">
+        <button class="nav-link text-gray-500 hover:text-gray-300">Logout</button>
+      </form>
+    </nav>
+    {% endif %}
+
+    {% with messages = get_flashed_messages() %}
+      {% for msg in messages %}
+        <div class="card rounded p-3 mb-4 border border-yellow-600 text-yellow-300 text-sm">{{ msg }}</div>
+      {% endfor %}
+    {% endwith %}
+
+    {% block content %}{% endblock %}
+  </div>
+</body>
+</html>

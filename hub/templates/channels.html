@@ -1,0 +1,46 @@
+<!-- SPDX-License-Identifier: LicenseRef-TVArgenta-NC-Attribution-Consult-First
+     Proyecto: TVArgenta — Retro TV | Autor: Ricardo Sappia (rsflightronics@gmail.com)
+     © 2025. No comercial, atribución y consulta previa. TAL CUAL, sin garantías.
+     Ver LICENSE para términos completos.
+-->
+{% extends "base.html" %}
+{% block title %}Channels — TVArgenta Hub{% endblock %}
+{% block content %}
+<div class="flex items-center justify-between mb-4">
+  <h2 class="text-lg font-bold">Lineup global <span class="text-xs text-gray-400">v{{ version }}</span></h2>
+  <span class="text-xs text-gray-500">Edición desde el hub llega en fase 2 — por ahora solo lectura</span>
+</div>
+
+{% if channels %}
+<div class="space-y-3">
+  {% for num, ch in channels %}
+  <div class="card rounded-lg p-4 flex flex-wrap gap-4 items-start">
+    <div class="text-3xl font-bold text-blue-300 w-12 text-center shrink-0">{{ num }}</div>
+    <div class="flex-1 min-w-48">
+      <div class="font-bold">{{ ch.nombre }}</div>
+      {% if ch.descripcion %}<div class="text-xs text-gray-400">{{ ch.descripcion }}</div>{% endif %}
+      {% if ch.aliases %}
+      <div class="text-[10px] text-gray-500 mt-1">aliases: {{ ch.aliases | join(", ") }}</div>
+      {% endif %}
+    </div>
+    <div class="text-xs text-gray-300 min-w-48">
+      {% if ch.series_filter %}
+        {% for s in ch.series_filter %}
+        <span class="inline-block bg-gray-800 rounded px-1.5 py-0.5 m-0.5">{{ s.replace("_", " ") }}</span>
+        {% endfor %}
+      {% endif %}
+      {% if ch.tags_prioridad %}
+        {% for t in ch.tags_prioridad %}
+        <span class="inline-block bg-blue-900 rounded px-1.5 py-0.5 m-0.5">#{{ t }}</span>
+        {% endfor %}
+      {% endif %}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="text-center text-gray-500 py-12">
+  Sin lineup — impórtalo con <code>manage.py import-channels</code>.
+</div>
+{% endif %}
+{% endblock %}

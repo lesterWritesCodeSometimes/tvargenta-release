@@ -1,0 +1,48 @@
+<!-- SPDX-License-Identifier: LicenseRef-TVArgenta-NC-Attribution-Consult-First
+     Proyecto: TVArgenta — Retro TV | Autor: Ricardo Sappia (rsflightronics@gmail.com)
+     © 2025. No comercial, atribución y consulta previa. TAL CUAL, sin garantías.
+     Ver LICENSE para términos completos.
+-->
+{% extends "base.html" %}
+{% block title %}Library — TVArgenta Hub{% endblock %}
+{% block content %}
+<form method="get" class="flex flex-wrap gap-2 mb-4 items-center justify-center">
+  <input type="text" name="q" value="{{ query }}" placeholder="Buscar…"
+         class="rounded bg-gray-900 border border-gray-700 px-3 py-1.5 text-sm text-white w-64 focus:outline-none focus:border-blue-500">
+  <select name="category" onchange="this.form.submit()"
+          class="rounded bg-gray-900 border border-gray-700 px-2 py-1.5 text-sm text-white">
+    <option value="">Todas las categorías</option>
+    {% for c in categories %}
+    <option value="{{ c }}" {{ 'selected' if c == category else '' }}>{{ c }}</option>
+    {% endfor %}
+  </select>
+  <button class="rounded bg-blue-600 hover:bg-blue-700 px-3 py-1.5 text-sm font-bold">Filtrar</button>
+  <span class="text-xs text-gray-400 ml-2">{{ items | length }} títulos · {{ total_bytes | human_bytes }}</span>
+</form>
+
+<div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+  {% for item in items %}
+  <div class="card rounded-lg overflow-hidden">
+    <div class="aspect-video bg-gray-900 flex items-center justify-center">
+      {% if item.thumb %}
+      <img src="{{ url_for('thumb', filename=item.thumb) }}" alt="" loading="lazy"
+           class="w-full h-full object-cover">
+      {% else %}
+      <span class="text-gray-600 text-3xl">▮▶</span>
+      {% endif %}
+    </div>
+    <div class="p-2">
+      <div class="text-xs font-bold truncate" title="{{ item.title }}">{{ item.title }}</div>
+      <div class="text-[10px] text-gray-400 flex justify-between mt-1">
+        <span class="truncate">{{ item.series or item.category }}</span>
+        <span class="shrink-0 ml-1">{{ item.size | human_bytes }}</span>
+      </div>
+    </div>
+  </div>
+  {% else %}
+  <div class="col-span-full text-center text-gray-500 py-12">
+    La biblioteca está vacía — corre el seed o sube contenido con la CLI.
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}
